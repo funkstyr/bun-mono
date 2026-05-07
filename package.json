@@ -1,0 +1,67 @@
+{
+  "name": "bun-mono",
+  "private": true,
+  "workspaces": {
+    "packages": [
+      "apps/*",
+      "packages/*"
+    ],
+    "catalog": {
+      "dotenv": "^17.4.2",
+      "zod": "^4.3.6",
+      "typescript": "^6.0.3",
+      "@types/bun": "^1.3.13",
+      "hono": "^4.12.15",
+      "@orpc/server": "^1.14.0",
+      "@orpc/openapi": "^1.14.0",
+      "@orpc/zod": "^1.14.0",
+      "better-auth": "^1.6.9",
+      "react": "^19.2.5",
+      "ai": "^6.0.168",
+      "effect": "^3.21.2",
+      "@effect/schema": "^0.75.5",
+      "@effect/platform": "^0.96.1",
+      "arktype": "^2.2.0",
+      "@types/react": "^19.2.14",
+      "@effect/vitest": "^0.29.0",
+      "vitest": "^4.1.5",
+      "@vitest/ui": "^4.1.5",
+      "@vitest/coverage-v8": "^4.1.5",
+      "jsdom": "^29.1.0",
+      "@playwright/test": "^1.59.1",
+      "playwright": "^1.59.1",
+      "@libsql/client": "^0.17.3",
+      "libsql": "^0.5.29",
+      "@orpc/client": "^1.14.0"
+    }
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "check-types": "turbo check-types",
+    "dev:native": "turbo -F native dev",
+    "dev:web": "turbo -F web dev",
+    "dev:server": "turbo -F server dev",
+    "db:push": "turbo -F @bun-mono/db db:push",
+    "db:studio": "turbo -F @bun-mono/db db:studio",
+    "db:generate": "turbo -F @bun-mono/db db:generate",
+    "db:migrate": "turbo -F @bun-mono/db db:migrate",
+    "db:local": "turbo -F @bun-mono/db db:local",
+    "check": "oxlint && oxfmt --write"
+  },
+  "dependencies": {
+    "@bun-mono/env": "workspace:*",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@bun-mono/config": "workspace:*",
+    "@types/bun": "catalog:",
+    "oxfmt": "^0.48.0",
+    "oxlint": "^1.63.0",
+    "turbo": "^2.9.9",
+    "typescript": "catalog:"
+  },
+  "packageManager": "bun@1.3.13"
+}

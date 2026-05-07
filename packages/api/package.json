@@ -1,0 +1,39 @@
+{
+  "name": "@bun-mono/api",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@bun-mono/auth": "workspace:*",
+    "@bun-mono/db": "workspace:*",
+    "@bun-mono/env": "workspace:*",
+    "@effect/schema": "catalog:",
+    "@orpc/client": "catalog:",
+    "@orpc/openapi": "catalog:",
+    "@orpc/server": "catalog:",
+    "@orpc/zod": "catalog:",
+    "arktype": "catalog:",
+    "dotenv": "catalog:",
+    "effect": "catalog:",
+    "hono": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@bun-mono/config": "workspace:*",
+    "@effect/vitest": "catalog:",
+    "@playwright/test": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "@vitest/ui": "catalog:",
+    "jsdom": "catalog:",
+    "playwright": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

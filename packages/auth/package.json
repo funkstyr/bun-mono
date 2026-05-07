@@ -1,0 +1,27 @@
+{
+  "name": "@bun-mono/auth",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@better-auth/drizzle-adapter": "^1.6.9",
+    "@bun-mono/db": "workspace:*",
+    "@bun-mono/env": "workspace:*",
+    "better-auth": "catalog:",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@bun-mono/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}
