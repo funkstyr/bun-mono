@@ -3,6 +3,11 @@ import * as schema from "@bun-mono/db/schema/auth";
 import { env } from "@bun-mono/env/server";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { username } from "better-auth/plugins";
+
+import { reservedUsernames } from "./reserved-usernames";
+
+const reservedSet = new Set(reservedUsernames.map((w) => w.toLowerCase()));
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -21,5 +26,9 @@ export const auth = betterAuth({
       httpOnly: true,
     },
   },
-  plugins: [],
+  plugins: [
+    username({
+      usernameValidator: (value) => !reservedSet.has(value.toLowerCase()),
+    }),
+  ],
 });

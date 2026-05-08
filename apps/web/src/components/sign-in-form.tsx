@@ -19,31 +19,43 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
 
   const form = useForm({
     defaultValues: {
-      email: "",
+      identifier: "",
       password: "",
     },
     onSubmit: async ({ value }) => {
-      await authClient.signIn.email(
-        {
-          email: value.email,
-          password: value.password,
+      const isEmail = value.identifier.includes("@");
+      const callbacks = {
+        onSuccess: () => {
+          navigate({
+            to: "/dashboard",
+          });
+          toast.success("Sign in successful");
         },
-        {
-          onSuccess: () => {
-            navigate({
-              to: "/dashboard",
-            });
-            toast.success("Sign in successful");
-          },
-          onError: (error) => {
-            toast.error(error.error.message || error.error.statusText);
-          },
+        onError: (error: { error: { message?: string; statusText?: string } }) => {
+          toast.error(error.error.message || error.error.statusText);
         },
-      );
+      };
+      if (isEmail) {
+        await authClient.signIn.email(
+          {
+            email: value.identifier,
+            password: value.password,
+          },
+          callbacks,
+        );
+      } else {
+        await authClient.signIn.username(
+          {
+            username: value.identifier,
+            password: value.password,
+          },
+          callbacks,
+        );
+      }
     },
     validators: {
       onSubmit: z.object({
-        email: z.email("Invalid email address"),
+        identifier: z.string().min(1, "Email or username is required"),
         password: z.string().min(8, "Password must be at least 8 characters"),
       }),
     },
@@ -66,14 +78,13 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
         className="space-y-4"
       >
         <div>
-          <form.Field name="email">
+          <form.Field name="identifier">
             {(field) => (
               <div className="space-y-2">
-                <Label htmlFor={field.name}>Email</Label>
+                <Label htmlFor={field.name}>Email or username</Label>
                 <Input
                   id={field.name}
                   name={field.name}
-                  type="email"
                   value={field.state.value}
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
