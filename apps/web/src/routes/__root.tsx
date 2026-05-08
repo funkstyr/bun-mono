@@ -6,7 +6,8 @@ import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
 import type { orpc } from "@/utils/orpc";
 
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@bun-mono/core-ui/sonner";
+import { ThemeProvider } from "@bun-mono/core-ui/theme-provider";
 
 import Header from "../components/header";
 import appCss from "../index.css?url";
@@ -42,20 +43,22 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 
 function RootDocument() {
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <head>
         <HeadContent />
       </head>
       <body>
-        <div className="grid h-svh grid-rows-[auto_1fr]">
-          <Header />
-          <Outlet />
-        </div>
-        <Toaster richColors />
+        <ThemeProvider>
+          <div className="grid h-svh grid-rows-[auto_1fr]">
+            <Header />
+            <Outlet />
+          </div>
+          <Toaster richColors />
 
-        <TanStackRouterDevtools position="bottom-left" />
-        <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
-        <Scripts />
+          <TanStackRouterDevtools position="bottom-left" />
+          <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
+          <Scripts />
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -52,3 +52,4 @@ temp
 
 # Claude Code (local junction to .agents/skills)
 .claude/
+.scratch/

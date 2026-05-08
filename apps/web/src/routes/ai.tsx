@@ -6,8 +6,8 @@ import { Send } from "lucide-react";
 import { useRef, useEffect, useState } from "react";
 import { Streamdown } from "streamdown";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@bun-mono/core-ui/button";
+import { Input } from "@bun-mono/core-ui/input";
 
 export const Route = createFileRoute("/ai")({
   component: RouteComponent,

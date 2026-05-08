@@ -8,11 +8,11 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { authClient } from "@/lib/auth-client";
+} from "@bun-mono/core-ui/dropdown-menu";
+import { Button } from "@bun-mono/core-ui/button";
+import { Skeleton } from "@bun-mono/core-ui/skeleton";
 
-import { Button } from "./ui/button";
-import { Skeleton } from "./ui/skeleton";
+import { authClient } from "@/lib/auth-client";
 
 export default function UserMenu() {
   const navigate = useNavigate();
