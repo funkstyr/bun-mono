@@ -105,9 +105,41 @@ const revokeOtherSessions = protectedProcedure.handler(async ({ context }) => {
   return { ok: true as const };
 });
 
+export const changePasswordInput = type({
+  currentPassword: "string >= 1",
+  newPassword: "string >= 8",
+});
+
+const changePassword = protectedProcedure
+  .input(changePasswordInput)
+  .handler(async ({ context, input }) => {
+    try {
+      await auth.api.changePassword({
+        body: {
+          currentPassword: input.currentPassword,
+          newPassword: input.newPassword,
+          revokeOtherSessions: true,
+        },
+        headers: context.headers,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.toLowerCase().includes("invalid password")) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Current password is incorrect",
+          data: { field: "currentPassword", reason: "invalid" },
+        });
+      }
+      throw error;
+    }
+
+    return { ok: true as const };
+  });
+
 export const accountRouter = {
   updateProfile,
   listSessions,
   revokeSession,
   revokeOtherSessions,
+  changePassword,
 };

@@ -2,6 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 
 import { getUser } from "@/functions/get-user";
 
+import { PasswordSection } from "@/components/account/password-section";
 import { ProfileSection } from "@/components/account/profile-section";
 import { SessionsSection } from "@/components/account/sessions-section";
 
@@ -27,6 +28,7 @@ function RouteComponent() {
     <div className="mx-auto w-full max-w-2xl px-4 py-8 space-y-6 overflow-y-auto">
       <h1 className="text-xl font-semibold">Account</h1>
       <ProfileSection user={session.user} />
+      <PasswordSection />
       <SessionsSection />
     </div>
   );
