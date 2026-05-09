@@ -5,6 +5,7 @@ import { getUser } from "@/functions/get-user";
 import { PasswordSection } from "@/components/account/password-section";
 import { ProfileSection } from "@/components/account/profile-section";
 import { SessionsSection } from "@/components/account/sessions-section";
+import { ThemeSection } from "@/components/account/theme-section";
 
 export const Route = createFileRoute("/account")({
   component: RouteComponent,
@@ -30,6 +31,7 @@ function RouteComponent() {
       <ProfileSection user={session.user} />
       <PasswordSection />
       <SessionsSection />
+      <ThemeSection />
     </div>
   );
 }
