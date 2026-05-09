@@ -25,6 +25,7 @@
     "dotenv": "catalog:",
     "effect": "catalog:",
     "hono": "catalog:",
+    "ua-parser-js": "^2.0.9",
     "zod": "catalog:"
   },
   "devDependencies": {
