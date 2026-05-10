@@ -27,12 +27,17 @@ function RouteComponent() {
   if (!session) return null;
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-8 space-y-6 overflow-y-auto">
-      <h1 className="text-xl font-semibold">Account</h1>
-      <ProfileSection user={session.user} />
-      <PasswordSection />
-      <SessionsSection />
+    <div className='mx-auto w-full max-w-2xl px-4 py-8 space-y-6 overflow-y-auto'>
+      <h1 className='text-xl font-semibold'>Account</h1>
+
       <ThemeSection />
+
+      <ProfileSection user={session.user} />
+
+      <PasswordSection />
+
+      <SessionsSection />
+
       <DangerZoneSection user={session.user} />
     </div>
   );
