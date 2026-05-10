@@ -136,10 +136,37 @@ const changePassword = protectedProcedure
     return { ok: true as const };
   });
 
+export const deleteAccountInput = type({ confirmation: "string >= 1" });
+
+const deleteAccount = protectedProcedure
+  .input(deleteAccountInput)
+  .handler(async ({ context, input }) => {
+    const sessionUsername = context.session.user.username;
+    if (!sessionUsername) {
+      throw new ORPCError("BAD_REQUEST", {
+        message: "Account has no username to confirm against",
+      });
+    }
+    if (input.confirmation.toLowerCase() !== sessionUsername.toLowerCase()) {
+      throw new ORPCError("BAD_REQUEST", {
+        message: "Confirmation does not match your username",
+        data: { field: "confirmation", reason: "mismatch" },
+      });
+    }
+
+    await auth.api.deleteUser({
+      body: {},
+      headers: context.headers,
+    });
+
+    return { ok: true as const };
+  });
+
 export const accountRouter = {
   updateProfile,
   listSessions,
   revokeSession,
   revokeOtherSessions,
   changePassword,
+  deleteAccount,
 };

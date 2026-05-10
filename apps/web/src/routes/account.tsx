@@ -2,6 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 
 import { getUser } from "@/functions/get-user";
 
+import { DangerZoneSection } from "@/components/account/danger-zone-section";
 import { PasswordSection } from "@/components/account/password-section";
 import { ProfileSection } from "@/components/account/profile-section";
 import { SessionsSection } from "@/components/account/sessions-section";
@@ -32,6 +33,7 @@ function RouteComponent() {
       <PasswordSection />
       <SessionsSection />
       <ThemeSection />
+      <DangerZoneSection user={session.user} />
     </div>
   );
 }
