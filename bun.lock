@@ -82,6 +82,7 @@
         "@bun-mono/auth": "workspace:*",
         "@bun-mono/core-ui": "workspace:*",
         "@bun-mono/env": "workspace:*",
+        "@bun-mono/workout-timer": "workspace:*",
         "@effect/platform": "catalog:",
         "@effect/platform-browser": "^0.76.0",
         "@effect/schema": "catalog:",
@@ -240,6 +241,23 @@
         "typescript": "catalog:",
       },
     },
+    "packages/workout-timer": {
+      "name": "@bun-mono/workout-timer",
+      "dependencies": {
+        "@bun-mono/core-ui": "workspace:*",
+      },
+      "devDependencies": {
+        "@bun-mono/config": "workspace:*",
+        "@types/react": "catalog:",
+        "@types/react-dom": "19.2.3",
+        "typescript": "catalog:",
+      },
+      "peerDependencies": {
+        "react": "catalog:",
+        "react-dom": "^19.2.6",
+        "tailwindcss": "^4.2.4",
+      },
+    },
   },
   "catalog": {
     "@effect/platform": "^0.96.1",
@@ -377,6 +395,8 @@
     "@bun-mono/db": ["@bun-mono/db@workspace:packages/db"],
 
     "@bun-mono/env": ["@bun-mono/env@workspace:packages/env"],
+
+    "@bun-mono/workout-timer": ["@bun-mono/workout-timer@workspace:packages/workout-timer"],
 
     "@chevrotain/cst-dts-gen": ["@chevrotain/cst-dts-gen@12.0.0", "", { "dependencies": { "@chevrotain/gast": "12.0.0", "@chevrotain/types": "12.0.0" } }, "sha512-fSL4KXjTl7cDgf0B5Rip9Q05BOrYvkJV/RrBTE/bKDN096E4hN/ySpcBK5B24T76dlQ2i32Zc3PAE27jFnFrKg=="],
 

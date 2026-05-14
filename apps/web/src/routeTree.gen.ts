@@ -9,12 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TimerRouteImport } from './routes/timer'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AiRouteImport } from './routes/ai'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
 
+const TimerRoute = TimerRouteImport.update({
+  id: '/timer',
+  path: '/timer',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -47,6 +53,7 @@ export interface FileRoutesByFullPath {
   '/ai': typeof AiRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/timer': typeof TimerRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +61,7 @@ export interface FileRoutesByTo {
   '/ai': typeof AiRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/timer': typeof TimerRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,13 +70,14 @@ export interface FileRoutesById {
   '/ai': typeof AiRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/timer': typeof TimerRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/account' | '/ai' | '/dashboard' | '/login'
+  fullPaths: '/' | '/account' | '/ai' | '/dashboard' | '/login' | '/timer'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/account' | '/ai' | '/dashboard' | '/login'
-  id: '__root__' | '/' | '/account' | '/ai' | '/dashboard' | '/login'
+  to: '/' | '/account' | '/ai' | '/dashboard' | '/login' | '/timer'
+  id: '__root__' | '/' | '/account' | '/ai' | '/dashboard' | '/login' | '/timer'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -77,10 +86,18 @@ export interface RootRouteChildren {
   AiRoute: typeof AiRoute
   DashboardRoute: typeof DashboardRoute
   LoginRoute: typeof LoginRoute
+  TimerRoute: typeof TimerRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/timer': {
+      id: '/timer'
+      path: '/timer'
+      fullPath: '/timer'
+      preLoaderRoute: typeof TimerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -125,6 +142,7 @@ const rootRouteChildren: RootRouteChildren = {
   AiRoute: AiRoute,
   DashboardRoute: DashboardRoute,
   LoginRoute: LoginRoute,
+  TimerRoute: TimerRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

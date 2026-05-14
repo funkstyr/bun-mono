@@ -1,0 +1,26 @@
+{
+  "name": "@bun-mono/workout-timer",
+  "type": "module",
+  "exports": {
+    "./styles.css": "./src/styles.css",
+    "./*": [
+      "./src/*.tsx",
+      "./src/*.ts"
+    ]
+  },
+  "scripts": {},
+  "dependencies": {
+    "@bun-mono/core-ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@bun-mono/config": "workspace:*",
+    "@types/react": "catalog:",
+    "@types/react-dom": "19.2.3",
+    "typescript": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "catalog:",
+    "react-dom": "^19.2.6",
+    "tailwindcss": "^4.2.4"
+  }
+}

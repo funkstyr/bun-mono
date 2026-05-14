@@ -13,6 +13,7 @@
     "@bun-mono/auth": "workspace:*",
     "@bun-mono/core-ui": "workspace:*",
     "@bun-mono/env": "workspace:*",
+    "@bun-mono/workout-timer": "workspace:*",
     "@effect/platform": "catalog:",
     "@effect/platform-browser": "^0.76.0",
     "@effect/schema": "catalog:",

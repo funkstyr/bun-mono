@@ -27,9 +27,9 @@ function RouteComponent() {
   if (!session) return null;
 
   return (
-    <div className='overflow-y-auto'>
-      <div className='mx-auto w-full max-w-2xl px-4 py-8 space-y-6'>
-        <h1 className='text-xl font-semibold'>Account</h1>
+    <div className="overflow-y-auto">
+      <div className="mx-auto w-full max-w-2xl px-4 py-8 space-y-6">
+        <h1 className="text-xl font-semibold">Account</h1>
 
         <ThemeSection />
 
