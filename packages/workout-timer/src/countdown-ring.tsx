@@ -35,10 +35,10 @@ export function CountdownRing({
       : "var(--muted-foreground)";
 
   return (
-    <div className="relative" style={{ width: SIZE, height: SIZE }}>
+    <div className="relative" style={{ width: "var(--ring-size)", height: "var(--ring-size)" }}>
       <svg
-        width={SIZE}
-        height={SIZE}
+        width="100%"
+        height="100%"
         viewBox={`0 0 ${SIZE} ${SIZE}`}
         role="img"
         aria-label={`${phase} countdown ring`}

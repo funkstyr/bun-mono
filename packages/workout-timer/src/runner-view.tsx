@@ -145,7 +145,17 @@ export function RunnerView({ timer, onNavigate }: RunnerViewProps) {
   const isPaused = state.isPaused;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-background">
+    <div
+      className="fixed inset-0 z-50 flex flex-col bg-background"
+      style={
+        {
+          "--ring-size": "min(clamp(240px, 70dvmin, 1200px), 50dvh)",
+          "--rhythm-gap": "clamp(12px, calc(var(--ring-size) * 0.06), 80px)",
+          "--btn-size": "max(44px, calc(var(--ring-size) * 0.18))",
+          "--btn-pause-size": "max(48px, calc(var(--ring-size) * 0.22))",
+        } as React.CSSProperties
+      }
+    >
       <div className="flex items-center justify-between px-4 py-3">
         <Button
           type="button"
@@ -168,10 +178,17 @@ export function RunnerView({ timer, onNavigate }: RunnerViewProps) {
         </Button>
       </div>
 
-      <div className="flex flex-1 flex-col items-center justify-center gap-6 px-4">
+      <div
+        className="flex flex-1 flex-col items-center justify-center px-4"
+        style={{ gap: "var(--rhythm-gap)" }}
+      >
         <div
-          className="text-3xl font-semibold tracking-wide uppercase"
-          style={{ color: phaseColor(state.phase) }}
+          className="font-semibold tracking-wide uppercase"
+          style={{
+            color: phaseColor(state.phase),
+            fontSize: "calc(var(--ring-size) * 0.13)",
+            lineHeight: 1.1,
+          }}
         >
           {phaseLabel(state.phase)}
         </div>
@@ -183,11 +200,23 @@ export function RunnerView({ timer, onNavigate }: RunnerViewProps) {
             remainingMs={state.remainingMs}
           >
             <div className="flex flex-col items-center gap-1">
-              <div className="text-5xl font-bold tabular-nums">
+              <div
+                className="font-bold tabular-nums"
+                style={{
+                  fontSize: "calc(var(--ring-size) * 0.28)",
+                  lineHeight: 1,
+                }}
+              >
                 {formatMmSs(state.remainingMs / 1000)}
               </div>
               {isPaused ? (
-                <div className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+                <div
+                  className="font-semibold tracking-widest text-muted-foreground uppercase"
+                  style={{
+                    fontSize: "max(11px, calc(var(--ring-size) * 0.045))",
+                    lineHeight: 1.2,
+                  }}
+                >
                   Paused
                 </div>
               ) : null}
@@ -195,28 +224,56 @@ export function RunnerView({ timer, onNavigate }: RunnerViewProps) {
           </CountdownRing>
         </div>
 
-        <div className="h-6 text-base text-muted-foreground">
+        <div
+          className="text-muted-foreground"
+          style={{
+            fontSize: "calc(var(--ring-size) * 0.075)",
+            lineHeight: 1.2,
+            minHeight: "1.5em",
+          }}
+        >
           {showRoundIndicator ? `Round ${state.currentRound} of ${config.rounds}` : ""}
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center" style={{ gap: "var(--rhythm-gap)" }}>
           <Button
             type="button"
             variant="outline"
             size="lg"
             aria-label="Reset workout"
             onClick={engine.controls.reset}
+            style={{ width: "var(--btn-size)", height: "var(--btn-size)" }}
           >
-            <RotateCcwIcon />
+            <RotateCcwIcon
+              style={{
+                width: "calc(var(--btn-size) * 0.4)",
+                height: "calc(var(--btn-size) * 0.4)",
+              }}
+            />
           </Button>
           <Button
             type="button"
             size="lg"
-            className="h-16 w-16 rounded-full"
+            className="rounded-full"
             aria-label={isPaused ? "Resume workout" : "Pause workout"}
             onClick={isPaused ? engine.controls.resume : engine.controls.pause}
+            style={{ width: "var(--btn-pause-size)", height: "var(--btn-pause-size)" }}
           >
-            {isPaused ? <PlayIcon /> : <PauseIcon />}
+            {isPaused ? (
+              <PlayIcon
+                style={{
+                  width: "calc(var(--btn-pause-size) * 0.4)",
+                  height: "calc(var(--btn-pause-size) * 0.4)",
+                }}
+              />
+            ) : (
+              <PauseIcon
+                style={{
+                  width: "calc(var(--btn-pause-size) * 0.4)",
+                  height: "calc(var(--btn-pause-size) * 0.4)",
+                }}
+              />
+            )}
           </Button>
           <Button
             type="button"
@@ -224,13 +281,25 @@ export function RunnerView({ timer, onNavigate }: RunnerViewProps) {
             size="lg"
             aria-label="Skip phase"
             onClick={engine.controls.skip}
+            style={{ width: "var(--btn-size)", height: "var(--btn-size)" }}
           >
-            <SkipForwardIcon />
+            <SkipForwardIcon
+              style={{
+                width: "calc(var(--btn-size) * 0.4)",
+                height: "calc(var(--btn-size) * 0.4)",
+              }}
+            />
           </Button>
         </div>
       </div>
 
-      <div className="px-4 py-6 text-center text-xs text-muted-foreground">
+      <div
+        className="px-4 py-6 text-center text-muted-foreground"
+        style={{
+          fontSize: "max(12px, calc(var(--ring-size) * 0.05))",
+          lineHeight: 1.4,
+        }}
+      >
         Total: {formatMmSs(totalSeconds)} left
       </div>
     </div>
