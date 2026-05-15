@@ -117,3 +117,39 @@ export function advancePhase(config: SetConfig, anchor: Anchor, _now: number): A
     pausedRemainingMs: null,
   };
 }
+
+export function pauseAnchor(anchor: Anchor, now: number): Anchor {
+  if (anchor.pausedRemainingMs !== null) return anchor;
+  if (anchor.phase === "idle" || anchor.phase === "complete") return anchor;
+  const elapsed = now - anchor.phaseStartTs;
+  const remaining = Math.max(0, Math.min(anchor.phaseDurationMs, anchor.phaseDurationMs - elapsed));
+  return { ...anchor, pausedRemainingMs: remaining };
+}
+
+export function resumeAnchor(anchor: Anchor, now: number): Anchor {
+  if (anchor.pausedRemainingMs === null) return anchor;
+  if (anchor.phase === "idle" || anchor.phase === "complete") return anchor;
+  return {
+    ...anchor,
+    phaseStartTs: now - (anchor.phaseDurationMs - anchor.pausedRemainingMs),
+    pausedRemainingMs: null,
+  };
+}
+
+export function skipAnchor(config: SetConfig, anchor: Anchor, now: number): Anchor {
+  if (anchor.phase === "idle" || anchor.phase === "complete") return anchor;
+  const wasPaused = anchor.pausedRemainingMs !== null;
+  const advanced = advancePhase(config, anchor, now);
+  const isTerminal = advanced.phase === "complete";
+  return {
+    ...advanced,
+    phaseStartTs: now,
+    pausedRemainingMs: wasPaused && !isTerminal ? advanced.phaseDurationMs : null,
+  };
+}
+
+export function resetAnchor(config: SetConfig, anchor: Anchor, now: number): Anchor {
+  const wasPaused = anchor.pausedRemainingMs !== null;
+  const fresh = initialAnchor(config, now);
+  return wasPaused ? { ...fresh, pausedRemainingMs: fresh.phaseDurationMs } : fresh;
+}

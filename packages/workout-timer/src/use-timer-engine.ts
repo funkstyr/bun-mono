@@ -4,6 +4,10 @@ import {
   advancePhase,
   computeState,
   initialAnchor,
+  pauseAnchor,
+  resetAnchor,
+  resumeAnchor,
+  skipAnchor,
   type Anchor,
   type EngineState,
   type Phase,
@@ -78,6 +82,7 @@ export function useTimerEngine(
       lastCountdownSecondRef.current = -1;
       if (anchor.phase === "complete") {
         callbacksRef.current.onComplete?.();
+        clearTickInterval();
         break;
       }
       result = computeState(config, anchor, now);
@@ -93,7 +98,7 @@ export function useTimerEngine(
     }
 
     forceTick();
-  }, [config]);
+  }, [config, clearTickInterval]);
 
   const ensureInterval = useCallback(() => {
     if (intervalRef.current != null) return;
@@ -115,7 +120,54 @@ export function useTimerEngine(
     forceTick();
   }, [clearTickInterval]);
 
-  const noop = useCallback(() => {}, []);
+  const pause = useCallback(() => {
+    const a = anchorRef.current;
+    if (a.pausedRemainingMs !== null) return;
+    if (a.phase === "idle" || a.phase === "complete") return;
+    anchorRef.current = pauseAnchor(a, Date.now());
+    clearTickInterval();
+    forceTick();
+  }, [clearTickInterval]);
+
+  const resume = useCallback(() => {
+    const a = anchorRef.current;
+    if (a.pausedRemainingMs === null) return;
+    if (a.phase === "idle" || a.phase === "complete") return;
+    anchorRef.current = resumeAnchor(a, Date.now());
+    ensureInterval();
+    forceTick();
+  }, [ensureInterval]);
+
+  const skip = useCallback(() => {
+    const a = anchorRef.current;
+    if (a.phase === "idle" || a.phase === "complete") return;
+    const now = Date.now();
+    const prevPhase = a.phase;
+    const next = skipAnchor(config, a, now);
+    anchorRef.current = next;
+    lastCountdownPhaseStartRef.current = next.phaseStartTs;
+    lastCountdownSecondRef.current = -1;
+    callbacksRef.current.onPhaseChange?.(prevPhase, next.phase);
+    if (next.phase === "complete") {
+      callbacksRef.current.onComplete?.();
+      clearTickInterval();
+    }
+    forceTick();
+  }, [config, clearTickInterval]);
+
+  const reset = useCallback(() => {
+    const a = anchorRef.current;
+    const wasPaused = a.pausedRemainingMs !== null;
+    anchorRef.current = resetAnchor(config, a, Date.now());
+    lastCountdownPhaseStartRef.current = anchorRef.current.phaseStartTs;
+    lastCountdownSecondRef.current = -1;
+    if (wasPaused) {
+      clearTickInterval();
+    } else {
+      ensureInterval();
+    }
+    forceTick();
+  }, [config, clearTickInterval, ensureInterval]);
 
   useEffect(() => {
     return () => {
@@ -128,10 +180,10 @@ export function useTimerEngine(
     state: result.state,
     controls: {
       start,
-      pause: noop,
-      resume: noop,
-      skip: noop,
-      reset: noop,
+      pause,
+      resume,
+      skip,
+      reset,
       stop,
     },
   };

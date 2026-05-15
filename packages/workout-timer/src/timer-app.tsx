@@ -2,7 +2,7 @@ import { useMemo } from "react";
 
 import { EditorSheet, type EditorInitialValues } from "./editor-sheet";
 import { ListView } from "./list-view";
-import { RunnerView } from "./runner-view";
+import { RunnerHost } from "./runner-view";
 import { useTimers } from "./use-timers";
 
 export type TimerView = "list" | "edit" | "run";
@@ -23,19 +23,14 @@ export function TimerApp({ view, timerId, onNavigate }: TimerAppProps) {
     return { id: found.id, name: found.name, set: found.sets[0]! };
   }, [view, timerId, timers]);
 
-  const runningTimer = useMemo(() => {
-    if (view !== "run" || !timerId) return undefined;
-    return timers.find((t) => t.id === timerId);
-  }, [view, timerId, timers]);
-
   const closeEditor = () => onNavigate({ view: "list", timerId: null });
 
   return (
     <>
       <ListView onNavigate={onNavigate} />
       <EditorSheet open={view === "edit"} onClose={closeEditor} initialValues={initialValues} />
-      {view === "run" && runningTimer ? (
-        <RunnerView key={runningTimer.id} timer={runningTimer} onNavigate={onNavigate} />
+      {view === "run" && timerId ? (
+        <RunnerHost key={timerId} timerId={timerId} onNavigate={onNavigate} />
       ) : null}
     </>
   );
