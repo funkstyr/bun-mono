@@ -1,12 +1,20 @@
+import { MoreVerticalIcon } from "lucide-react";
 import { useMemo } from "react";
 
 import { Button } from "@bun-mono/core-ui/button";
 import { Card, CardContent, CardDescription, CardTitle } from "@bun-mono/core-ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@bun-mono/core-ui/dropdown-menu";
+import { toast } from "@bun-mono/core-ui/sonner";
 
 import { formatMmSs } from "./format";
 import type { SavedTimer } from "./schemas";
 import type { TimerView } from "./timer-app";
-import { useTimers } from "./use-timers";
+import { deleteTimer, duplicateTimer, restoreTimer, useTimers } from "./use-timers";
 
 export type ListViewProps = {
   onNavigate: (next: { view: TimerView; timerId: string | null }) => void;
@@ -18,6 +26,25 @@ export function ListView({ onNavigate }: ListViewProps) {
   const sorted = useMemo(() => [...timers].sort((a, b) => b.updatedAt - a.updatedAt), [timers]);
 
   const handleCreate = () => onNavigate({ view: "edit", timerId: null });
+
+  const handleEdit = (id: string) => onNavigate({ view: "edit", timerId: id });
+
+  const handleDuplicate = (id: string) => {
+    duplicateTimer(id);
+  };
+
+  const handleDelete = (timer: SavedTimer) => {
+    const snapshot: SavedTimer = { ...timer, sets: [{ ...timer.sets[0]! }] };
+    deleteTimer(timer.id);
+    toast(`Deleted "${snapshot.name}"`, {
+      action: {
+        label: "Undo",
+        onClick: () => {
+          restoreTimer(snapshot);
+        },
+      },
+    });
+  };
 
   if (sorted.length === 0) {
     return (
@@ -44,6 +71,9 @@ export function ListView({ onNavigate }: ListViewProps) {
             <TimerCard
               timer={timer}
               onStart={() => onNavigate({ view: "run", timerId: timer.id })}
+              onEdit={() => handleEdit(timer.id)}
+              onDuplicate={() => handleDuplicate(timer.id)}
+              onDelete={() => handleDelete(timer)}
             />
           </li>
         ))}
@@ -52,9 +82,22 @@ export function ListView({ onNavigate }: ListViewProps) {
   );
 }
 
-function TimerCard({ timer, onStart }: { timer: SavedTimer; onStart: () => void }) {
+function TimerCard({
+  timer,
+  onStart,
+  onEdit,
+  onDuplicate,
+  onDelete,
+}: {
+  timer: SavedTimer;
+  onStart: () => void;
+  onEdit: () => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+}) {
   const set = timer.sets[0]!;
   const summary = `${set.rounds} rounds · ${formatMmSs(set.activeSec)} active / ${formatMmSs(set.restSec)} rest`;
+  const stop = (event: React.SyntheticEvent) => event.stopPropagation();
   return (
     <Card
       role="button"
@@ -66,13 +109,36 @@ function TimerCard({ timer, onStart }: { timer: SavedTimer; onStart: () => void 
           onStart();
         }
       }}
-      className="cursor-pointer transition-colors hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      className="relative cursor-pointer transition-colors hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
       aria-label={`Start ${timer.name}`}
     >
-      <CardContent className="space-y-1">
+      <CardContent className="space-y-1 pr-10">
         <CardTitle className="text-base">{timer.name}</CardTitle>
         <CardDescription>{summary}</CardDescription>
       </CardContent>
+      <div className="absolute right-2 top-2" onClick={stop} onKeyDown={stop}>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={`More actions for ${timer.name}`}
+                onClick={stop}
+              />
+            }
+          >
+            <MoreVerticalIcon />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onEdit}>Edit</DropdownMenuItem>
+            <DropdownMenuItem onClick={onDuplicate}>Duplicate</DropdownMenuItem>
+            <DropdownMenuItem variant="destructive" onClick={onDelete}>
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </Card>
   );
 }

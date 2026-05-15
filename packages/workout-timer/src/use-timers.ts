@@ -117,6 +117,15 @@ export function duplicateTimer(id: string): SavedTimer | null {
   return copy;
 }
 
+export function restoreTimer(snapshot: SavedTimer): SavedTimer {
+  const { timers } = read();
+  if (!timers.some((t) => t.id === snapshot.id)) {
+    timers.push({ ...snapshot, sets: [{ ...snapshot.sets[0]! }] });
+    write(timers);
+  }
+  return snapshot;
+}
+
 export function deleteTimer(id: string): SavedTimer | null {
   const { timers } = read();
   const idx = timers.findIndex((t) => t.id === id);
