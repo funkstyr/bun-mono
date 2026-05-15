@@ -8,15 +8,20 @@
       "./src/*.ts"
     ]
   },
-  "scripts": {},
+  "scripts": {
+    "test": "vitest run"
+  },
   "dependencies": {
-    "@bun-mono/core-ui": "workspace:*"
+    "@bun-mono/core-ui": "workspace:*",
+    "arktype": "catalog:"
   },
   "devDependencies": {
     "@bun-mono/config": "workspace:*",
     "@types/react": "catalog:",
     "@types/react-dom": "19.2.3",
-    "typescript": "catalog:"
+    "jsdom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "react": "catalog:",
