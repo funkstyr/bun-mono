@@ -5,21 +5,19 @@ import { Card, CardContent, CardDescription, CardTitle } from "@bun-mono/core-ui
 
 import { formatMmSs } from "./format";
 import type { SavedTimer } from "./schemas";
-import { createTimer, useTimers } from "./use-timers";
+import type { TimerView } from "./timer-app";
+import { useTimers } from "./use-timers";
 
 export type ListViewProps = {
-  onCreate?: (created: SavedTimer) => void;
+  onNavigate: (next: { view: TimerView; timerId: string | null }) => void;
 };
 
-export function ListView({ onCreate }: ListViewProps) {
+export function ListView({ onNavigate }: ListViewProps) {
   const timers = useTimers();
 
   const sorted = useMemo(() => [...timers].sort((a, b) => b.updatedAt - a.updatedAt), [timers]);
 
-  const handleCreate = () => {
-    const created = createTimer();
-    onCreate?.(created);
-  };
+  const handleCreate = () => onNavigate({ view: "edit", timerId: null });
 
   if (sorted.length === 0) {
     return (

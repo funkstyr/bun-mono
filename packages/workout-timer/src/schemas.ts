@@ -39,3 +39,11 @@ export const defaultSetConfig = (): SetConfig => ({
   restSec: 10,
   prepSec: 5,
 });
+
+export const nameSchema = type("1 <= string <= 60");
+export const roundsSchema = type("1 <= number.integer <= 99");
+export const prepSecSchema = type("0 <= number.integer <= 60");
+export const workSecSchema = type("1 <= number.integer <= 3600");
+export const restSecSchema = type("0 <= number.integer <= 3600");
+export const minutesSchema = type("0 <= number.integer <= 60");
+export const secondsRemSchema = type("0 <= number.integer <= 59");

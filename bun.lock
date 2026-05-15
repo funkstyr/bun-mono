@@ -245,6 +245,7 @@
       "name": "@bun-mono/workout-timer",
       "dependencies": {
         "@bun-mono/core-ui": "workspace:*",
+        "@tanstack/react-form": "^1.29.1",
         "arktype": "catalog:",
       },
       "devDependencies": {
@@ -256,6 +257,7 @@
         "vitest": "catalog:",
       },
       "peerDependencies": {
+        "lucide-react": "^1.14.0",
         "react": "catalog:",
         "react-dom": "^19.2.6",
         "tailwindcss": "^4.2.4",

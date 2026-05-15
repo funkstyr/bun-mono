@@ -5,8 +5,15 @@ import { loadAndMigrate, saveAll, STORAGE_KEY, subscribe } from "./storage";
 
 const EMPTY_TIMERS: readonly SavedTimer[] = [];
 
+let cachedRaw: string | null | undefined = undefined;
+let cachedSnapshot: readonly SavedTimer[] = EMPTY_TIMERS;
+
 function getSnapshot(): readonly SavedTimer[] {
-  return loadAndMigrate().timers;
+  const raw = typeof window === "undefined" ? null : window.localStorage.getItem(STORAGE_KEY);
+  if (raw === cachedRaw) return cachedSnapshot;
+  cachedRaw = raw;
+  cachedSnapshot = loadAndMigrate().timers;
+  return cachedSnapshot;
 }
 
 function getServerSnapshot(): readonly SavedTimer[] {

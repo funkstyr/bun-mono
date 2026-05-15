@@ -6,8 +6,8 @@ import { Skeleton } from "@bun-mono/core-ui/skeleton";
 import { TimerApp, type TimerView } from "@bun-mono/workout-timer/timer-app";
 
 const timerSearchSchema = type({
-  "view?": "'list' | 'edit' | 'run'",
-  "timerId?": "string",
+  "view?": "'list' | 'edit' | 'run' | undefined",
+  "timerId?": "string | undefined",
 });
 
 export const Route = createFileRoute("/timer")({
@@ -48,10 +48,11 @@ function RouteComponent() {
       timerId={search.timerId ?? null}
       onNavigate={(next) => {
         void navigate({
-          search: {
+          to: "/timer",
+          search: () => ({
             view: next.view,
             timerId: next.timerId ?? undefined,
-          },
+          }),
         });
       }}
     />
