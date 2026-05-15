@@ -41,7 +41,10 @@ export function ListView({ onNavigate }: ListViewProps) {
       <ul className="space-y-3">
         {sorted.map((timer) => (
           <li key={timer.id}>
-            <TimerCard timer={timer} />
+            <TimerCard
+              timer={timer}
+              onStart={() => onNavigate({ view: "run", timerId: timer.id })}
+            />
           </li>
         ))}
       </ul>
@@ -49,11 +52,23 @@ export function ListView({ onNavigate }: ListViewProps) {
   );
 }
 
-function TimerCard({ timer }: { timer: SavedTimer }) {
+function TimerCard({ timer, onStart }: { timer: SavedTimer; onStart: () => void }) {
   const set = timer.sets[0]!;
   const summary = `${set.rounds} rounds · ${formatMmSs(set.activeSec)} active / ${formatMmSs(set.restSec)} rest`;
   return (
-    <Card>
+    <Card
+      role="button"
+      tabIndex={0}
+      onClick={onStart}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onStart();
+        }
+      }}
+      className="cursor-pointer transition-colors hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      aria-label={`Start ${timer.name}`}
+    >
       <CardContent className="space-y-1">
         <CardTitle className="text-base">{timer.name}</CardTitle>
         <CardDescription>{summary}</CardDescription>
