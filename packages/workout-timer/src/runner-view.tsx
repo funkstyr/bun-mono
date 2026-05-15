@@ -1,8 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PauseIcon, PlayIcon, RotateCcwIcon, SkipForwardIcon, XIcon } from "lucide-react";
+import {
+  PauseIcon,
+  PlayIcon,
+  RotateCcwIcon,
+  SkipForwardIcon,
+  Volume2Icon,
+  VolumeXIcon,
+  XIcon,
+} from "lucide-react";
 
 import { Button } from "@bun-mono/core-ui/button";
 
+import { isMuted, playComplete, playPhaseChange, playTick, setMuted } from "./audio";
 import { CountdownRing } from "./countdown-ring";
 import type { Phase } from "./engine";
 import { formatMmSs } from "./format";
@@ -69,9 +78,26 @@ export function RunnerView({ timer, onNavigate }: RunnerViewProps) {
 
   const workoutStartedAtRef = useRef<number>(0);
   const [elapsedMs, setElapsedMs] = useState<number | null>(null);
+  const [muted, setMutedState] = useState<boolean>(() => isMuted());
+
+  const toggleMuted = useCallback(() => {
+    setMutedState((prev) => {
+      const next = !prev;
+      setMuted(next);
+      return next;
+    });
+  }, []);
 
   const engine = useTimerEngine(config, {
+    onCountdownTick: () => {
+      playTick();
+    },
+    onPhaseChange: (_prev, next) => {
+      if (next === "complete") return;
+      playPhaseChange();
+    },
     onComplete: () => {
+      playComplete();
       setElapsedMs(Date.now() - workoutStartedAtRef.current);
     },
   });
@@ -130,7 +156,16 @@ export function RunnerView({ timer, onNavigate }: RunnerViewProps) {
         >
           <XIcon />
         </Button>
-        <div />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={muted ? "Unmute sounds" : "Mute sounds"}
+          aria-pressed={muted}
+          onClick={toggleMuted}
+        >
+          {muted ? <VolumeXIcon /> : <Volume2Icon />}
+        </Button>
       </div>
 
       <div className="flex flex-1 flex-col items-center justify-center gap-6 px-4">
