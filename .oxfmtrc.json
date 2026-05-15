@@ -1,3 +1,17 @@
 {
-  "ignorePatterns": []
+  "sortImports": {
+    "groups": [
+      "side_effect",
+      ["builtin", "external"],
+      ["internal", "subpath"],
+      ["parent", "sibling", "index"],
+      "style",
+      "unknown"
+    ],
+    "internalPattern": ["@bun-mono/**", "~/**", "@/**"],
+    "newlinesBetween": true
+  },
+  "sortPackageJson": true,
+  "sortTailwindcss": true,
+  "ignorePatterns": ["**/routeTree.gen.ts"]
 }

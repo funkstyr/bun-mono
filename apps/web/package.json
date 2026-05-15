@@ -4,8 +4,9 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "serve": "vite preview",
-    "dev": "vite dev"
+    "check-types": "tsgo --noEmit",
+    "dev": "vite dev",
+    "serve": "vite preview"
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.177",
@@ -58,12 +59,12 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/react": "catalog:",
     "@types/react-dom": "19.2.3",
+    "@typescript/native-preview": "catalog:",
     "@vitejs/plugin-react": "^6.0.1",
     "@vitest/coverage-v8": "catalog:",
     "@vitest/ui": "catalog:",
     "jsdom": "catalog:",
     "playwright": "catalog:",
-    "typescript": "catalog:",
     "vite": "^8.0.10",
     "vitest": "catalog:",
     "web-vitals": "^5.2.0"

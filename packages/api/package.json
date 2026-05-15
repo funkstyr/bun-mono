@@ -10,6 +10,7 @@
     }
   },
   "scripts": {
+    "check-types": "tsgo --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
@@ -32,11 +33,11 @@
     "@bun-mono/config": "workspace:*",
     "@effect/vitest": "catalog:",
     "@playwright/test": "catalog:",
+    "@typescript/native-preview": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "@vitest/ui": "catalog:",
     "jsdom": "catalog:",
     "playwright": "catalog:",
-    "typescript": "catalog:",
     "vitest": "catalog:"
   }
 }

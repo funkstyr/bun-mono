@@ -9,6 +9,7 @@
     ]
   },
   "scripts": {
+    "check-types": "tsgo --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
@@ -20,8 +21,8 @@
     "@bun-mono/config": "workspace:*",
     "@types/react": "catalog:",
     "@types/react-dom": "19.2.3",
+    "@typescript/native-preview": "catalog:",
     "jsdom": "catalog:",
-    "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "peerDependencies": {

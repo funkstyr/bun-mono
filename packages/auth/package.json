@@ -11,7 +11,9 @@
       "default": "./src/*.ts"
     }
   },
-  "scripts": {},
+  "scripts": {
+    "check-types": "tsgo --noEmit"
+  },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.6.9",
     "@bun-mono/db": "workspace:*",
@@ -22,6 +24,6 @@
   },
   "devDependencies": {
     "@bun-mono/config": "workspace:*",
-    "typescript": "catalog:"
+    "@typescript/native-preview": "catalog:"
   }
 }

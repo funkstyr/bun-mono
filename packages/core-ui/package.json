@@ -8,7 +8,9 @@
       "./src/*.ts"
     ]
   },
-  "scripts": {},
+  "scripts": {
+    "check-types": "tsgo --noEmit"
+  },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
     "class-variance-authority": "^0.7.1",
@@ -21,7 +23,7 @@
     "@bun-mono/config": "workspace:*",
     "@types/react": "catalog:",
     "@types/react-dom": "19.2.3",
-    "typescript": "catalog:"
+    "@typescript/native-preview": "catalog:"
   },
   "peerDependencies": {
     "lucide-react": "^1.14.0",
