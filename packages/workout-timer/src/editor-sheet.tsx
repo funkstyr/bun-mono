@@ -20,7 +20,7 @@ import {
   restSecSchema,
   roundsSchema,
   secondsRemSchema,
-  workSecSchema,
+  activeSecSchema,
   type SetConfig,
 } from "./schemas";
 import { createTimer, updateTimer } from "./use-timers";
@@ -41,8 +41,8 @@ type EditorFormValues = {
   name: string;
   rounds: number;
   prepSec: number;
-  workMin: number;
-  workSecRem: number;
+  activeMin: number;
+  activeSecRem: number;
   restMin: number;
   restSecRem: number;
 };
@@ -58,20 +58,20 @@ const defaultEditorValues = (initial?: EditorInitialValues): EditorFormValues =>
       name: "",
       rounds: 5,
       prepSec: 5,
-      workMin: 0,
-      workSecRem: 30,
+      activeMin: 0,
+      activeSecRem: 30,
       restMin: 0,
       restSecRem: 10,
     };
   }
-  const work = splitSec(initial.set.workSec);
+  const active = splitSec(initial.set.activeSec);
   const rest = splitSec(initial.set.restSec);
   return {
     name: initial.name,
     rounds: initial.set.rounds,
     prepSec: initial.set.prepSec,
-    workMin: work.min,
-    workSecRem: work.sec,
+    activeMin: active.min,
+    activeSecRem: active.sec,
     restMin: rest.min,
     restSecRem: rest.sec,
   };
@@ -113,10 +113,10 @@ const validateSecondsRem =
     return undefined;
   };
 
-const composedWorkError = (workMin: number, workSecRem: number): string | undefined => {
-  const total = workMin * 60 + workSecRem;
-  const result = workSecSchema(total);
-  if (result instanceof type.errors) return "Work duration must be between 0:01 and 60:00";
+const composedActiveError = (activeMin: number, activeSecRem: number): string | undefined => {
+  const total = activeMin * 60 + activeSecRem;
+  const result = activeSecSchema(total);
+  if (result instanceof type.errors) return "Active duration must be between 0:01 and 60:00";
   return undefined;
 };
 
@@ -127,8 +127,8 @@ const composedRestError = (restMin: number, restSecRem: number): string | undefi
   return undefined;
 };
 
-const validateWorkMin = validateMinutes("Work");
-const validateWorkSecRem = validateSecondsRem("Work");
+const validateActiveMin = validateMinutes("Active");
+const validateActiveSecRem = validateSecondsRem("Active");
 const validateRestMin = validateMinutes("Rest");
 const validateRestSecRem = validateSecondsRem("Rest");
 
@@ -227,7 +227,7 @@ export function EditorSheet({ open, onClose, initialValues }: EditorSheetProps) 
       const set: SetConfig = {
         rounds: value.rounds,
         prepSec: value.prepSec,
-        workSec: value.workMin * 60 + value.workSecRem,
+        activeSec: value.activeMin * 60 + value.activeSecRem,
         restSec: value.restMin * 60 + value.restSecRem,
       };
       const name = value.name.trim();
@@ -325,9 +325,9 @@ export function EditorSheet({ open, onClose, initialValues }: EditorSheetProps) 
           </form.Field>
 
           <div className="space-y-1.5">
-            <Label>Work</Label>
+            <Label>Active</Label>
             <div className="flex items-end gap-3">
-              <form.Field name="workMin" validators={{ onChange: validateWorkMin }}>
+              <form.Field name="activeMin" validators={{ onChange: validateActiveMin }}>
                 {(field) => (
                   <div className="flex flex-col gap-1">
                     <Label
@@ -349,7 +349,7 @@ export function EditorSheet({ open, onClose, initialValues }: EditorSheetProps) 
                   </div>
                 )}
               </form.Field>
-              <form.Field name="workSecRem" validators={{ onChange: validateWorkSecRem }}>
+              <form.Field name="activeSecRem" validators={{ onChange: validateActiveSecRem }}>
                 {(field) => (
                   <div className="flex flex-col gap-1">
                     <Label
@@ -372,8 +372,8 @@ export function EditorSheet({ open, onClose, initialValues }: EditorSheetProps) 
                 )}
               </form.Field>
             </div>
-            <form.Subscribe selector={(s) => [s.values.workMin, s.values.workSecRem] as const}>
-              {([m, sec]) => <FieldError message={composedWorkError(m, sec)} />}
+            <form.Subscribe selector={(s) => [s.values.activeMin, s.values.activeSecRem] as const}>
+              {([m, sec]) => <FieldError message={composedActiveError(m, sec)} />}
             </form.Subscribe>
           </div>
 
@@ -439,15 +439,15 @@ export function EditorSheet({ open, onClose, initialValues }: EditorSheetProps) 
                 canSubmit: s.canSubmit,
                 isDirty: s.isDirty,
                 isSubmitting: s.isSubmitting,
-                workMin: s.values.workMin,
-                workSecRem: s.values.workSecRem,
+                activeMin: s.values.activeMin,
+                activeSecRem: s.values.activeSecRem,
                 restMin: s.values.restMin,
                 restSecRem: s.values.restSecRem,
               })}
             >
               {(state) => {
                 const composedInvalid =
-                  composedWorkError(state.workMin, state.workSecRem) !== undefined ||
+                  composedActiveError(state.activeMin, state.activeSecRem) !== undefined ||
                   composedRestError(state.restMin, state.restSecRem) !== undefined;
                 const disabled =
                   !state.canSubmit || !state.isDirty || state.isSubmitting || composedInvalid;

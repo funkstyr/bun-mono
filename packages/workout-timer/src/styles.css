@@ -2,12 +2,12 @@
 
 :root {
   --timer-prep: oklch(0.65 0.18 145);
-  --timer-work: oklch(0.6 0.22 25);
+  --timer-active: oklch(0.6 0.22 25);
   --timer-rest: oklch(0.62 0.18 240);
 }
 
 .dark {
   --timer-prep: oklch(0.7 0.16 145);
-  --timer-work: oklch(0.68 0.2 25);
+  --timer-active: oklch(0.68 0.2 25);
   --timer-rest: oklch(0.7 0.16 240);
 }

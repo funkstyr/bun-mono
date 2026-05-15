@@ -31,7 +31,7 @@ describe("loadAndMigrate", () => {
           name: "Test",
           createdAt: 1_700_000_000_000,
           updatedAt: 1_700_000_000_000,
-          sets: [{ rounds: 5, workSec: 30, restSec: 10, prepSec: 5 }],
+          sets: [{ rounds: 5, activeSec: 30, restSec: 10, prepSec: 5 }],
         },
       ],
     };
@@ -57,7 +57,7 @@ describe("loadAndMigrate", () => {
             name: "x",
             createdAt: 0,
             updatedAt: 0,
-            sets: [{ rounds: 0, workSec: 30, restSec: 10, prepSec: 5 }],
+            sets: [{ rounds: 0, activeSec: 30, restSec: 10, prepSec: 5 }],
           },
         ],
       }),

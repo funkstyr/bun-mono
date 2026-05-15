@@ -51,7 +51,7 @@ export function ListView({ onNavigate }: ListViewProps) {
 
 function TimerCard({ timer }: { timer: SavedTimer }) {
   const set = timer.sets[0]!;
-  const summary = `${set.rounds} rounds · ${formatMmSs(set.workSec)} work / ${formatMmSs(set.restSec)} rest`;
+  const summary = `${set.rounds} rounds · ${formatMmSs(set.activeSec)} active / ${formatMmSs(set.restSec)} rest`;
   return (
     <Card>
       <CardContent className="space-y-1">

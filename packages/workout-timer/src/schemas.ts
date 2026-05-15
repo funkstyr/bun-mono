@@ -2,7 +2,7 @@ import { type } from "arktype";
 
 export const setConfigSchema = type({
   rounds: "1 <= number.integer <= 99",
-  workSec: "1 <= number.integer <= 3600",
+  activeSec: "1 <= number.integer <= 3600",
   restSec: "0 <= number.integer <= 3600",
   prepSec: "0 <= number.integer <= 60",
 });
@@ -35,7 +35,7 @@ export const emptyStore = (): StoredV1 => ({
 
 export const defaultSetConfig = (): SetConfig => ({
   rounds: 5,
-  workSec: 30,
+  activeSec: 30,
   restSec: 10,
   prepSec: 5,
 });
@@ -43,7 +43,7 @@ export const defaultSetConfig = (): SetConfig => ({
 export const nameSchema = type("1 <= string <= 60");
 export const roundsSchema = type("1 <= number.integer <= 99");
 export const prepSecSchema = type("0 <= number.integer <= 60");
-export const workSecSchema = type("1 <= number.integer <= 3600");
+export const activeSecSchema = type("1 <= number.integer <= 3600");
 export const restSecSchema = type("0 <= number.integer <= 3600");
 export const minutesSchema = type("0 <= number.integer <= 60");
 export const secondsRemSchema = type("0 <= number.integer <= 59");
