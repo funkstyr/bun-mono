@@ -38,8 +38,13 @@ function FormField({ field, children }: { field: FieldLike; children: React.Reac
   const hasError = errorMessages.length > 0;
   const errorIds = hasError ? `${id}-error` : "";
 
+  const contextValue = React.useMemo(
+    () => ({ id, name: field.name, errorIds, hasError, errorMessages }),
+    [id, field.name, errorIds, hasError, errorMessages],
+  );
+
   return (
-    <FormFieldContext.Provider value={{ id, name: field.name, errorIds, hasError, errorMessages }}>
+    <FormFieldContext.Provider value={contextValue}>
       <div className="space-y-2">{children}</div>
     </FormFieldContext.Provider>
   );

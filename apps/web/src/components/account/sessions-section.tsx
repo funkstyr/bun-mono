@@ -1,10 +1,59 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-
+import { client, orpc } from "@/utils/orpc";
 import { Button } from "@bun-mono/core-ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@bun-mono/core-ui/card";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
+import { toast } from "sonner";
 
-import { client, orpc } from "@/utils/orpc";
+type SessionItem = {
+  id: string;
+  browser: string;
+  os: string;
+  device: string;
+  ipAddress?: string | null;
+  lastActiveAt: Date | string;
+  isCurrent?: boolean;
+};
+
+function SessionRow({
+  session,
+  onRevoke,
+  isRevoking,
+}: {
+  session: SessionItem;
+  onRevoke: (id: string) => void;
+  isRevoking: boolean;
+}) {
+  const handleRevoke = useCallback(() => onRevoke(session.id), [onRevoke, session.id]);
+  return (
+    <li className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
+      <div className="min-w-0 flex-1 space-y-0.5">
+        <div className="flex items-center gap-2">
+          <span className="font-medium">
+            {session.browser} on {session.os}
+          </span>
+          {session.isCurrent ? (
+            <span className="bg-primary/10 text-primary rounded-none px-1.5 py-0.5 text-[10px] font-medium tracking-wide uppercase">
+              Current
+            </span>
+          ) : null}
+        </div>
+        <div className="text-muted-foreground">
+          {session.device}
+          {session.ipAddress ? ` · ${session.ipAddress}` : ""}
+        </div>
+        <div className="text-muted-foreground">
+          Last active {formatRelative(session.lastActiveAt)}
+        </div>
+      </div>
+      {!session.isCurrent ? (
+        <Button variant="outline" size="sm" disabled={isRevoking} onClick={handleRevoke}>
+          Revoke
+        </Button>
+      ) : null}
+    </li>
+  );
+}
 
 const RELATIVE_TIME = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
 
@@ -55,6 +104,9 @@ export function SessionsSection() {
 
   const hasOthers = (sessions?.length ?? 0) > 1;
 
+  const handleRevoke = useCallback((id: string) => revoke.mutate(id), [revoke]);
+  const handleRevokeOthers = useCallback(() => revokeOthers.mutate(), [revokeOthers]);
+
   return (
     <Card>
       <CardHeader>
@@ -69,40 +121,12 @@ export function SessionsSection() {
         ) : (
           <ul className="divide-y">
             {sessions.map((s) => (
-              <li
+              <SessionRow
                 key={s.id}
-                className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0"
-              >
-                <div className="min-w-0 flex-1 space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">
-                      {s.browser} on {s.os}
-                    </span>
-                    {s.isCurrent ? (
-                      <span className="bg-primary/10 text-primary rounded-none px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide">
-                        Current
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="text-muted-foreground">
-                    {s.device}
-                    {s.ipAddress ? ` · ${s.ipAddress}` : ""}
-                  </div>
-                  <div className="text-muted-foreground">
-                    Last active {formatRelative(s.lastActiveAt)}
-                  </div>
-                </div>
-                {!s.isCurrent ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={revoke.isPending && revoke.variables === s.id}
-                    onClick={() => revoke.mutate(s.id)}
-                  >
-                    Revoke
-                  </Button>
-                ) : null}
-              </li>
+                session={s}
+                onRevoke={handleRevoke}
+                isRevoking={revoke.isPending && revoke.variables === s.id}
+              />
             ))}
           </ul>
         )}
@@ -113,7 +137,7 @@ export function SessionsSection() {
               variant="destructive"
               size="sm"
               disabled={revokeOthers.isPending}
-              onClick={() => revokeOthers.mutate()}
+              onClick={handleRevokeOthers}
             >
               {revokeOthers.isPending ? "Signing out..." : "Sign out everywhere else"}
             </Button>

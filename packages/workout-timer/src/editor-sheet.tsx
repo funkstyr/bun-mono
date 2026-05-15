@@ -1,7 +1,3 @@
-import { useForm } from "@tanstack/react-form";
-import { type } from "arktype";
-import { MinusIcon, PlusIcon } from "lucide-react";
-
 import { Button } from "@bun-mono/core-ui/button";
 import {
   Dialog,
@@ -12,6 +8,10 @@ import {
 } from "@bun-mono/core-ui/dialog";
 import { Input } from "@bun-mono/core-ui/input";
 import { Label } from "@bun-mono/core-ui/label";
+import { useForm } from "@tanstack/react-form";
+import { type } from "arktype";
+import { MinusIcon, PlusIcon } from "lucide-react";
+import { useCallback } from "react";
 
 import {
   minutesSchema,
@@ -34,7 +34,7 @@ export type EditorInitialValues = {
 export type EditorSheetProps = {
   open: boolean;
   onClose: () => void;
-  initialValues?: EditorInitialValues;
+  initialValues: EditorInitialValues | undefined;
 };
 
 type EditorFormValues = {
@@ -132,6 +132,35 @@ const validateActiveSecRem = validateSecondsRem("Active");
 const validateRestMin = validateMinutes("Rest");
 const validateRestSecRem = validateSecondsRem("Rest");
 
+const nameValidators = { onChange: validateName, onBlur: validateName };
+const roundsValidators = { onChange: validateRounds };
+const prepSecValidators = { onChange: validatePrepSec };
+const activeMinValidators = { onChange: validateActiveMin };
+const activeSecRemValidators = { onChange: validateActiveSecRem };
+const restMinValidators = { onChange: validateRestMin };
+const restSecRemValidators = { onChange: validateRestSecRem };
+
+const activeComposedSelector = (s: { values: { activeMin: number; activeSecRem: number } }) =>
+  [s.values.activeMin, s.values.activeSecRem] as const;
+
+const restComposedSelector = (s: { values: { restMin: number; restSecRem: number } }) =>
+  [s.values.restMin, s.values.restSecRem] as const;
+
+const submitSelector = (s: {
+  canSubmit: boolean;
+  isDirty: boolean;
+  isSubmitting: boolean;
+  values: { activeMin: number; activeSecRem: number; restMin: number; restSecRem: number };
+}) => ({
+  canSubmit: s.canSubmit,
+  isDirty: s.isDirty,
+  isSubmitting: s.isSubmitting,
+  activeMin: s.values.activeMin,
+  activeSecRem: s.values.activeSecRem,
+  restMin: s.values.restMin,
+  restSecRem: s.values.restSecRem,
+});
+
 type NumericFieldProps = {
   id: string;
   value: number;
@@ -155,9 +184,24 @@ function NumericStepper({
   disabled,
   ariaInvalid,
 }: NumericFieldProps) {
-  const clamp = (n: number) => Math.max(min, Math.min(max, n));
-  const decrement = () => onChange(clamp(value - step));
-  const increment = () => onChange(clamp(value + step));
+  const decrement = useCallback(() => {
+    onChange(Math.max(min, Math.min(max, value - step)));
+  }, [onChange, min, max, value, step]);
+  const increment = useCallback(() => {
+    onChange(Math.max(min, Math.min(max, value + step)));
+  }, [onChange, min, max, value, step]);
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const raw = e.target.value;
+      if (raw === "") {
+        onChange(Number.NaN);
+        return;
+      }
+      const parsed = Number.parseInt(raw, 10);
+      onChange(Number.isNaN(parsed) ? Number.NaN : parsed);
+    },
+    [onChange],
+  );
   return (
     <div className="flex items-center gap-1">
       <Button
@@ -175,15 +219,7 @@ function NumericStepper({
         type="number"
         inputMode="numeric"
         value={Number.isFinite(value) ? String(value) : ""}
-        onChange={(e) => {
-          const raw = e.target.value;
-          if (raw === "") {
-            onChange(Number.NaN);
-            return;
-          }
-          const parsed = Number.parseInt(raw, 10);
-          onChange(Number.isNaN(parsed) ? Number.NaN : parsed);
-        }}
+        onChange={handleInputChange}
         onBlur={onBlur}
         min={min}
         max={max}
@@ -206,12 +242,43 @@ function NumericStepper({
   );
 }
 
-function FieldError({ message }: { message?: string }) {
+function FieldError({ message }: { message: string | undefined }) {
   if (!message) return null;
   return (
     <p className="text-destructive text-xs" role="alert">
       {message}
     </p>
+  );
+}
+
+function NameTextField({
+  field,
+}: {
+  field: {
+    name: string;
+    state: { value: string; meta: { errors: ReadonlyArray<unknown> } };
+    handleBlur: () => void;
+    handleChange: (value: string) => void;
+  };
+}) {
+  const errorMsg = firstStringError(field.state.meta.errors);
+  const onChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => field.handleChange(e.target.value),
+    [field],
+  );
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={field.name}>Name</Label>
+      <Input
+        id={field.name}
+        name={field.name}
+        value={field.state.value}
+        onBlur={field.handleBlur}
+        onChange={onChange}
+        aria-invalid={errorMsg ? true : undefined}
+      />
+      <FieldError message={errorMsg} />
+    </div>
   );
 }
 
@@ -240,9 +307,21 @@ export function EditorSheet({ open, onClose, initialValues }: EditorSheetProps) 
     },
   });
 
-  const handleOpenChange = (next: boolean) => {
-    if (!next) onClose();
-  };
+  const handleOpenChange = useCallback(
+    (next: boolean) => {
+      if (!next) onClose();
+    },
+    [onClose],
+  );
+
+  const handleSubmit = useCallback(
+    (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      void form.handleSubmit();
+    },
+    [form],
+  );
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -251,36 +330,12 @@ export function EditorSheet({ open, onClose, initialValues }: EditorSheetProps) 
           <DialogTitle>{isEdit ? "Edit timer" : "New timer"}</DialogTitle>
         </DialogHeader>
 
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            void form.handleSubmit();
-          }}
-          className="space-y-4"
-        >
-          <form.Field name="name" validators={{ onChange: validateName, onBlur: validateName }}>
-            {(field) => {
-              const errorMsg = firstStringError(field.state.meta.errors);
-              return (
-                <div className="space-y-1.5">
-                  <Label htmlFor={field.name}>Name</Label>
-                  <Input
-                    id={field.name}
-                    name={field.name}
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    aria-invalid={errorMsg ? true : undefined}
-                    autoFocus
-                  />
-                  <FieldError message={errorMsg} />
-                </div>
-              );
-            }}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <form.Field name="name" validators={nameValidators}>
+            {(field) => <NameTextField field={field} />}
           </form.Field>
 
-          <form.Field name="rounds" validators={{ onChange: validateRounds }}>
+          <form.Field name="rounds" validators={roundsValidators}>
             {(field) => {
               const errorMsg = firstStringError(field.state.meta.errors);
               return (
@@ -289,7 +344,7 @@ export function EditorSheet({ open, onClose, initialValues }: EditorSheetProps) 
                   <NumericStepper
                     id={field.name}
                     value={field.state.value}
-                    onChange={(v) => field.handleChange(v)}
+                    onChange={field.handleChange}
                     onBlur={field.handleBlur}
                     step={1}
                     min={1}
@@ -302,7 +357,7 @@ export function EditorSheet({ open, onClose, initialValues }: EditorSheetProps) 
             }}
           </form.Field>
 
-          <form.Field name="prepSec" validators={{ onChange: validatePrepSec }}>
+          <form.Field name="prepSec" validators={prepSecValidators}>
             {(field) => {
               const errorMsg = firstStringError(field.state.meta.errors);
               return (
@@ -311,7 +366,7 @@ export function EditorSheet({ open, onClose, initialValues }: EditorSheetProps) 
                   <NumericStepper
                     id={field.name}
                     value={field.state.value}
-                    onChange={(v) => field.handleChange(v)}
+                    onChange={field.handleChange}
                     onBlur={field.handleBlur}
                     step={5}
                     min={0}
@@ -327,19 +382,19 @@ export function EditorSheet({ open, onClose, initialValues }: EditorSheetProps) 
           <div className="space-y-1.5">
             <Label>Active</Label>
             <div className="flex items-end gap-3">
-              <form.Field name="activeMin" validators={{ onChange: validateActiveMin }}>
+              <form.Field name="activeMin" validators={activeMinValidators}>
                 {(field) => (
                   <div className="flex flex-col gap-1">
                     <Label
                       htmlFor={field.name}
-                      className="text-muted-foreground text-[10px] uppercase tracking-wide"
+                      className="text-muted-foreground text-[10px] tracking-wide uppercase"
                     >
                       Min
                     </Label>
                     <NumericStepper
                       id={field.name}
                       value={field.state.value}
-                      onChange={(v) => field.handleChange(v)}
+                      onChange={field.handleChange}
                       onBlur={field.handleBlur}
                       step={1}
                       min={0}
@@ -349,19 +404,19 @@ export function EditorSheet({ open, onClose, initialValues }: EditorSheetProps) 
                   </div>
                 )}
               </form.Field>
-              <form.Field name="activeSecRem" validators={{ onChange: validateActiveSecRem }}>
+              <form.Field name="activeSecRem" validators={activeSecRemValidators}>
                 {(field) => (
                   <div className="flex flex-col gap-1">
                     <Label
                       htmlFor={field.name}
-                      className="text-muted-foreground text-[10px] uppercase tracking-wide"
+                      className="text-muted-foreground text-[10px] tracking-wide uppercase"
                     >
                       Sec
                     </Label>
                     <NumericStepper
                       id={field.name}
                       value={field.state.value}
-                      onChange={(v) => field.handleChange(v)}
+                      onChange={field.handleChange}
                       onBlur={field.handleBlur}
                       step={5}
                       min={0}
@@ -372,7 +427,7 @@ export function EditorSheet({ open, onClose, initialValues }: EditorSheetProps) 
                 )}
               </form.Field>
             </div>
-            <form.Subscribe selector={(s) => [s.values.activeMin, s.values.activeSecRem] as const}>
+            <form.Subscribe selector={activeComposedSelector}>
               {([m, sec]) => <FieldError message={composedActiveError(m, sec)} />}
             </form.Subscribe>
           </div>
@@ -380,19 +435,19 @@ export function EditorSheet({ open, onClose, initialValues }: EditorSheetProps) 
           <div className="space-y-1.5">
             <Label>Rest</Label>
             <div className="flex items-end gap-3">
-              <form.Field name="restMin" validators={{ onChange: validateRestMin }}>
+              <form.Field name="restMin" validators={restMinValidators}>
                 {(field) => (
                   <div className="flex flex-col gap-1">
                     <Label
                       htmlFor={field.name}
-                      className="text-muted-foreground text-[10px] uppercase tracking-wide"
+                      className="text-muted-foreground text-[10px] tracking-wide uppercase"
                     >
                       Min
                     </Label>
                     <NumericStepper
                       id={field.name}
                       value={field.state.value}
-                      onChange={(v) => field.handleChange(v)}
+                      onChange={field.handleChange}
                       onBlur={field.handleBlur}
                       step={1}
                       min={0}
@@ -402,19 +457,19 @@ export function EditorSheet({ open, onClose, initialValues }: EditorSheetProps) 
                   </div>
                 )}
               </form.Field>
-              <form.Field name="restSecRem" validators={{ onChange: validateRestSecRem }}>
+              <form.Field name="restSecRem" validators={restSecRemValidators}>
                 {(field) => (
                   <div className="flex flex-col gap-1">
                     <Label
                       htmlFor={field.name}
-                      className="text-muted-foreground text-[10px] uppercase tracking-wide"
+                      className="text-muted-foreground text-[10px] tracking-wide uppercase"
                     >
                       Sec
                     </Label>
                     <NumericStepper
                       id={field.name}
                       value={field.state.value}
-                      onChange={(v) => field.handleChange(v)}
+                      onChange={field.handleChange}
                       onBlur={field.handleBlur}
                       step={5}
                       min={0}
@@ -425,7 +480,7 @@ export function EditorSheet({ open, onClose, initialValues }: EditorSheetProps) 
                 )}
               </form.Field>
             </div>
-            <form.Subscribe selector={(s) => [s.values.restMin, s.values.restSecRem] as const}>
+            <form.Subscribe selector={restComposedSelector}>
               {([m, sec]) => <FieldError message={composedRestError(m, sec)} />}
             </form.Subscribe>
           </div>
@@ -434,17 +489,7 @@ export function EditorSheet({ open, onClose, initialValues }: EditorSheetProps) 
             <Button type="button" variant="outline" size="sm" onClick={onClose}>
               Cancel
             </Button>
-            <form.Subscribe
-              selector={(s) => ({
-                canSubmit: s.canSubmit,
-                isDirty: s.isDirty,
-                isSubmitting: s.isSubmitting,
-                activeMin: s.values.activeMin,
-                activeSecRem: s.values.activeSecRem,
-                restMin: s.values.restMin,
-                restSecRem: s.values.restSecRem,
-              })}
-            >
+            <form.Subscribe selector={submitSelector}>
               {(state) => {
                 const composedInvalid =
                   composedActiveError(state.activeMin, state.activeSecRem) !== undefined ||

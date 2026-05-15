@@ -1,5 +1,4 @@
 import type { Logger, LoggerOptions } from "pino";
-
 import pino from "pino";
 
 // Log levels: trace, debug, info, warn, error, fatal

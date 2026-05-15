@@ -1,14 +1,59 @@
-import { ORPCError } from "@orpc/client";
-import { useForm } from "@tanstack/react-form";
-import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-
+import { client, orpc } from "@/utils/orpc";
 import { Button } from "@bun-mono/core-ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@bun-mono/core-ui/card";
 import { FormControl, FormField, FormLabel, FormMessage } from "@bun-mono/core-ui/form";
 import { Input } from "@bun-mono/core-ui/input";
+import { ORPCError } from "@orpc/client";
+import { useForm } from "@tanstack/react-form";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCallback, useMemo } from "react";
+import { toast } from "sonner";
 
-import { client, orpc } from "@/utils/orpc";
+type StringField = {
+  name: string;
+  state: { value: string; meta: { errors: Array<{ message?: string } | string | undefined> } };
+  handleBlur: () => void;
+  handleChange: (value: string) => void;
+};
+
+function PasswordField({
+  field,
+  label,
+  autoComplete,
+}: {
+  field: StringField;
+  label: string;
+  autoComplete: "current-password" | "new-password";
+}) {
+  const onChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => field.handleChange(e.target.value),
+    [field],
+  );
+  return (
+    <FormField field={field}>
+      <FormLabel>{label}</FormLabel>
+      <FormControl>
+        <Input
+          type="password"
+          autoComplete={autoComplete}
+          value={field.state.value}
+          onBlur={field.handleBlur}
+          onChange={onChange}
+        />
+      </FormControl>
+      <FormMessage />
+    </FormField>
+  );
+}
+
+const currentPasswordValidators = {
+  onChange: ({ value }: { value: string }) => (value.length < 1 ? "Required" : undefined),
+};
+
+const newPasswordValidators = {
+  onChange: ({ value }: { value: string }) =>
+    value.length < 8 ? "New password must be at least 8 characters" : undefined,
+};
 
 export function PasswordSection() {
   const queryClient = useQueryClient();
@@ -49,6 +94,35 @@ export function PasswordSection() {
     },
   });
 
+  const handleSubmit = useCallback(
+    (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      void form.handleSubmit();
+    },
+    [form],
+  );
+
+  const confirmNewPasswordValidators = useMemo(
+    () => ({
+      onChangeListenTo: ["newPassword"] as Array<"newPassword">,
+      onChange: ({
+        value,
+        fieldApi,
+      }: {
+        value: string;
+        fieldApi: { form: { getFieldValue: (name: "newPassword") => string } };
+      }) => {
+        if (value.length === 0) return "Required";
+        if (value !== fieldApi.form.getFieldValue("newPassword")) {
+          return "Passwords do not match";
+        }
+        return undefined;
+      },
+    }),
+    [],
+  );
+
   return (
     <Card>
       <CardHeader>
@@ -58,88 +132,30 @@ export function PasswordSection() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            form.handleSubmit();
-          }}
-          className="space-y-4"
-        >
-          <form.Field
-            name="currentPassword"
-            validators={{
-              onChange: ({ value }) => (value.length < 1 ? "Required" : undefined),
-            }}
-          >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <form.Field name="currentPassword" validators={currentPasswordValidators}>
             {(field) => (
-              <FormField field={field}>
-                <FormLabel>Current password</FormLabel>
-                <FormControl>
-                  <Input
-                    type="password"
-                    autoComplete="current-password"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormField>
+              <PasswordField
+                field={field}
+                label="Current password"
+                autoComplete="current-password"
+              />
             )}
           </form.Field>
 
-          <form.Field
-            name="newPassword"
-            validators={{
-              onChange: ({ value }) =>
-                value.length < 8 ? "New password must be at least 8 characters" : undefined,
-            }}
-          >
+          <form.Field name="newPassword" validators={newPasswordValidators}>
             {(field) => (
-              <FormField field={field}>
-                <FormLabel>New password</FormLabel>
-                <FormControl>
-                  <Input
-                    type="password"
-                    autoComplete="new-password"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormField>
+              <PasswordField field={field} label="New password" autoComplete="new-password" />
             )}
           </form.Field>
 
-          <form.Field
-            name="confirmNewPassword"
-            validators={{
-              onChangeListenTo: ["newPassword"],
-              onChange: ({ value, fieldApi }) => {
-                if (value.length === 0) return "Required";
-                if (value !== fieldApi.form.getFieldValue("newPassword")) {
-                  return "Passwords do not match";
-                }
-                return undefined;
-              },
-            }}
-          >
+          <form.Field name="confirmNewPassword" validators={confirmNewPasswordValidators}>
             {(field) => (
-              <FormField field={field}>
-                <FormLabel>Confirm new password</FormLabel>
-                <FormControl>
-                  <Input
-                    type="password"
-                    autoComplete="new-password"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormField>
+              <PasswordField
+                field={field}
+                label="Confirm new password"
+                autoComplete="new-password"
+              />
             )}
           </form.Field>
 

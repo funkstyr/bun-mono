@@ -1,12 +1,10 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
-
-import { getUser } from "@/functions/get-user";
-
 import { DangerZoneSection } from "@/components/account/danger-zone-section";
 import { PasswordSection } from "@/components/account/password-section";
 import { ProfileSection } from "@/components/account/profile-section";
 import { SessionsSection } from "@/components/account/sessions-section";
 import { ThemeSection } from "@/components/account/theme-section";
+import { getUser } from "@/functions/get-user";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/account")({
   component: RouteComponent,
@@ -28,7 +26,7 @@ function RouteComponent() {
 
   return (
     <div className="overflow-y-auto">
-      <div className="mx-auto w-full max-w-2xl px-4 py-8 space-y-6">
+      <div className="mx-auto w-full max-w-2xl space-y-6 px-4 py-8">
         <h1 className="text-xl font-semibold">Account</h1>
 
         <ThemeSection />

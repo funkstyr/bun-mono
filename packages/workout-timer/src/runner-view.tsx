@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@bun-mono/core-ui/button";
 import {
   PauseIcon,
   PlayIcon,
@@ -8,8 +8,7 @@ import {
   VolumeXIcon,
   XIcon,
 } from "lucide-react";
-
-import { Button } from "@bun-mono/core-ui/button";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { isMuted, playComplete, playPhaseChange, playTick, setMuted } from "./audio";
 import { CountdownRing } from "./countdown-ring";
@@ -73,6 +72,54 @@ const phaseColor = (phase: Phase): string => {
   }
 };
 
+const rootStyle = {
+  "--ring-size": "min(clamp(240px, 70dvmin, 1200px), 50dvh)",
+  "--rhythm-gap": "clamp(12px, calc(var(--ring-size) * 0.06), 80px)",
+  "--btn-size": "max(44px, calc(var(--ring-size) * 0.18))",
+  "--btn-pause-size": "max(48px, calc(var(--ring-size) * 0.22))",
+} as React.CSSProperties;
+
+const rhythmGapStyle = { gap: "var(--rhythm-gap)" } as const;
+
+const phaseLabelStyle = {
+  fontSize: "calc(var(--ring-size) * 0.13)",
+  lineHeight: 1.1,
+} as const;
+
+const remainingTimeStyle = {
+  fontSize: "calc(var(--ring-size) * 0.28)",
+  lineHeight: 1,
+} as const;
+
+const pausedLabelStyle = {
+  fontSize: "max(11px, calc(var(--ring-size) * 0.045))",
+  lineHeight: 1.2,
+} as const;
+
+const roundIndicatorStyle = {
+  fontSize: "calc(var(--ring-size) * 0.075)",
+  lineHeight: 1.2,
+  minHeight: "1.5em",
+} as const;
+
+const sideButtonStyle = { width: "var(--btn-size)", height: "var(--btn-size)" } as const;
+const sideIconStyle = {
+  width: "calc(var(--btn-size) * 0.4)",
+  height: "calc(var(--btn-size) * 0.4)",
+} as const;
+const pauseButtonStyle = {
+  width: "var(--btn-pause-size)",
+  height: "var(--btn-pause-size)",
+} as const;
+const pauseIconStyle = {
+  width: "calc(var(--btn-pause-size) * 0.4)",
+  height: "calc(var(--btn-pause-size) * 0.4)",
+} as const;
+const totalLineStyle = {
+  fontSize: "max(12px, calc(var(--ring-size) * 0.05))",
+  lineHeight: 1.4,
+} as const;
+
 export function RunnerView({ timer, onNavigate }: RunnerViewProps) {
   const config = useMemo(() => timer.sets[0]!, [timer]);
 
@@ -104,6 +151,15 @@ export function RunnerView({ timer, onNavigate }: RunnerViewProps) {
 
   useWakeLock(engine.state.phase !== "idle" && engine.state.phase !== "complete");
 
+  const goHome = useCallback(() => {
+    onNavigate({ view: "list", timerId: null });
+  }, [onNavigate]);
+
+  const phaseLabelDynamicStyle = useMemo(
+    () => ({ ...phaseLabelStyle, color: phaseColor(engine.state.phase) }),
+    [engine.state.phase],
+  );
+
   const startWorkout = useCallback(() => {
     workoutStartedAtRef.current = Date.now();
     setElapsedMs(null);
@@ -126,7 +182,7 @@ export function RunnerView({ timer, onNavigate }: RunnerViewProps) {
         elapsedMs={elapsedMs ?? 0}
         rounds={config.rounds}
         onRepeat={startWorkout}
-        onDone={() => onNavigate({ view: "list", timerId: null })}
+        onDone={goHome}
       />
     );
   }
@@ -145,24 +201,14 @@ export function RunnerView({ timer, onNavigate }: RunnerViewProps) {
   const isPaused = state.isPaused;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col bg-background"
-      style={
-        {
-          "--ring-size": "min(clamp(240px, 70dvmin, 1200px), 50dvh)",
-          "--rhythm-gap": "clamp(12px, calc(var(--ring-size) * 0.06), 80px)",
-          "--btn-size": "max(44px, calc(var(--ring-size) * 0.18))",
-          "--btn-pause-size": "max(48px, calc(var(--ring-size) * 0.22))",
-        } as React.CSSProperties
-      }
-    >
+    <div className="bg-background fixed inset-0 z-50 flex flex-col" style={rootStyle}>
       <div className="flex items-center justify-between px-4 py-3">
         <Button
           type="button"
           variant="ghost"
           size="icon"
           aria-label="Cancel workout"
-          onClick={() => onNavigate({ view: "list", timerId: null })}
+          onClick={goHome}
         >
           <XIcon />
         </Button>
@@ -178,18 +224,8 @@ export function RunnerView({ timer, onNavigate }: RunnerViewProps) {
         </Button>
       </div>
 
-      <div
-        className="flex flex-1 flex-col items-center justify-center px-4"
-        style={{ gap: "var(--rhythm-gap)" }}
-      >
-        <div
-          className="font-semibold tracking-wide uppercase"
-          style={{
-            color: phaseColor(state.phase),
-            fontSize: "calc(var(--ring-size) * 0.13)",
-            lineHeight: 1.1,
-          }}
-        >
+      <div className="flex flex-1 flex-col items-center justify-center px-4" style={rhythmGapStyle}>
+        <div className="font-semibold tracking-wide uppercase" style={phaseLabelDynamicStyle}>
           {phaseLabel(state.phase)}
         </div>
 
@@ -200,22 +236,13 @@ export function RunnerView({ timer, onNavigate }: RunnerViewProps) {
             remainingMs={state.remainingMs}
           >
             <div className="flex flex-col items-center gap-1">
-              <div
-                className="font-bold tabular-nums"
-                style={{
-                  fontSize: "calc(var(--ring-size) * 0.28)",
-                  lineHeight: 1,
-                }}
-              >
+              <div className="font-bold tabular-nums" style={remainingTimeStyle}>
                 {formatMmSs(state.remainingMs / 1000)}
               </div>
               {isPaused ? (
                 <div
-                  className="font-semibold tracking-widest text-muted-foreground uppercase"
-                  style={{
-                    fontSize: "max(11px, calc(var(--ring-size) * 0.045))",
-                    lineHeight: 1.2,
-                  }}
+                  className="text-muted-foreground font-semibold tracking-widest uppercase"
+                  style={pausedLabelStyle}
                 >
                   Paused
                 </div>
@@ -224,32 +251,20 @@ export function RunnerView({ timer, onNavigate }: RunnerViewProps) {
           </CountdownRing>
         </div>
 
-        <div
-          className="text-muted-foreground"
-          style={{
-            fontSize: "calc(var(--ring-size) * 0.075)",
-            lineHeight: 1.2,
-            minHeight: "1.5em",
-          }}
-        >
+        <div className="text-muted-foreground" style={roundIndicatorStyle}>
           {showRoundIndicator ? `Round ${state.currentRound} of ${config.rounds}` : ""}
         </div>
 
-        <div className="flex items-center" style={{ gap: "var(--rhythm-gap)" }}>
+        <div className="flex items-center" style={rhythmGapStyle}>
           <Button
             type="button"
             variant="outline"
             size="lg"
             aria-label="Reset workout"
             onClick={engine.controls.reset}
-            style={{ width: "var(--btn-size)", height: "var(--btn-size)" }}
+            style={sideButtonStyle}
           >
-            <RotateCcwIcon
-              style={{
-                width: "calc(var(--btn-size) * 0.4)",
-                height: "calc(var(--btn-size) * 0.4)",
-              }}
-            />
+            <RotateCcwIcon style={sideIconStyle} />
           </Button>
           <Button
             type="button"
@@ -257,23 +272,9 @@ export function RunnerView({ timer, onNavigate }: RunnerViewProps) {
             className="rounded-full"
             aria-label={isPaused ? "Resume workout" : "Pause workout"}
             onClick={isPaused ? engine.controls.resume : engine.controls.pause}
-            style={{ width: "var(--btn-pause-size)", height: "var(--btn-pause-size)" }}
+            style={pauseButtonStyle}
           >
-            {isPaused ? (
-              <PlayIcon
-                style={{
-                  width: "calc(var(--btn-pause-size) * 0.4)",
-                  height: "calc(var(--btn-pause-size) * 0.4)",
-                }}
-              />
-            ) : (
-              <PauseIcon
-                style={{
-                  width: "calc(var(--btn-pause-size) * 0.4)",
-                  height: "calc(var(--btn-pause-size) * 0.4)",
-                }}
-              />
-            )}
+            {isPaused ? <PlayIcon style={pauseIconStyle} /> : <PauseIcon style={pauseIconStyle} />}
           </Button>
           <Button
             type="button"
@@ -281,25 +282,14 @@ export function RunnerView({ timer, onNavigate }: RunnerViewProps) {
             size="lg"
             aria-label="Skip phase"
             onClick={engine.controls.skip}
-            style={{ width: "var(--btn-size)", height: "var(--btn-size)" }}
+            style={sideButtonStyle}
           >
-            <SkipForwardIcon
-              style={{
-                width: "calc(var(--btn-size) * 0.4)",
-                height: "calc(var(--btn-size) * 0.4)",
-              }}
-            />
+            <SkipForwardIcon style={sideIconStyle} />
           </Button>
         </div>
       </div>
 
-      <div
-        className="px-4 py-6 text-center text-muted-foreground"
-        style={{
-          fontSize: "max(12px, calc(var(--ring-size) * 0.05))",
-          lineHeight: 1.4,
-        }}
-      >
+      <div className="text-muted-foreground px-4 py-6 text-center" style={totalLineStyle}>
         Total: {formatMmSs(totalSeconds)} left
       </div>
     </div>
@@ -316,19 +306,19 @@ type CompleteViewProps = {
 function CompleteView({ elapsedMs, rounds, onRepeat, onDone }: CompleteViewProps) {
   const elapsedSeconds = Math.round(elapsedMs / 1000);
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-background">
+    <div className="bg-background fixed inset-0 z-50 flex flex-col">
       <div className="flex flex-1 flex-col items-center justify-center gap-8 px-4 text-center">
         <div className="text-5xl font-bold tracking-wide">DONE</div>
         <div className="flex flex-col items-center gap-3">
           <div className="flex flex-col items-center">
             <div className="text-4xl font-semibold tabular-nums">{formatMmSs(elapsedSeconds)}</div>
-            <div className="text-xs tracking-widest text-muted-foreground uppercase">
+            <div className="text-muted-foreground text-xs tracking-widest uppercase">
               Total time
             </div>
           </div>
           <div className="flex flex-col items-center">
             <div className="text-4xl font-semibold tabular-nums">{rounds}</div>
-            <div className="text-xs tracking-widest text-muted-foreground uppercase">
+            <div className="text-muted-foreground text-xs tracking-widest uppercase">
               Rounds completed
             </div>
           </div>

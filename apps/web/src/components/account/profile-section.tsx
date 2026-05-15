@@ -1,15 +1,50 @@
-import { useForm } from "@tanstack/react-form";
-import { ORPCError } from "@orpc/client";
-import { toast } from "sonner";
-
+import { authClient } from "@/lib/auth-client";
+import { client } from "@/utils/orpc";
 import { validateUsername } from "@bun-mono/api/lib/validate-username";
 import { Button } from "@bun-mono/core-ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@bun-mono/core-ui/card";
 import { FormControl, FormField, FormLabel, FormMessage } from "@bun-mono/core-ui/form";
 import { Input } from "@bun-mono/core-ui/input";
+import { ORPCError } from "@orpc/client";
+import { useForm } from "@tanstack/react-form";
+import { useCallback } from "react";
+import { toast } from "sonner";
 
-import { authClient } from "@/lib/auth-client";
-import { client } from "@/utils/orpc";
+type StringField = {
+  name: string;
+  state: { value: string; meta: { errors: Array<{ message?: string } | string | undefined> } };
+  handleBlur: () => void;
+  handleChange: (value: string) => void;
+};
+
+function ProfileTextField({ field, label }: { field: StringField; label: string }) {
+  const onChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => field.handleChange(e.target.value),
+    [field],
+  );
+  return (
+    <FormField field={field}>
+      <FormLabel>{label}</FormLabel>
+      <FormControl>
+        <Input value={field.state.value} onBlur={field.handleBlur} onChange={onChange} />
+      </FormControl>
+      <FormMessage />
+    </FormField>
+  );
+}
+
+const nameValidators = {
+  onChange: ({ value }: { value: string }) =>
+    value.trim().length < 2 ? "Name must be at least 2 characters" : undefined,
+};
+
+const usernameValidators = {
+  onChange: ({ value }: { value: string }) => {
+    const result = validateUsername(value);
+    if (!result.ok) return usernameMessages[result.reason];
+    return undefined;
+  },
+};
 
 const usernameMessages: Record<
   Extract<ReturnType<typeof validateUsername>, { ok: false }>["reason"],
@@ -22,9 +57,9 @@ const usernameMessages: Record<
 };
 
 type ProfileUser = {
-  name?: string | null;
-  displayUsername?: string | null;
-  username?: string | null;
+  name?: string | null | undefined;
+  displayUsername?: string | null | undefined;
+  username?: string | null | undefined;
 };
 
 export function ProfileSection({ user }: { user: ProfileUser }) {
@@ -65,6 +100,15 @@ export function ProfileSection({ user }: { user: ProfileUser }) {
     },
   });
 
+  const handleSubmit = useCallback(
+    (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      void form.handleSubmit();
+    },
+    [form],
+  );
+
   return (
     <Card>
       <CardHeader>
@@ -72,59 +116,13 @@ export function ProfileSection({ user }: { user: ProfileUser }) {
         <CardDescription>Update your display name and username.</CardDescription>
       </CardHeader>
       <CardContent>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            form.handleSubmit();
-          }}
-          className="space-y-4"
-        >
-          <form.Field
-            name="name"
-            validators={{
-              onChange: ({ value }) =>
-                value.trim().length < 2 ? "Name must be at least 2 characters" : undefined,
-            }}
-          >
-            {(field) => (
-              <FormField field={field}>
-                <FormLabel>Name</FormLabel>
-                <FormControl>
-                  <Input
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormField>
-            )}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <form.Field name="name" validators={nameValidators}>
+            {(field) => <ProfileTextField field={field} label="Name" />}
           </form.Field>
 
-          <form.Field
-            name="username"
-            validators={{
-              onChange: ({ value }) => {
-                const result = validateUsername(value);
-                if (!result.ok) return usernameMessages[result.reason];
-                return undefined;
-              },
-            }}
-          >
-            {(field) => (
-              <FormField field={field}>
-                <FormLabel>Username</FormLabel>
-                <FormControl>
-                  <Input
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormField>
-            )}
+          <form.Field name="username" validators={usernameValidators}>
+            {(field) => <ProfileTextField field={field} label="Username" />}
           </form.Field>
 
           <form.Subscribe>

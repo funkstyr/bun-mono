@@ -1,7 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
-import { toast } from "sonner";
-
+import { authClient } from "@/lib/auth-client";
+import { client } from "@/utils/orpc";
 import { Button } from "@bun-mono/core-ui/button";
 import {
   Dialog,
@@ -15,9 +13,9 @@ import {
 } from "@bun-mono/core-ui/dialog";
 import { Input } from "@bun-mono/core-ui/input";
 import { Label } from "@bun-mono/core-ui/label";
-
-import { authClient } from "@/lib/auth-client";
-import { client } from "@/utils/orpc";
+import { useNavigate } from "@tanstack/react-router";
+import { useCallback, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 export function DeleteAccountDialog({
   username,
@@ -33,13 +31,16 @@ export function DeleteAccountDialog({
 
   const matches = confirmation.trim().toLowerCase() === username.toLowerCase();
 
-  const onOpenChange = (next: boolean) => {
-    if (isPending) return;
-    setOpen(next);
-    if (!next) setConfirmation("");
-  };
+  const onOpenChange = useCallback(
+    (next: boolean) => {
+      if (isPending) return;
+      setOpen(next);
+      if (!next) setConfirmation("");
+    },
+    [isPending],
+  );
 
-  const onConfirm = async () => {
+  const onConfirm = useCallback(async () => {
     if (!matches || isPending) return;
     setIsPending(true);
     try {
@@ -53,17 +54,34 @@ export function DeleteAccountDialog({
       toast.error(message);
       setIsPending(false);
     }
-  };
+  }, [matches, isPending, confirmation, navigate]);
+
+  const handleConfirmationChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => setConfirmation(e.target.value),
+    [],
+  );
+
+  const triggerRender = useMemo(
+    () => (
+      <Button variant="destructive" size="sm">
+        Delete account
+      </Button>
+    ),
+    [],
+  );
+
+  const cancelRender = useMemo(
+    () => (
+      <Button variant="outline" size="sm" disabled={isPending}>
+        Cancel
+      </Button>
+    ),
+    [isPending],
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger
-        render={
-          <Button variant="destructive" size="sm">
-            Delete account
-          </Button>
-        }
-      />
+      <DialogTrigger render={triggerRender} />
       <DialogContent showClose={!isPending}>
         <DialogHeader>
           <DialogTitle>Delete your account?</DialogTitle>
@@ -81,19 +99,13 @@ export function DeleteAccountDialog({
             id="delete-confirm"
             autoComplete="off"
             value={confirmation}
-            onChange={(e) => setConfirmation(e.target.value)}
+            onChange={handleConfirmationChange}
             disabled={isPending}
           />
         </div>
 
         <DialogFooter>
-          <DialogClose
-            render={
-              <Button variant="outline" size="sm" disabled={isPending}>
-                Cancel
-              </Button>
-            }
-          />
+          <DialogClose render={cancelRender} />
           <Button
             variant="destructive"
             size="sm"

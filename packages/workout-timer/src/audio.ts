@@ -103,8 +103,7 @@ export function playComplete(): void {
   playTone({ frequency: 783.99, durationMs: 800, type: "sine", gain: 0.2 }, 0.24);
 }
 
-// Test-only helper
-export function __resetForTests(): void {
+export function resetForTests(): void {
   ctx = null;
   muted = readPersistedMute();
 }

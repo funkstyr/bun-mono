@@ -1,9 +1,8 @@
-import { useEffect, useId, useState } from "react";
-import { useTheme } from "next-themes";
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@bun-mono/core-ui/card";
 import { Label } from "@bun-mono/core-ui/label";
 import { RadioGroup, RadioGroupItem } from "@bun-mono/core-ui/radio-group";
+import { useTheme } from "next-themes";
+import { useCallback, useEffect, useId, useState } from "react";
 
 const OPTIONS = [
   { value: "light", label: "Light" },
@@ -20,6 +19,8 @@ export function ThemeSection() {
     setMounted(true);
   }, []);
 
+  const handleValueChange = useCallback((value: string) => setTheme(String(value)), [setTheme]);
+
   return (
     <Card>
       <CardHeader>
@@ -29,7 +30,7 @@ export function ThemeSection() {
       <CardContent>
         <RadioGroup
           value={mounted ? (theme ?? "system") : "system"}
-          onValueChange={(value) => setTheme(String(value))}
+          onValueChange={handleValueChange}
           aria-label="Theme"
         >
           {OPTIONS.map((opt) => {

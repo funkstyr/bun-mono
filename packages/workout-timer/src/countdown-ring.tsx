@@ -13,6 +13,9 @@ const phaseStroke: Record<Exclude<Phase, "idle" | "complete">, string> = {
   rest: "var(--timer-rest)",
 };
 
+const ringStyle = { width: "var(--ring-size)", height: "var(--ring-size)" } as const;
+const progressCircleStyle = { transition: "stroke-dashoffset 100ms linear" } as const;
+
 export type CountdownRingProps = {
   phase: Phase;
   phaseDurationMs: number;
@@ -35,7 +38,7 @@ export function CountdownRing({
       : "var(--muted-foreground)";
 
   return (
-    <div className="relative" style={{ width: "var(--ring-size)", height: "var(--ring-size)" }}>
+    <div className="relative" style={ringStyle}>
       <svg
         width="100%"
         height="100%"
@@ -62,7 +65,7 @@ export function CountdownRing({
           strokeDasharray={CIRCUMFERENCE}
           strokeDashoffset={dashOffset}
           transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
-          style={{ transition: "stroke-dashoffset 100ms linear" }}
+          style={progressCircleStyle}
         />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">{children}</div>

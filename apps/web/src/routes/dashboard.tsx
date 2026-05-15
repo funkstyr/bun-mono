@@ -1,8 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, redirect } from "@tanstack/react-router";
-
 import { getUser } from "@/functions/get-user";
 import { orpc } from "@/utils/orpc";
+import { useQuery } from "@tanstack/react-query";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/dashboard")({
   component: RouteComponent,

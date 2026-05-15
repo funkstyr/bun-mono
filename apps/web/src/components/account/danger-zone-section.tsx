@@ -3,8 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@bun-
 import { DeleteAccountDialog } from "./delete-account-dialog";
 
 type DangerZoneUser = {
-  username?: string | null;
-  displayUsername?: string | null;
+  username?: string | null | undefined;
+  displayUsername?: string | null | undefined;
 };
 
 export function DangerZoneSection({ user }: { user: DangerZoneUser }) {

@@ -1,7 +1,6 @@
+import { auth } from "@bun-mono/auth";
 import { ORPCError } from "@orpc/server";
 import { type } from "arktype";
-
-import { auth } from "@bun-mono/auth";
 
 import { protectedProcedure } from "../index";
 import { parseUserAgent } from "../lib/parse-user-agent";

@@ -1,15 +1,13 @@
+import type { orpc } from "@/utils/orpc";
+import { Toaster } from "@bun-mono/core-ui/sonner";
+import { ThemeProvider } from "@bun-mono/core-ui/theme-provider";
 import type { QueryClient } from "@tanstack/react-query";
-
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
-import type { orpc } from "@/utils/orpc";
-
-import { Toaster } from "@bun-mono/core-ui/sonner";
-import { ThemeProvider } from "@bun-mono/core-ui/theme-provider";
-
 import Header from "../components/header";
+
 import appCss from "../index.css?url";
 export interface RouterAppContext {
   orpc: typeof orpc;

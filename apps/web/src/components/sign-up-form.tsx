@@ -1,16 +1,55 @@
-import { useForm } from "@tanstack/react-form";
-import { useNavigate } from "@tanstack/react-router";
-import { toast } from "sonner";
-import z from "zod";
-
 import { authClient } from "@/lib/auth-client";
-
 import { validateUsername } from "@bun-mono/api/lib/validate-username";
 import { Button } from "@bun-mono/core-ui/button";
 import { Input } from "@bun-mono/core-ui/input";
 import { Label } from "@bun-mono/core-ui/label";
+import { useForm } from "@tanstack/react-form";
+import { useNavigate } from "@tanstack/react-router";
+import { useCallback } from "react";
+import { toast } from "sonner";
+import { z } from "zod";
 
 import Loader from "./loader";
+
+type StringField = {
+  name: string;
+  state: { value: string; meta: { errors: Array<{ message?: string } | undefined> } };
+  handleBlur: () => void;
+  handleChange: (value: string) => void;
+};
+
+function TextField({
+  field,
+  label,
+  type,
+}: {
+  field: StringField;
+  label: string;
+  type?: "text" | "password" | "email";
+}) {
+  const onChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => field.handleChange(e.target.value),
+    [field],
+  );
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={field.name}>{label}</Label>
+      <Input
+        id={field.name}
+        name={field.name}
+        type={type}
+        value={field.state.value}
+        onBlur={field.handleBlur}
+        onChange={onChange}
+      />
+      {field.state.meta.errors.map((error) => (
+        <p key={error?.message} className="text-red-500">
+          {error?.message}
+        </p>
+      ))}
+    </div>
+  );
+}
 
 const usernameMessages: Record<
   Extract<ReturnType<typeof validateUsername>, { ok: false }>["reason"],
@@ -87,109 +126,43 @@ export default function SignUpForm({ onSwitchToSignIn }: { onSwitchToSignIn: () 
     },
   });
 
+  const handleFormSubmit = useCallback(
+    (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      void form.handleSubmit();
+    },
+    [form],
+  );
+
   if (isPending) {
     return <Loader />;
   }
 
   return (
-    <div className="mx-auto w-full mt-10 max-w-md p-6">
+    <div className="mx-auto mt-10 w-full max-w-md p-6">
       <h1 className="mb-6 text-center text-3xl font-bold">Create Account</h1>
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          form.handleSubmit();
-        }}
-        className="space-y-4"
-      >
+      <form onSubmit={handleFormSubmit} className="space-y-4">
         <div>
-          <form.Field name="name">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Name</Label>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-                {field.state.meta.errors.map((error) => (
-                  <p key={error?.message} className="text-red-500">
-                    {error?.message}
-                  </p>
-                ))}
-              </div>
-            )}
-          </form.Field>
+          <form.Field name="name">{(field) => <TextField field={field} label="Name" />}</form.Field>
         </div>
 
         <div>
           <form.Field name="username">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Username</Label>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-                {field.state.meta.errors.map((error) => (
-                  <p key={error?.message} className="text-red-500">
-                    {error?.message}
-                  </p>
-                ))}
-              </div>
-            )}
+            {(field) => <TextField field={field} label="Username" />}
           </form.Field>
         </div>
 
         <div>
           <form.Field name="email">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Email</Label>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  type="email"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-                {field.state.meta.errors.map((error) => (
-                  <p key={error?.message} className="text-red-500">
-                    {error?.message}
-                  </p>
-                ))}
-              </div>
-            )}
+            {(field) => <TextField field={field} label="Email" type="email" />}
           </form.Field>
         </div>
 
         <div>
           <form.Field name="password">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Password</Label>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  type="password"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-                {field.state.meta.errors.map((error) => (
-                  <p key={error?.message} className="text-red-500">
-                    {error?.message}
-                  </p>
-                ))}
-              </div>
-            )}
+            {(field) => <TextField field={field} label="Password" type="password" />}
           </form.Field>
         </div>
 

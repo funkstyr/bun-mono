@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 
 import { EditorSheet, type EditorInitialValues } from "./editor-sheet";
 import { ListView } from "./list-view";
@@ -23,7 +23,7 @@ export function TimerApp({ view, timerId, onNavigate }: TimerAppProps) {
     return { id: found.id, name: found.name, set: found.sets[0]! };
   }, [view, timerId, timers]);
 
-  const closeEditor = () => onNavigate({ view: "list", timerId: null });
+  const closeEditor = useCallback(() => onNavigate({ view: "list", timerId: null }), [onNavigate]);
 
   return (
     <>

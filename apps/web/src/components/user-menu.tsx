@@ -1,5 +1,5 @@
-import { Link, useNavigate } from "@tanstack/react-router";
-
+import { authClient } from "@/lib/auth-client";
+import { Button } from "@bun-mono/core-ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,14 +9,31 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@bun-mono/core-ui/dropdown-menu";
-import { Button } from "@bun-mono/core-ui/button";
 import { Skeleton } from "@bun-mono/core-ui/skeleton";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useCallback, useMemo } from "react";
 
-import { authClient } from "@/lib/auth-client";
+const triggerButton = <Button variant="outline" />;
 
 export default function UserMenu() {
   const navigate = useNavigate();
   const { data: session, isPending } = authClient.useSession();
+
+  const goAccount = useCallback(() => {
+    void navigate({ to: "/account" });
+  }, [navigate]);
+
+  const signOut = useCallback(() => {
+    void authClient.signOut({
+      fetchOptions: {
+        onSuccess: () => {
+          void navigate({ to: "/" });
+        },
+      },
+    });
+  }, [navigate]);
+
+  const trigger = useMemo(() => triggerButton, []);
 
   if (isPending) {
     return <Skeleton className="h-9 w-24" />;
@@ -32,35 +49,14 @@ export default function UserMenu() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="outline" />}>
-        {session.user.name}
-      </DropdownMenuTrigger>
+      <DropdownMenuTrigger render={trigger}>{session.user.name}</DropdownMenuTrigger>
       <DropdownMenuContent className="bg-card">
         <DropdownMenuGroup>
           <DropdownMenuLabel>My Account</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem>{session.user.email}</DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => {
-              navigate({ to: "/account" });
-            }}
-          >
-            Account
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            variant="destructive"
-            onClick={() => {
-              authClient.signOut({
-                fetchOptions: {
-                  onSuccess: () => {
-                    navigate({
-                      to: "/",
-                    });
-                  },
-                },
-              });
-            }}
-          >
+          <DropdownMenuItem onClick={goAccount}>Account</DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onClick={signOut}>
             Sign Out
           </DropdownMenuItem>
         </DropdownMenuGroup>
