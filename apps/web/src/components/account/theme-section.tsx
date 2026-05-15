@@ -1,8 +1,9 @@
+import { useCallback, useEffect, useId, useState } from "react";
+import { useTheme } from "next-themes";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@bun-mono/core-ui/card";
 import { Label } from "@bun-mono/core-ui/label";
 import { RadioGroup, RadioGroupItem } from "@bun-mono/core-ui/radio-group";
-import { useTheme } from "next-themes";
-import { useCallback, useEffect, useId, useState } from "react";
 
 const OPTIONS = [
   { value: "light", label: "Light" },

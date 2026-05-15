@@ -1,5 +1,6 @@
-import { auth } from "@bun-mono/auth";
 import type { Context as HonoContext } from "hono";
+
+import { auth } from "@bun-mono/auth";
 
 export type CreateContextOptions = {
   context: HonoContext;

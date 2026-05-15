@@ -1,5 +1,7 @@
-import { authClient } from "@/lib/auth-client";
-import { client } from "@/utils/orpc";
+import { useCallback, useMemo, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
+
 import { Button } from "@bun-mono/core-ui/button";
 import {
   Dialog,
@@ -13,9 +15,8 @@ import {
 } from "@bun-mono/core-ui/dialog";
 import { Input } from "@bun-mono/core-ui/input";
 import { Label } from "@bun-mono/core-ui/label";
-import { useNavigate } from "@tanstack/react-router";
-import { useCallback, useMemo, useState } from "react";
-import { toast } from "sonner";
+import { authClient } from "@/lib/auth-client";
+import { client } from "@/utils/orpc";
 
 export function DeleteAccountDialog({
   username,

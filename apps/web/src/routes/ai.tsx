@@ -1,12 +1,13 @@
+import { useCallback, useRef, useEffect, useState } from "react";
 import { useChat } from "@ai-sdk/react";
-import { Button } from "@bun-mono/core-ui/button";
-import { Input } from "@bun-mono/core-ui/input";
-import { env } from "@bun-mono/env/web";
 import { createFileRoute } from "@tanstack/react-router";
 import { DefaultChatTransport } from "ai";
 import { Send } from "lucide-react";
-import { useCallback, useRef, useEffect, useState } from "react";
 import { Streamdown } from "streamdown";
+
+import { Button } from "@bun-mono/core-ui/button";
+import { Input } from "@bun-mono/core-ui/input";
+import { env } from "@bun-mono/env/web";
 
 export const Route = createFileRoute("/ai")({
   component: RouteComponent,

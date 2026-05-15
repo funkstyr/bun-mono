@@ -1,5 +1,6 @@
-import { reservedUsernames } from "@bun-mono/auth/reserved-usernames";
 import { describe, expect, it } from "vitest";
+
+import { reservedUsernames } from "@bun-mono/auth/reserved-usernames";
 
 import { validateUsername } from "./validate-username";
 

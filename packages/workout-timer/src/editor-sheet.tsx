@@ -1,3 +1,8 @@
+import { useCallback } from "react";
+import { useForm } from "@tanstack/react-form";
+import { type } from "arktype";
+import { MinusIcon, PlusIcon } from "lucide-react";
+
 import { Button } from "@bun-mono/core-ui/button";
 import {
   Dialog,
@@ -8,10 +13,6 @@ import {
 } from "@bun-mono/core-ui/dialog";
 import { Input } from "@bun-mono/core-ui/input";
 import { Label } from "@bun-mono/core-ui/label";
-import { useForm } from "@tanstack/react-form";
-import { type } from "arktype";
-import { MinusIcon, PlusIcon } from "lucide-react";
-import { useCallback } from "react";
 
 import {
   minutesSchema,

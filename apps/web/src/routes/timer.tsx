@@ -1,8 +1,9 @@
-import { Skeleton } from "@bun-mono/core-ui/skeleton";
-import { TimerApp, type TimerView } from "@bun-mono/workout-timer/timer-app";
+import { useCallback, useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { type } from "arktype";
-import { useCallback, useEffect, useState } from "react";
+
+import { Skeleton } from "@bun-mono/core-ui/skeleton";
+import { TimerApp, type TimerView } from "@bun-mono/workout-timer/timer-app";
 
 const timerSearchSchema = type({
   "view?": "'list' | 'edit' | 'run' | undefined",

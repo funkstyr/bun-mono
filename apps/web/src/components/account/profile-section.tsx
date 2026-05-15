@@ -1,14 +1,15 @@
-import { authClient } from "@/lib/auth-client";
-import { client } from "@/utils/orpc";
+import { useCallback } from "react";
+import { ORPCError } from "@orpc/client";
+import { useForm } from "@tanstack/react-form";
+import { toast } from "sonner";
+
 import { validateUsername } from "@bun-mono/api/lib/validate-username";
 import { Button } from "@bun-mono/core-ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@bun-mono/core-ui/card";
 import { FormControl, FormField, FormLabel, FormMessage } from "@bun-mono/core-ui/form";
 import { Input } from "@bun-mono/core-ui/input";
-import { ORPCError } from "@orpc/client";
-import { useForm } from "@tanstack/react-form";
-import { useCallback } from "react";
-import { toast } from "sonner";
+import { authClient } from "@/lib/auth-client";
+import { client } from "@/utils/orpc";
 
 type StringField = {
   name: string;

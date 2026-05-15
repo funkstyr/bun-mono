@@ -1,9 +1,10 @@
-import { db } from "@bun-mono/db";
-import * as schema from "@bun-mono/db/schema/auth";
-import { env } from "@bun-mono/env/server";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { username } from "better-auth/plugins";
+
+import { db } from "@bun-mono/db";
+import * as schema from "@bun-mono/db/schema/auth";
+import { env } from "@bun-mono/env/server";
 
 import { reservedUsernames } from "./reserved-usernames";
 

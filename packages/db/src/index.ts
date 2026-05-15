@@ -1,6 +1,7 @@
-import { env } from "@bun-mono/env/server";
 import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
+
+import { env } from "@bun-mono/env/server";
 
 import * as schema from "./schema/index";
 

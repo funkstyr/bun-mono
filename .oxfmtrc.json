@@ -1,14 +1,26 @@
 {
   "sortImports": {
+    "customGroups": [
+      {
+        "groupName": "react",
+        "elementNamePattern": ["react", "react/**", "react-dom", "react-dom/**"]
+      },
+      { "groupName": "workspace", "elementNamePattern": ["@bun-mono/**"] }
+    ],
     "groups": [
       "side_effect",
+      "react",
+      { "newlinesBetween": false },
       ["builtin", "external"],
+      "workspace",
+      { "newlinesBetween": false },
       ["internal", "subpath"],
-      ["parent", "sibling", "index"],
       "style",
+      { "newlinesBetween": false },
+      ["parent", "sibling", "index"],
       "unknown"
     ],
-    "internalPattern": ["@bun-mono/**", "~/**", "@/**"],
+    "internalPattern": ["~/", "@/"],
     "newlinesBetween": true
   },
   "sortPackageJson": true,

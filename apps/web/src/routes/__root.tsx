@@ -1,14 +1,14 @@
-import type { orpc } from "@/utils/orpc";
-import { Toaster } from "@bun-mono/core-ui/sonner";
-import { ThemeProvider } from "@bun-mono/core-ui/theme-provider";
 import type { QueryClient } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
-import Header from "../components/header";
+import { Toaster } from "@bun-mono/core-ui/sonner";
+import { ThemeProvider } from "@bun-mono/core-ui/theme-provider";
+import type { orpc } from "@/utils/orpc";
 
 import appCss from "../index.css?url";
+import Header from "../components/header";
 export interface RouterAppContext {
   orpc: typeof orpc;
   queryClient: QueryClient;
@@ -25,7 +25,7 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
         content: "width=device-width, initial-scale=1",
       },
       {
-        title: "My App",
+        title: "Bun POC Monorepo",
       },
     ],
     links: [

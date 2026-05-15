@@ -1,3 +1,6 @@
+import { useCallback, useMemo } from "react";
+import { MoreVerticalIcon } from "lucide-react";
+
 import { Button } from "@bun-mono/core-ui/button";
 import { Card, CardContent, CardDescription, CardTitle } from "@bun-mono/core-ui/card";
 import {
@@ -7,8 +10,6 @@ import {
   DropdownMenuTrigger,
 } from "@bun-mono/core-ui/dropdown-menu";
 import { toast } from "@bun-mono/core-ui/sonner";
-import { MoreVerticalIcon } from "lucide-react";
-import { useCallback, useMemo } from "react";
 
 import { formatMmSs } from "./format";
 import type { SavedTimer } from "./schemas";

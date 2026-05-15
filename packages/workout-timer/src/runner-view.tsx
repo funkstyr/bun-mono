@@ -1,4 +1,4 @@
-import { Button } from "@bun-mono/core-ui/button";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   PauseIcon,
   PlayIcon,
@@ -8,7 +8,8 @@ import {
   VolumeXIcon,
   XIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { Button } from "@bun-mono/core-ui/button";
 
 import { isMuted, playComplete, playPhaseChange, playTick, setMuted } from "./audio";
 import { CountdownRing } from "./countdown-ring";

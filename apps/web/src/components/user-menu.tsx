@@ -1,4 +1,6 @@
-import { authClient } from "@/lib/auth-client";
+import { useCallback, useMemo } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
+
 import { Button } from "@bun-mono/core-ui/button";
 import {
   DropdownMenu,
@@ -10,8 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@bun-mono/core-ui/dropdown-menu";
 import { Skeleton } from "@bun-mono/core-ui/skeleton";
-import { Link, useNavigate } from "@tanstack/react-router";
-import { useCallback, useMemo } from "react";
+import { authClient } from "@/lib/auth-client";
 
 const triggerButton = <Button variant="outline" />;
 
