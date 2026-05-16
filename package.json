@@ -66,7 +66,7 @@
     "@bun-mono/config": "workspace:*",
     "@types/bun": "catalog:",
     "@typescript/native-preview": "catalog:",
-    "lefthook": "^1.13.7",
+    "lefthook": "^2.1.6",
     "oxfmt": "^0.48.0",
     "oxlint": "^1.63.0",
     "turbo": "^2.9.9"

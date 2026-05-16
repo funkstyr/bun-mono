@@ -15,7 +15,8 @@
     "./timer-app": "./src/timer-app.tsx",
     "./use-timer-engine": "./src/use-timer-engine.ts",
     "./use-timers": "./src/use-timers.ts",
-    "./use-wake-lock": "./src/use-wake-lock.ts"
+    "./use-wake-lock": "./src/use-wake-lock.ts",
+    "./workout-editor": "./src/workout-editor.tsx"
   },
   "scripts": {
     "check-types": "tsgo --noEmit",
@@ -23,6 +24,9 @@
   },
   "dependencies": {
     "@bun-mono/core-ui": "workspace:*",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@tanstack/react-form": "^1.29.1",
     "arktype": "catalog:"
   },
