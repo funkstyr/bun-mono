@@ -6,31 +6,46 @@ import { RunnerHost } from "./runner-view";
 import { useTimers } from "./use-timers";
 
 export type TimerView = "list" | "edit" | "run";
+export type TimerKind = "set" | "workout";
+
+export type TimerAppNavigate = (next: {
+  view: TimerView;
+  kind: TimerKind;
+  id: string | null;
+}) => void;
 
 export type TimerAppProps = {
   view: TimerView;
-  timerId: string | null;
-  onNavigate: (next: { view: TimerView; timerId: string | null }) => void;
+  kind: TimerKind;
+  id: string | null;
+  onNavigate: TimerAppNavigate;
 };
 
-export function TimerApp({ view, timerId, onNavigate }: TimerAppProps) {
-  const timers = useTimers();
+export function TimerApp({ view, kind, id, onNavigate }: TimerAppProps) {
+  const sets = useTimers();
 
   const initialValues = useMemo<EditorInitialValues | undefined>(() => {
-    if (view !== "edit" || !timerId) return undefined;
-    const found = timers.find((t) => t.id === timerId);
+    if (view !== "edit" || kind !== "set" || !id) return undefined;
+    const found = sets.find((s) => s.id === id);
     if (!found) return undefined;
-    return { id: found.id, name: found.name, set: found.sets[0]! };
-  }, [view, timerId, timers]);
+    return { id: found.id, name: found.name, config: found.config };
+  }, [view, kind, id, sets]);
 
-  const closeEditor = useCallback(() => onNavigate({ view: "list", timerId: null }), [onNavigate]);
+  const closeEditor = useCallback(
+    () => onNavigate({ view: "list", kind: "set", id: null }),
+    [onNavigate],
+  );
 
   return (
     <>
       <ListView onNavigate={onNavigate} />
-      <EditorSheet open={view === "edit"} onClose={closeEditor} initialValues={initialValues} />
-      {view === "run" && timerId ? (
-        <RunnerHost key={timerId} timerId={timerId} onNavigate={onNavigate} />
+      <EditorSheet
+        open={view === "edit" && kind === "set"}
+        onClose={closeEditor}
+        initialValues={initialValues}
+      />
+      {view === "run" && kind === "set" && id ? (
+        <RunnerHost key={id} setId={id} onNavigate={onNavigate} />
       ) : null}
     </>
   );

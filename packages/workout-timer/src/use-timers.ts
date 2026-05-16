@@ -1,23 +1,23 @@
 import { useSyncExternalStore } from "react";
 
-import { defaultSetConfig, emptyStore, type SavedTimer, type SetConfig } from "./schemas";
+import { defaultSetConfig, emptyStore, type SavedSet, type SetConfig } from "./schemas";
 import { loadAndMigrate, saveAll, STORAGE_KEY, subscribe } from "./storage";
 
-const EMPTY_TIMERS: readonly SavedTimer[] = [];
+const EMPTY_SETS: readonly SavedSet[] = [];
 
 let cachedRaw: string | null | undefined = undefined;
-let cachedSnapshot: readonly SavedTimer[] = EMPTY_TIMERS;
+let cachedSnapshot: readonly SavedSet[] = EMPTY_SETS;
 
-function getSnapshot(): readonly SavedTimer[] {
+function getSnapshot(): readonly SavedSet[] {
   const raw = typeof window === "undefined" ? null : window.localStorage.getItem(STORAGE_KEY);
   if (raw === cachedRaw) return cachedSnapshot;
   cachedRaw = raw;
-  cachedSnapshot = loadAndMigrate().timers;
+  cachedSnapshot = loadAndMigrate().sets;
   return cachedSnapshot;
 }
 
-function getServerSnapshot(): readonly SavedTimer[] {
-  return EMPTY_TIMERS;
+function getServerSnapshot(): readonly SavedSet[] {
+  return EMPTY_SETS;
 }
 
 function subscribeBoth(listener: () => void): () => void {
@@ -36,101 +36,101 @@ function subscribeBoth(listener: () => void): () => void {
   };
 }
 
-export function useTimers(): readonly SavedTimer[] {
+export function useTimers(): readonly SavedSet[] {
   return useSyncExternalStore(subscribeBoth, getSnapshot, getServerSnapshot);
 }
 
-function read(): { timers: SavedTimer[] } {
+function read(): { sets: SavedSet[]; workouts: ReturnType<typeof loadAndMigrate>["workouts"] } {
   const state = loadAndMigrate();
-  return { timers: [...state.timers] };
+  return { sets: [...state.sets], workouts: [...state.workouts] };
 }
 
-function write(timers: SavedTimer[]): void {
-  saveAll({ ...emptyStore(), timers });
+function write(sets: SavedSet[], workouts: ReturnType<typeof loadAndMigrate>["workouts"]): void {
+  saveAll({ ...emptyStore(), sets, workouts });
 }
 
-function dedupeName(name: string, existing: readonly SavedTimer[]): string {
-  const names = new Set(existing.map((t) => t.name));
+function dedupeName(name: string, existing: readonly SavedSet[]): string {
+  const names = new Set(existing.map((s) => s.name));
   if (!names.has(name)) return name;
   let n = 2;
   while (names.has(`${name} (${n})`)) n++;
   return `${name} (${n})`;
 }
 
-export function createTimer(input?: { name?: string; set?: SetConfig }): SavedTimer {
-  const { timers } = read();
+export function createSet(input?: { name?: string; config?: SetConfig }): SavedSet {
+  const { sets, workouts } = read();
   const now = Date.now();
-  const timer: SavedTimer = {
+  const set: SavedSet = {
     id: crypto.randomUUID(),
-    name: dedupeName(input?.name ?? "New timer", timers),
+    name: dedupeName(input?.name ?? "New set", sets),
     createdAt: now,
     updatedAt: now,
-    sets: [input?.set ?? defaultSetConfig()],
+    config: input?.config ?? defaultSetConfig(),
   };
-  timers.push(timer);
-  write(timers);
-  return timer;
+  sets.push(set);
+  write(sets, workouts);
+  return set;
 }
 
-export function updateTimer(
+export function updateSet(
   id: string,
-  patch: Partial<Pick<SavedTimer, "name">> & { set?: SetConfig },
-): SavedTimer | null {
-  const { timers } = read();
-  const idx = timers.findIndex((t) => t.id === id);
+  patch: Partial<Pick<SavedSet, "name">> & { config?: SetConfig },
+): SavedSet | null {
+  const { sets, workouts } = read();
+  const idx = sets.findIndex((s) => s.id === id);
   if (idx === -1) return null;
-  const prev = timers[idx]!;
-  const next: SavedTimer = {
+  const prev = sets[idx]!;
+  const next: SavedSet = {
     ...prev,
     name: patch.name ?? prev.name,
-    sets: [patch.set ?? prev.sets[0]!],
+    config: patch.config ?? prev.config,
     updatedAt: Date.now(),
   };
-  timers[idx] = next;
-  write(timers);
+  sets[idx] = next;
+  write(sets, workouts);
   return next;
 }
 
-function copySuffix(baseName: string, existing: readonly SavedTimer[]): string {
+function copySuffix(baseName: string, existing: readonly SavedSet[]): string {
   const candidate = `${baseName} (copy)`;
-  const names = new Set(existing.map((t) => t.name));
+  const names = new Set(existing.map((s) => s.name));
   if (!names.has(candidate)) return candidate;
   let n = 2;
   while (names.has(`${baseName} (copy ${n})`)) n++;
   return `${baseName} (copy ${n})`;
 }
 
-export function duplicateTimer(id: string): SavedTimer | null {
-  const { timers } = read();
-  const source = timers.find((t) => t.id === id);
+export function duplicateSet(id: string): SavedSet | null {
+  const { sets, workouts } = read();
+  const source = sets.find((s) => s.id === id);
   if (!source) return null;
   const now = Date.now();
-  const copy: SavedTimer = {
+  const copy: SavedSet = {
     id: crypto.randomUUID(),
-    name: copySuffix(source.name, timers),
+    name: copySuffix(source.name, sets),
     createdAt: now,
     updatedAt: now,
-    sets: [{ ...source.sets[0]! }],
+    config: { ...source.config },
   };
-  timers.push(copy);
-  write(timers);
+  sets.push(copy);
+  write(sets, workouts);
   return copy;
 }
 
-export function restoreTimer(snapshot: SavedTimer): SavedTimer {
-  const { timers } = read();
-  if (!timers.some((t) => t.id === snapshot.id)) {
-    timers.push({ ...snapshot, sets: [{ ...snapshot.sets[0]! }] });
-    write(timers);
+export function restoreSet(snapshot: SavedSet): SavedSet {
+  const { sets, workouts } = read();
+  if (!sets.some((s) => s.id === snapshot.id)) {
+    sets.push({ ...snapshot, config: { ...snapshot.config } });
+    write(sets, workouts);
   }
   return snapshot;
 }
 
-export function deleteTimer(id: string): SavedTimer | null {
-  const { timers } = read();
-  const idx = timers.findIndex((t) => t.id === id);
+export function deleteSet(id: string): SavedSet | null {
+  const { sets, workouts } = read();
+  const idx = sets.findIndex((s) => s.id === id);
   if (idx === -1) return null;
-  const [removed] = timers.splice(idx, 1);
-  write(timers);
+  const [removed] = sets.splice(idx, 1);
+  write(sets, workouts);
   return removed ?? null;
 }

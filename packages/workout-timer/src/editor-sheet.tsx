@@ -24,12 +24,12 @@ import {
   activeSecSchema,
   type SetConfig,
 } from "./schemas";
-import { createTimer, updateTimer } from "./use-timers";
+import { createSet, updateSet } from "./use-timers";
 
 export type EditorInitialValues = {
   id?: string;
   name: string;
-  set: SetConfig;
+  config: SetConfig;
 };
 
 export type EditorSheetProps = {
@@ -65,12 +65,12 @@ const defaultEditorValues = (initial?: EditorInitialValues): EditorFormValues =>
       restSecRem: 10,
     };
   }
-  const active = splitSec(initial.set.activeSec);
-  const rest = splitSec(initial.set.restSec);
+  const active = splitSec(initial.config.activeSec);
+  const rest = splitSec(initial.config.restSec);
   return {
     name: initial.name,
-    rounds: initial.set.rounds,
-    prepSec: initial.set.prepSec,
+    rounds: initial.config.rounds,
+    prepSec: initial.config.prepSec,
     activeMin: active.min,
     activeSecRem: active.sec,
     restMin: rest.min,
@@ -292,7 +292,7 @@ export function EditorSheet({ open, onClose, initialValues }: EditorSheetProps) 
   const form = useForm({
     defaultValues: defaultEditorValues(initialValues),
     onSubmit: ({ value }) => {
-      const set: SetConfig = {
+      const config: SetConfig = {
         rounds: value.rounds,
         prepSec: value.prepSec,
         activeSec: value.activeMin * 60 + value.activeSecRem,
@@ -300,9 +300,9 @@ export function EditorSheet({ open, onClose, initialValues }: EditorSheetProps) 
       };
       const name = value.name.trim();
       if (isEdit && initialValues?.id) {
-        updateTimer(initialValues.id, { name, set });
+        updateSet(initialValues.id, { name, config });
       } else {
-        createTimer({ name, set });
+        createSet({ name, config });
       }
       onClose();
     },
@@ -328,7 +328,7 @@ export function EditorSheet({ open, onClose, initialValues }: EditorSheetProps) 
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit timer" : "New timer"}</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit set" : "New set"}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">

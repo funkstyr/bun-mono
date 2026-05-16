@@ -15,34 +15,32 @@ import { isMuted, playComplete, playPhaseChange, playTick, setMuted } from "./au
 import { CountdownRing } from "./countdown-ring";
 import type { Phase } from "./engine";
 import { formatMmSs } from "./format";
-import type { SavedTimer } from "./schemas";
-import type { TimerView } from "./timer-app";
+import type { SavedSet } from "./schemas";
+import type { TimerAppNavigate } from "./timer-app";
 import { useTimerEngine } from "./use-timer-engine";
 import { useTimers } from "./use-timers";
 import { useWakeLock } from "./use-wake-lock";
 
 export type RunnerHostProps = {
-  timerId: string;
-  onNavigate: (next: { view: TimerView; timerId: string | null }) => void;
+  setId: string;
+  onNavigate: TimerAppNavigate;
 };
 
-export function RunnerHost({ timerId, onNavigate }: RunnerHostProps) {
-  const timers = useTimers();
-  const [snapshot] = useState<SavedTimer | null>(
-    () => timers.find((t) => t.id === timerId) ?? null,
-  );
+export function RunnerHost({ setId, onNavigate }: RunnerHostProps) {
+  const sets = useTimers();
+  const [snapshot] = useState<SavedSet | null>(() => sets.find((s) => s.id === setId) ?? null);
 
   useEffect(() => {
-    if (!snapshot) onNavigate({ view: "list", timerId: null });
+    if (!snapshot) onNavigate({ view: "list", kind: "set", id: null });
   }, [snapshot, onNavigate]);
 
   if (!snapshot) return null;
-  return <RunnerView timer={snapshot} onNavigate={onNavigate} />;
+  return <RunnerView set={snapshot} onNavigate={onNavigate} />;
 }
 
 export type RunnerViewProps = {
-  timer: SavedTimer;
-  onNavigate: (next: { view: TimerView; timerId: string | null }) => void;
+  set: SavedSet;
+  onNavigate: TimerAppNavigate;
 };
 
 const phaseLabel = (phase: Phase): string => {
@@ -121,8 +119,8 @@ const totalLineStyle = {
   lineHeight: 1.4,
 } as const;
 
-export function RunnerView({ timer, onNavigate }: RunnerViewProps) {
-  const config = useMemo(() => timer.sets[0]!, [timer]);
+export function RunnerView({ set, onNavigate }: RunnerViewProps) {
+  const config = useMemo(() => set.config, [set]);
 
   const workoutStartedAtRef = useRef<number>(0);
   const [elapsedMs, setElapsedMs] = useState<number | null>(null);
@@ -153,7 +151,7 @@ export function RunnerView({ timer, onNavigate }: RunnerViewProps) {
   useWakeLock(engine.state.phase !== "idle" && engine.state.phase !== "complete");
 
   const goHome = useCallback(() => {
-    onNavigate({ view: "list", timerId: null });
+    onNavigate({ view: "list", kind: "set", id: null });
   }, [onNavigate]);
 
   const phaseLabelDynamicStyle = useMemo(

@@ -12,43 +12,46 @@ import {
 import { toast } from "@bun-mono/core-ui/sonner";
 
 import { formatMmSs } from "./format";
-import type { SavedTimer } from "./schemas";
-import type { TimerView } from "./timer-app";
-import { deleteTimer, duplicateTimer, restoreTimer, useTimers } from "./use-timers";
+import type { SavedSet } from "./schemas";
+import type { TimerAppNavigate } from "./timer-app";
+import { deleteSet, duplicateSet, restoreSet, useTimers } from "./use-timers";
 
 export type ListViewProps = {
-  onNavigate: (next: { view: TimerView; timerId: string | null }) => void;
+  onNavigate: TimerAppNavigate;
 };
 
 export function ListView({ onNavigate }: ListViewProps) {
-  const timers = useTimers();
+  const sets = useTimers();
 
-  const sorted = useMemo(() => timers.toSorted((a, b) => b.updatedAt - a.updatedAt), [timers]);
+  const sorted = useMemo(() => sets.toSorted((a, b) => b.updatedAt - a.updatedAt), [sets]);
 
-  const handleCreate = useCallback(() => onNavigate({ view: "edit", timerId: null }), [onNavigate]);
+  const handleCreate = useCallback(
+    () => onNavigate({ view: "edit", kind: "set", id: null }),
+    [onNavigate],
+  );
 
   const handleStart = useCallback(
-    (id: string) => onNavigate({ view: "run", timerId: id }),
+    (id: string) => onNavigate({ view: "run", kind: "set", id }),
     [onNavigate],
   );
 
   const handleEdit = useCallback(
-    (id: string) => onNavigate({ view: "edit", timerId: id }),
+    (id: string) => onNavigate({ view: "edit", kind: "set", id }),
     [onNavigate],
   );
 
   const handleDuplicate = useCallback((id: string) => {
-    duplicateTimer(id);
+    duplicateSet(id);
   }, []);
 
-  const handleDelete = useCallback((timer: SavedTimer) => {
-    const snapshot: SavedTimer = { ...timer, sets: [{ ...timer.sets[0]! }] };
-    deleteTimer(timer.id);
+  const handleDelete = useCallback((set: SavedSet) => {
+    const snapshot: SavedSet = { ...set, config: { ...set.config } };
+    deleteSet(set.id);
     toast(`Deleted "${snapshot.name}"`, {
       action: {
         label: "Undo",
         onClick: () => {
-          restoreTimer(snapshot);
+          restoreSet(snapshot);
         },
       },
     });
@@ -59,7 +62,7 @@ export function ListView({ onNavigate }: ListViewProps) {
       <div className="mx-auto w-full max-w-2xl px-4 py-8">
         <Card>
           <CardContent className="flex flex-col items-center gap-4 py-8 text-center">
-            <CardTitle>No saved timers yet</CardTitle>
+            <CardTitle>No saved sets yet</CardTitle>
             <CardDescription>Create one to get started.</CardDescription>
             <Button onClick={handleCreate}>+ Create</Button>
           </CardContent>
@@ -74,10 +77,10 @@ export function ListView({ onNavigate }: ListViewProps) {
         <Button onClick={handleCreate}>+ Create</Button>
       </div>
       <ul className="space-y-3">
-        {sorted.map((timer) => (
-          <li key={timer.id}>
-            <TimerCard
-              timer={timer}
+        {sorted.map((set) => (
+          <li key={set.id}>
+            <SetCard
+              set={set}
               onStart={handleStart}
               onEdit={handleEdit}
               onDuplicate={handleDuplicate}
@@ -92,35 +95,35 @@ export function ListView({ onNavigate }: ListViewProps) {
 
 const stopEvent = (event: React.SyntheticEvent) => event.stopPropagation();
 
-function TimerCard({
-  timer,
+function SetCard({
+  set,
   onStart,
   onEdit,
   onDuplicate,
   onDelete,
 }: {
-  timer: SavedTimer;
+  set: SavedSet;
   onStart: (id: string) => void;
   onEdit: (id: string) => void;
   onDuplicate: (id: string) => void;
-  onDelete: (timer: SavedTimer) => void;
+  onDelete: (set: SavedSet) => void;
 }) {
-  const set = timer.sets[0]!;
-  const summary = `${set.rounds} rounds · ${formatMmSs(set.activeSec)} active / ${formatMmSs(set.restSec)} rest`;
-  const handleStart = useCallback(() => onStart(timer.id), [onStart, timer.id]);
-  const handleEdit = useCallback(() => onEdit(timer.id), [onEdit, timer.id]);
-  const handleDuplicate = useCallback(() => onDuplicate(timer.id), [onDuplicate, timer.id]);
-  const handleDelete = useCallback(() => onDelete(timer), [onDelete, timer]);
+  const config = set.config;
+  const summary = `${config.rounds} rounds · ${formatMmSs(config.activeSec)} active / ${formatMmSs(config.restSec)} rest`;
+  const handleStart = useCallback(() => onStart(set.id), [onStart, set.id]);
+  const handleEdit = useCallback(() => onEdit(set.id), [onEdit, set.id]);
+  const handleDuplicate = useCallback(() => onDuplicate(set.id), [onDuplicate, set.id]);
+  const handleDelete = useCallback(() => onDelete(set), [onDelete, set]);
   const triggerRender = useMemo(
     () => (
       <Button
         variant="ghost"
         size="icon-sm"
-        aria-label={`More actions for ${timer.name}`}
+        aria-label={`More actions for ${set.name}`}
         onClick={stopEvent}
       />
     ),
-    [timer.name],
+    [set.name],
   );
   return (
     <Card className="hover:bg-accent/40 focus-within:ring-ring relative transition-colors focus-within:ring-2">
@@ -128,10 +131,10 @@ function TimerCard({
         type="button"
         onClick={handleStart}
         className="w-full cursor-pointer bg-transparent text-left focus-visible:outline-none"
-        aria-label={`Start ${timer.name}`}
+        aria-label={`Start ${set.name}`}
       >
         <CardContent className="space-y-1 pr-10">
-          <CardTitle className="text-base">{timer.name}</CardTitle>
+          <CardTitle className="text-base">{set.name}</CardTitle>
           <CardDescription>{summary}</CardDescription>
         </CardContent>
       </button>

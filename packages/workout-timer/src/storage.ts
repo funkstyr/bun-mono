@@ -1,10 +1,33 @@
 import { type } from "arktype";
 
-import { CURRENT_SCHEMA_VERSION, emptyStore, storedV1Schema, type StoredV1 } from "./schemas";
+import {
+  CURRENT_SCHEMA_VERSION,
+  emptyStore,
+  storedV2Schema,
+  type SavedSet,
+  type SavedTimerV1,
+  type StoredV2,
+} from "./schemas";
 
 export const STORAGE_KEY = "workout-timer:v1";
 
-export const migrations: Record<number, (data: unknown) => unknown> = {};
+function migrateV1ToV2(data: unknown): unknown {
+  if (!data || typeof data !== "object") return emptyStore();
+  const v1 = data as { schemaVersion: unknown; timers?: unknown };
+  const timers = Array.isArray(v1.timers) ? (v1.timers as SavedTimerV1[]) : [];
+  const sets: SavedSet[] = timers.map((timer) => ({
+    id: timer.id,
+    name: timer.name,
+    createdAt: timer.createdAt,
+    updatedAt: timer.updatedAt,
+    config: timer.sets[0]!,
+  }));
+  return { schemaVersion: 2, sets, workouts: [] };
+}
+
+export const migrations: Record<number, (data: unknown) => unknown> = {
+  1: migrateV1ToV2,
+};
 
 const listeners = new Set<() => void>();
 
@@ -28,7 +51,7 @@ function readRaw(): string | null {
   }
 }
 
-export function loadAndMigrate(): StoredV1 {
+export function loadAndMigrate(): StoredV2 {
   const raw = readRaw();
   if (raw === null) return emptyStore();
 
@@ -55,14 +78,14 @@ export function loadAndMigrate(): StoredV1 {
     current = migrate(current);
   }
 
-  const validated = storedV1Schema(current);
+  const validated = storedV2Schema(current);
   if (validated instanceof type.errors) {
     return emptyStore();
   }
   return validated;
 }
 
-export function saveAll(state: StoredV1): void {
+export function saveAll(state: StoredV2): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
