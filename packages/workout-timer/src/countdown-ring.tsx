@@ -1,13 +1,13 @@
 import { type ReactNode } from "react";
 
-import type { Phase } from "./engine";
+import type { PhaseKind } from "./engine";
 
 const SIZE = 280;
 const STROKE = 14;
 const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-const phaseStroke: Record<Exclude<Phase, "idle" | "complete">, string> = {
+const phaseStroke: Record<Exclude<PhaseKind, "complete">, string> = {
   prep: "var(--timer-prep)",
   active: "var(--timer-active)",
   rest: "var(--timer-rest)",
@@ -17,7 +17,7 @@ const ringStyle = { width: "var(--ring-size)", height: "var(--ring-size)" } as c
 const progressCircleStyle = { transition: "stroke-dashoffset 100ms linear" } as const;
 
 export type CountdownRingProps = {
-  phase: Phase;
+  phase: PhaseKind;
   phaseDurationMs: number;
   remainingMs: number;
   children?: ReactNode;
@@ -32,10 +32,7 @@ export function CountdownRing({
   const elapsed = Math.max(0, phaseDurationMs - remainingMs);
   const progress = phaseDurationMs > 0 ? Math.min(1, elapsed / phaseDurationMs) : 0;
   const dashOffset = CIRCUMFERENCE * progress;
-  const stroke =
-    phase === "prep" || phase === "active" || phase === "rest"
-      ? phaseStroke[phase]
-      : "var(--muted-foreground)";
+  const stroke = phase === "complete" ? "var(--muted-foreground)" : phaseStroke[phase];
 
   return (
     <div className="relative" style={ringStyle}>

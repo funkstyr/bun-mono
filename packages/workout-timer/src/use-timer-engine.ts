@@ -8,14 +8,13 @@ import {
   resetAnchor,
   resumeAnchor,
   skipAnchor,
-  type Anchor,
+  type EngineAnchor,
   type EngineState,
-  type Phase,
+  type PhaseDescriptor,
 } from "./engine";
-import type { SetConfig } from "./schemas";
 
 export type TimerEngineCallbacks = {
-  onPhaseChange?: (prev: Phase, next: Phase) => void;
+  onPhaseChange?: (prev: PhaseDescriptor, next: PhaseDescriptor) => void;
   onCountdownTick?: (secondsLeft: number) => void;
   onComplete?: () => void;
 };
@@ -34,23 +33,31 @@ export type TimerEngine = {
   controls: TimerEngineControls;
 };
 
-const idleAnchor = (): Anchor => ({
-  phase: "idle",
-  currentRound: 0,
-  phaseStartTs: 0,
-  phaseDurationMs: 0,
-  pausedRemainingMs: null,
-});
+function totalDuration(sequence: PhaseDescriptor[]): number {
+  let total = 0;
+  for (const d of sequence) total += d.durationMs;
+  return total;
+}
+
+function preStartState(sequence: PhaseDescriptor[]): EngineState {
+  const first = sequence[0];
+  return {
+    phaseIndex: 0,
+    remainingMs: first?.durationMs ?? 0,
+    totalRemainingMs: totalDuration(sequence),
+    isPaused: false,
+    isComplete: first?.kind === "complete",
+  };
+}
 
 export function useTimerEngine(
-  config: SetConfig,
+  sequence: PhaseDescriptor[],
   callbacks: TimerEngineCallbacks = {},
 ): TimerEngine {
-  const anchorRef = useRef<Anchor>(idleAnchor());
+  const anchorRef = useRef<EngineAnchor | null>(null);
   const callbacksRef = useRef(callbacks);
   callbacksRef.current = callbacks;
 
-  const lastCountdownPhaseStartRef = useRef<number>(-1);
   const lastCountdownSecondRef = useRef<number>(-1);
 
   const [, forceTick] = useReducer((n: number) => n + 1, 0);
@@ -65,31 +72,35 @@ export function useTimerEngine(
 
   const tick = useCallback(() => {
     let anchor = anchorRef.current;
-    if (anchor.phase === "idle" || anchor.phase === "complete") {
+    if (!anchor) {
+      forceTick();
+      return;
+    }
+    if (sequence[anchor.phaseIndex]!.kind === "complete") {
       forceTick();
       return;
     }
     const now = Date.now();
-    let result = computeState(config, anchor, now);
+    let result = computeState(sequence, anchor, now);
 
     let safety = 32;
     while (result.phaseEnded && safety-- > 0) {
-      const prevPhase = anchor.phase;
-      anchor = advancePhase(config, anchor, now);
+      const prevDescriptor = sequence[anchor.phaseIndex]!;
+      anchor = advancePhase(sequence, anchor, now);
       anchorRef.current = anchor;
-      callbacksRef.current.onPhaseChange?.(prevPhase, anchor.phase);
-      lastCountdownPhaseStartRef.current = anchor.phaseStartTs;
+      const nextDescriptor = sequence[anchor.phaseIndex]!;
+      callbacksRef.current.onPhaseChange?.(prevDescriptor, nextDescriptor);
       lastCountdownSecondRef.current = -1;
-      if (anchor.phase === "complete") {
+      if (nextDescriptor.kind === "complete") {
         callbacksRef.current.onComplete?.();
         clearTickInterval();
         break;
       }
-      result = computeState(config, anchor, now);
+      result = computeState(sequence, anchor, now);
     }
 
-    const phase = result.state.phase;
-    if (phase === "prep" || phase === "active" || phase === "rest") {
+    const currentDescriptor = sequence[anchor.phaseIndex]!;
+    if (currentDescriptor.kind !== "complete") {
       const secondsLeft = Math.ceil(result.state.remainingMs / 1000);
       if (secondsLeft >= 1 && secondsLeft <= 3 && secondsLeft !== lastCountdownSecondRef.current) {
         lastCountdownSecondRef.current = secondsLeft;
@@ -98,7 +109,7 @@ export function useTimerEngine(
     }
 
     forceTick();
-  }, [config, clearTickInterval]);
+  }, [sequence, clearTickInterval]);
 
   const ensureInterval = useCallback(() => {
     if (intervalRef.current != null) return;
@@ -107,59 +118,64 @@ export function useTimerEngine(
 
   const start = useCallback(() => {
     const now = Date.now();
-    anchorRef.current = initialAnchor(config, now);
-    lastCountdownPhaseStartRef.current = anchorRef.current.phaseStartTs;
+    anchorRef.current = initialAnchor(sequence, now);
     lastCountdownSecondRef.current = -1;
     ensureInterval();
     forceTick();
-  }, [config, ensureInterval]);
+  }, [sequence, ensureInterval]);
 
   const stop = useCallback(() => {
     clearTickInterval();
-    anchorRef.current = idleAnchor();
+    anchorRef.current = null;
     forceTick();
   }, [clearTickInterval]);
 
   const pause = useCallback(() => {
     const a = anchorRef.current;
+    if (!a) return;
     if (a.pausedRemainingMs !== null) return;
-    if (a.phase === "idle" || a.phase === "complete") return;
-    anchorRef.current = pauseAnchor(a, Date.now());
+    if (sequence[a.phaseIndex]!.kind === "complete") return;
+    anchorRef.current = pauseAnchor(sequence, a, Date.now());
     clearTickInterval();
     forceTick();
-  }, [clearTickInterval]);
+  }, [sequence, clearTickInterval]);
 
   const resume = useCallback(() => {
     const a = anchorRef.current;
+    if (!a) return;
     if (a.pausedRemainingMs === null) return;
-    if (a.phase === "idle" || a.phase === "complete") return;
-    anchorRef.current = resumeAnchor(a, Date.now());
+    if (sequence[a.phaseIndex]!.kind === "complete") return;
+    anchorRef.current = resumeAnchor(sequence, a, Date.now());
     ensureInterval();
     forceTick();
-  }, [ensureInterval]);
+  }, [sequence, ensureInterval]);
 
   const skip = useCallback(() => {
     const a = anchorRef.current;
-    if (a.phase === "idle" || a.phase === "complete") return;
+    if (!a) return;
+    if (sequence[a.phaseIndex]!.kind === "complete") return;
     const now = Date.now();
-    const prevPhase = a.phase;
-    const next = skipAnchor(config, a, now);
+    const prevDescriptor = sequence[a.phaseIndex]!;
+    const next = skipAnchor(sequence, a, now);
     anchorRef.current = next;
-    lastCountdownPhaseStartRef.current = next.phaseStartTs;
     lastCountdownSecondRef.current = -1;
-    callbacksRef.current.onPhaseChange?.(prevPhase, next.phase);
-    if (next.phase === "complete") {
+    const nextDescriptor = sequence[next.phaseIndex]!;
+    callbacksRef.current.onPhaseChange?.(prevDescriptor, nextDescriptor);
+    if (nextDescriptor.kind === "complete") {
       callbacksRef.current.onComplete?.();
       clearTickInterval();
     }
     forceTick();
-  }, [config, clearTickInterval]);
+  }, [sequence, clearTickInterval]);
 
   const reset = useCallback(() => {
     const a = anchorRef.current;
+    if (!a) {
+      start();
+      return;
+    }
     const wasPaused = a.pausedRemainingMs !== null;
-    anchorRef.current = resetAnchor(config, a, Date.now());
-    lastCountdownPhaseStartRef.current = anchorRef.current.phaseStartTs;
+    anchorRef.current = resetAnchor(sequence, a, Date.now());
     lastCountdownSecondRef.current = -1;
     if (wasPaused) {
       clearTickInterval();
@@ -167,7 +183,7 @@ export function useTimerEngine(
       ensureInterval();
     }
     forceTick();
-  }, [config, clearTickInterval, ensureInterval]);
+  }, [sequence, clearTickInterval, ensureInterval, start]);
 
   useEffect(() => {
     return () => {
@@ -175,9 +191,12 @@ export function useTimerEngine(
     };
   }, [clearTickInterval]);
 
-  const result = computeState(config, anchorRef.current, Date.now());
+  const state = anchorRef.current
+    ? computeState(sequence, anchorRef.current, Date.now()).state
+    : preStartState(sequence);
+
   return {
-    state: result.state,
+    state,
     controls: {
       start,
       pause,

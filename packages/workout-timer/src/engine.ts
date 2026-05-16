@@ -1,155 +1,169 @@
-import type { SetConfig } from "./schemas";
+import type { SavedSet } from "./schemas";
 
-export type Phase = "idle" | "prep" | "active" | "rest" | "complete";
+export type PhaseKind = "prep" | "active" | "rest" | "complete";
 
-export type EngineState = {
-  phase: Phase;
-  currentRound: number;
-  remainingMs: number;
-  totalRemainingMs: number;
-  isPaused: boolean;
+export type PhaseDescriptor = {
+  kind: PhaseKind;
+  durationMs: number;
+  setIdx?: number;
+  setName?: string;
+  repeatIdx?: number;
+  round?: number;
+  upNextSetName?: string;
 };
 
-export type Anchor = {
-  phase: Phase;
-  currentRound: number;
+export type BuildSequenceInput = { kind: "set"; set: SavedSet };
+
+export function buildPhaseSequence(input: BuildSequenceInput): PhaseDescriptor[] {
+  const sequence: PhaseDescriptor[] = [];
+  const { config } = input.set;
+
+  if (config.prepSec > 0) {
+    sequence.push({ kind: "prep", durationMs: config.prepSec * 1000 });
+  }
+
+  for (let r = 1; r <= config.rounds; r++) {
+    sequence.push({ kind: "active", durationMs: config.activeSec * 1000, round: r });
+    const isLastRound = r === config.rounds;
+    if (!isLastRound && config.restSec > 0) {
+      sequence.push({ kind: "rest", durationMs: config.restSec * 1000, round: r });
+    }
+  }
+
+  sequence.push({ kind: "complete", durationMs: 0 });
+  return sequence;
+}
+
+export type EngineAnchor = {
+  phaseIndex: number;
   phaseStartTs: number;
-  phaseDurationMs: number;
   pausedRemainingMs: number | null;
 };
 
-type PhaseDescriptor = { phase: Phase; currentRound: number; durationMs: number };
+export type EngineState = {
+  phaseIndex: number;
+  remainingMs: number;
+  totalRemainingMs: number;
+  isPaused: boolean;
+  isComplete: boolean;
+};
 
-function nextDescriptor(config: SetConfig, phase: Phase, round: number): PhaseDescriptor | null {
-  if (phase === "complete") return null;
-  if (phase === "idle" || phase === "prep") {
-    return { phase: "active", currentRound: 1, durationMs: config.activeSec * 1000 };
-  }
-  if (phase === "active") {
-    if (round >= config.rounds) {
-      return { phase: "complete", currentRound: 0, durationMs: 0 };
-    }
-    if (config.restSec <= 0) {
-      return { phase: "active", currentRound: round + 1, durationMs: config.activeSec * 1000 };
-    }
-    return { phase: "rest", currentRound: round, durationMs: config.restSec * 1000 };
-  }
-  // rest
-  return { phase: "active", currentRound: round + 1, durationMs: config.activeSec * 1000 };
+export function initialAnchor(_sequence: PhaseDescriptor[], now: number): EngineAnchor {
+  return { phaseIndex: 0, phaseStartTs: now, pausedRemainingMs: null };
 }
 
-function remainingPhaseDurations(config: SetConfig, fromPhase: Phase, fromRound: number): number {
+function sumDurationsFrom(sequence: PhaseDescriptor[], fromIndex: number): number {
   let total = 0;
-  let phase = fromPhase;
-  let round = fromRound;
-  while (true) {
-    const next = nextDescriptor(config, phase, round);
-    if (!next || next.phase === "complete") return total;
-    total += next.durationMs;
-    phase = next.phase;
-    round = next.currentRound;
+  for (let i = fromIndex; i < sequence.length; i++) {
+    total += sequence[i]!.durationMs;
   }
-}
-
-export function initialAnchor(config: SetConfig, now: number): Anchor {
-  if (config.prepSec > 0) {
-    return {
-      phase: "prep",
-      currentRound: 0,
-      phaseStartTs: now,
-      phaseDurationMs: config.prepSec * 1000,
-      pausedRemainingMs: null,
-    };
-  }
-  return {
-    phase: "active",
-    currentRound: 1,
-    phaseStartTs: now,
-    phaseDurationMs: config.activeSec * 1000,
-    pausedRemainingMs: null,
-  };
+  return total;
 }
 
 export function computeState(
-  config: SetConfig,
-  anchor: Anchor,
+  sequence: PhaseDescriptor[],
+  anchor: EngineAnchor,
   now: number,
 ): { state: EngineState; phaseEnded: boolean } {
+  const descriptor = sequence[anchor.phaseIndex]!;
+  const isComplete = descriptor.kind === "complete";
   const isPaused = anchor.pausedRemainingMs !== null;
-  const isTerminal = anchor.phase === "complete" || anchor.phase === "idle";
 
   let remainingMs: number;
-  if (isPaused) {
-    remainingMs = Math.max(0, anchor.pausedRemainingMs ?? 0);
-  } else if (isTerminal) {
+  if (isComplete) {
     remainingMs = 0;
+  } else if (isPaused) {
+    remainingMs = Math.max(0, anchor.pausedRemainingMs ?? 0);
   } else {
     const elapsed = now - anchor.phaseStartTs;
-    remainingMs = Math.max(0, anchor.phaseDurationMs - elapsed);
+    remainingMs = Math.max(0, descriptor.durationMs - elapsed);
   }
 
-  const phaseEnded =
-    !isPaused && !isTerminal && now - anchor.phaseStartTs >= anchor.phaseDurationMs;
-
-  const downstream = remainingPhaseDurations(config, anchor.phase, anchor.currentRound);
+  const downstream = sumDurationsFrom(sequence, anchor.phaseIndex + 1);
   const totalRemainingMs = remainingMs + downstream;
+
+  const phaseEnded = !isPaused && !isComplete && now - anchor.phaseStartTs >= descriptor.durationMs;
 
   return {
     state: {
-      phase: anchor.phase,
-      currentRound: anchor.currentRound,
+      phaseIndex: anchor.phaseIndex,
       remainingMs,
       totalRemainingMs,
       isPaused,
+      isComplete,
     },
     phaseEnded,
   };
 }
 
-export function advancePhase(config: SetConfig, anchor: Anchor, _now: number): Anchor {
-  const next = nextDescriptor(config, anchor.phase, anchor.currentRound);
-  if (!next) return anchor;
+export function advancePhase(
+  sequence: PhaseDescriptor[],
+  anchor: EngineAnchor,
+  _now: number,
+): EngineAnchor {
+  if (anchor.phaseIndex >= sequence.length - 1) return anchor;
+  const currentDuration = sequence[anchor.phaseIndex]!.durationMs;
   return {
-    phase: next.phase,
-    currentRound: next.currentRound,
-    phaseStartTs: anchor.phaseStartTs + anchor.phaseDurationMs,
-    phaseDurationMs: next.durationMs,
+    phaseIndex: anchor.phaseIndex + 1,
+    phaseStartTs: anchor.phaseStartTs + currentDuration,
     pausedRemainingMs: null,
   };
 }
 
-export function pauseAnchor(anchor: Anchor, now: number): Anchor {
+export function pauseAnchor(
+  sequence: PhaseDescriptor[],
+  anchor: EngineAnchor,
+  now: number,
+): EngineAnchor {
   if (anchor.pausedRemainingMs !== null) return anchor;
-  if (anchor.phase === "idle" || anchor.phase === "complete") return anchor;
+  const descriptor = sequence[anchor.phaseIndex]!;
+  if (descriptor.kind === "complete") return anchor;
   const elapsed = now - anchor.phaseStartTs;
-  const remaining = Math.max(0, Math.min(anchor.phaseDurationMs, anchor.phaseDurationMs - elapsed));
+  const remaining = Math.max(0, Math.min(descriptor.durationMs, descriptor.durationMs - elapsed));
   return { ...anchor, pausedRemainingMs: remaining };
 }
 
-export function resumeAnchor(anchor: Anchor, now: number): Anchor {
+export function resumeAnchor(
+  sequence: PhaseDescriptor[],
+  anchor: EngineAnchor,
+  now: number,
+): EngineAnchor {
   if (anchor.pausedRemainingMs === null) return anchor;
-  if (anchor.phase === "idle" || anchor.phase === "complete") return anchor;
+  const descriptor = sequence[anchor.phaseIndex]!;
+  if (descriptor.kind === "complete") return anchor;
   return {
-    ...anchor,
-    phaseStartTs: now - (anchor.phaseDurationMs - anchor.pausedRemainingMs),
+    phaseIndex: anchor.phaseIndex,
+    phaseStartTs: now - (descriptor.durationMs - anchor.pausedRemainingMs),
     pausedRemainingMs: null,
   };
 }
 
-export function skipAnchor(config: SetConfig, anchor: Anchor, now: number): Anchor {
-  if (anchor.phase === "idle" || anchor.phase === "complete") return anchor;
+export function skipAnchor(
+  sequence: PhaseDescriptor[],
+  anchor: EngineAnchor,
+  now: number,
+): EngineAnchor {
+  const current = sequence[anchor.phaseIndex]!;
+  if (current.kind === "complete") return anchor;
   const wasPaused = anchor.pausedRemainingMs !== null;
-  const advanced = advancePhase(config, anchor, now);
-  const isTerminal = advanced.phase === "complete";
+  const nextIndex = Math.min(anchor.phaseIndex + 1, sequence.length - 1);
+  const nextDescriptor = sequence[nextIndex]!;
+  const isNextComplete = nextDescriptor.kind === "complete";
   return {
-    ...advanced,
+    phaseIndex: nextIndex,
     phaseStartTs: now,
-    pausedRemainingMs: wasPaused && !isTerminal ? advanced.phaseDurationMs : null,
+    pausedRemainingMs: wasPaused && !isNextComplete ? nextDescriptor.durationMs : null,
   };
 }
 
-export function resetAnchor(config: SetConfig, anchor: Anchor, now: number): Anchor {
+export function resetAnchor(
+  sequence: PhaseDescriptor[],
+  anchor: EngineAnchor,
+  now: number,
+): EngineAnchor {
   const wasPaused = anchor.pausedRemainingMs !== null;
-  const fresh = initialAnchor(config, now);
-  return wasPaused ? { ...fresh, pausedRemainingMs: fresh.phaseDurationMs } : fresh;
+  const fresh = initialAnchor(sequence, now);
+  if (!wasPaused) return fresh;
+  const firstDescriptor = sequence[0]!;
+  return { ...fresh, pausedRemainingMs: firstDescriptor.durationMs };
 }

@@ -13,7 +13,7 @@ import { Button } from "@bun-mono/core-ui/button";
 
 import { isMuted, playComplete, playPhaseChange, playTick, setMuted } from "./audio";
 import { CountdownRing } from "./countdown-ring";
-import type { Phase } from "./engine";
+import { buildPhaseSequence, type PhaseKind } from "./engine";
 import { formatMmSs } from "./format";
 import type { SavedSet } from "./schemas";
 import type { TimerAppNavigate } from "./timer-app";
@@ -43,8 +43,8 @@ export type RunnerViewProps = {
   onNavigate: TimerAppNavigate;
 };
 
-const phaseLabel = (phase: Phase): string => {
-  switch (phase) {
+const phaseLabel = (kind: PhaseKind): string => {
+  switch (kind) {
     case "prep":
       return "GET READY";
     case "active":
@@ -53,13 +53,11 @@ const phaseLabel = (phase: Phase): string => {
       return "REST";
     case "complete":
       return "DONE";
-    default:
-      return "";
   }
 };
 
-const phaseColor = (phase: Phase): string => {
-  switch (phase) {
+const phaseColor = (kind: PhaseKind): string => {
+  switch (kind) {
     case "prep":
       return "var(--timer-prep)";
     case "active":
@@ -120,7 +118,7 @@ const totalLineStyle = {
 } as const;
 
 export function RunnerView({ set, onNavigate }: RunnerViewProps) {
-  const config = useMemo(() => set.config, [set]);
+  const sequence = useMemo(() => buildPhaseSequence({ kind: "set", set }), [set]);
 
   const workoutStartedAtRef = useRef<number>(0);
   const [elapsedMs, setElapsedMs] = useState<number | null>(null);
@@ -134,12 +132,12 @@ export function RunnerView({ set, onNavigate }: RunnerViewProps) {
     });
   }, []);
 
-  const engine = useTimerEngine(config, {
+  const engine = useTimerEngine(sequence, {
     onCountdownTick: () => {
       playTick();
     },
     onPhaseChange: (_prev, next) => {
-      if (next === "complete") return;
+      if (next.kind === "complete") return;
       playPhaseChange();
     },
     onComplete: () => {
@@ -148,15 +146,18 @@ export function RunnerView({ set, onNavigate }: RunnerViewProps) {
     },
   });
 
-  useWakeLock(engine.state.phase !== "idle" && engine.state.phase !== "complete");
+  useWakeLock(!engine.state.isComplete);
 
   const goHome = useCallback(() => {
     onNavigate({ view: "list", kind: "set", id: null });
   }, [onNavigate]);
 
+  const currentDescriptor = sequence[engine.state.phaseIndex]!;
+  const currentKind = currentDescriptor.kind;
+
   const phaseLabelDynamicStyle = useMemo(
-    () => ({ ...phaseLabelStyle, color: phaseColor(engine.state.phase) }),
-    [engine.state.phase],
+    () => ({ ...phaseLabelStyle, color: phaseColor(currentKind) }),
+    [currentKind],
   );
 
   const startWorkout = useCallback(() => {
@@ -175,28 +176,19 @@ export function RunnerView({ set, onNavigate }: RunnerViewProps) {
 
   const { state } = engine;
 
-  if (state.phase === "complete") {
+  if (state.isComplete) {
     return (
       <CompleteView
         elapsedMs={elapsedMs ?? 0}
-        rounds={config.rounds}
+        rounds={set.config.rounds}
         onRepeat={startWorkout}
         onDone={goHome}
       />
     );
   }
 
-  const phaseDurationMs =
-    state.phase === "prep"
-      ? config.prepSec * 1000
-      : state.phase === "active"
-        ? config.activeSec * 1000
-        : state.phase === "rest"
-          ? config.restSec * 1000
-          : 0;
-
   const totalSeconds = Math.ceil(state.totalRemainingMs / 1000);
-  const showRoundIndicator = state.phase === "active" || state.phase === "rest";
+  const showRoundIndicator = currentKind === "active" || currentKind === "rest";
   const isPaused = state.isPaused;
 
   return (
@@ -225,13 +217,13 @@ export function RunnerView({ set, onNavigate }: RunnerViewProps) {
 
       <div className="flex flex-1 flex-col items-center justify-center px-4" style={rhythmGapStyle}>
         <div className="font-semibold tracking-wide uppercase" style={phaseLabelDynamicStyle}>
-          {phaseLabel(state.phase)}
+          {phaseLabel(currentKind)}
         </div>
 
         <div className={isPaused ? "relative opacity-60" : "relative"}>
           <CountdownRing
-            phase={state.phase}
-            phaseDurationMs={phaseDurationMs}
+            phase={currentKind}
+            phaseDurationMs={currentDescriptor.durationMs}
             remainingMs={state.remainingMs}
           >
             <div className="flex flex-col items-center gap-1">
@@ -251,7 +243,9 @@ export function RunnerView({ set, onNavigate }: RunnerViewProps) {
         </div>
 
         <div className="text-muted-foreground" style={roundIndicatorStyle}>
-          {showRoundIndicator ? `Round ${state.currentRound} of ${config.rounds}` : ""}
+          {showRoundIndicator && currentDescriptor.round
+            ? `Round ${currentDescriptor.round} of ${set.config.rounds}`
+            : ""}
         </div>
 
         <div className="flex items-center" style={rhythmGapStyle}>
