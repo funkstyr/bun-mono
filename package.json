@@ -32,16 +32,18 @@
       "playwright": "^1.59.1",
       "@libsql/client": "^0.17.3",
       "libsql": "^0.5.29",
-      "@orpc/client": "^1.14.0"
+      "@orpc/client": "^1.14.0",
+      "tsdown": "^0.22.0"
     }
   },
   "type": "module",
   "scripts": {
-    "dev": "turbo dev",
-    "dev:native": "turbo -F native dev",
-    "dev:web": "turbo -F web dev",
-    "dev:server": "turbo -F server dev",
+    "dev": "bun run build:packages && turbo dev",
+    "dev:native": "bun run build:packages && turbo -F native dev",
+    "dev:web": "bun run build:packages && turbo -F web dev",
+    "dev:server": "bun run build:packages && turbo -F server dev",
     "build": "turbo build",
+    "build:packages": "turbo build --filter=\"./packages/*\"",
     "check-types": "turbo check-types",
     "test": "turbo test",
     "lint": "oxlint",

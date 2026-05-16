@@ -1,26 +1,82 @@
 {
   "name": "@bun-mono/workout-timer",
+  "version": "0.0.0",
+  "private": true,
+  "files": [
+    "src",
+    "dist"
+  ],
   "type": "module",
+  "sideEffects": [
+    "**/*.css"
+  ],
   "exports": {
     "./styles.css": "./src/styles.css",
-    "./audio": "./src/audio.ts",
-    "./cascade": "./src/cascade.ts",
-    "./countdown-ring": "./src/countdown-ring.tsx",
-    "./editor-sheet": "./src/editor-sheet.tsx",
-    "./engine": "./src/engine.ts",
-    "./format": "./src/format.ts",
-    "./list-view": "./src/list-view.tsx",
-    "./runner-view": "./src/runner-view.tsx",
-    "./schemas": "./src/schemas.ts",
-    "./storage": "./src/storage.ts",
-    "./timer-app": "./src/timer-app.tsx",
-    "./use-timer-engine": "./src/use-timer-engine.ts",
-    "./use-timers": "./src/use-timers.ts",
-    "./use-wake-lock": "./src/use-wake-lock.ts",
-    "./workout-editor": "./src/workout-editor.tsx"
+    "./audio": {
+      "types": "./dist/audio.d.ts",
+      "import": "./dist/audio.js"
+    },
+    "./cascade": {
+      "types": "./dist/cascade.d.ts",
+      "import": "./dist/cascade.js"
+    },
+    "./countdown-ring": {
+      "types": "./dist/countdown-ring.d.ts",
+      "import": "./dist/countdown-ring.js"
+    },
+    "./editor-sheet": {
+      "types": "./dist/editor-sheet.d.ts",
+      "import": "./dist/editor-sheet.js"
+    },
+    "./engine": {
+      "types": "./dist/engine.d.ts",
+      "import": "./dist/engine.js"
+    },
+    "./format": {
+      "types": "./dist/format.d.ts",
+      "import": "./dist/format.js"
+    },
+    "./list-view": {
+      "types": "./dist/list-view.d.ts",
+      "import": "./dist/list-view.js"
+    },
+    "./runner-view": {
+      "types": "./dist/runner-view.d.ts",
+      "import": "./dist/runner-view.js"
+    },
+    "./schemas": {
+      "types": "./dist/schemas.d.ts",
+      "import": "./dist/schemas.js"
+    },
+    "./storage": {
+      "types": "./dist/storage.d.ts",
+      "import": "./dist/storage.js"
+    },
+    "./timer-app": {
+      "types": "./dist/timer-app.d.ts",
+      "import": "./dist/timer-app.js"
+    },
+    "./use-timer-engine": {
+      "types": "./dist/use-timer-engine.d.ts",
+      "import": "./dist/use-timer-engine.js"
+    },
+    "./use-timers": {
+      "types": "./dist/use-timers.d.ts",
+      "import": "./dist/use-timers.js"
+    },
+    "./use-wake-lock": {
+      "types": "./dist/use-wake-lock.d.ts",
+      "import": "./dist/use-wake-lock.js"
+    },
+    "./workout-editor": {
+      "types": "./dist/workout-editor.d.ts",
+      "import": "./dist/workout-editor.js"
+    }
   },
   "scripts": {
-    "check-types": "tsgo --noEmit",
+    "dev": "tsdown --watch",
+    "build": "tsdown",
+    "check-types": "tsgo --build",
     "test": "vitest run"
   },
   "dependencies": {
@@ -37,6 +93,7 @@
     "@types/react-dom": "19.2.3",
     "@typescript/native-preview": "catalog:",
     "jsdom": "catalog:",
+    "tsdown": "catalog:",
     "vitest": "catalog:"
   },
   "peerDependencies": {
