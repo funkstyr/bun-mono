@@ -73,6 +73,7 @@ app.use("/*", async (c, next) => {
   }
 
   await next();
+  return;
 });
 
 app.post("/ai", async (c) => {

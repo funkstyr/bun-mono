@@ -48,7 +48,7 @@
     "lint:fix": "oxlint --fix",
     "format": "oxfmt --check",
     "format:fix": "oxfmt --write",
-    "check": "bun lint && bun format && bun check-types && bun test && bun build",
+    "check": "bun lint && bun format && bun check-types && bun run test && bun run build",
     "fix": "bun lint:fix && bun format:fix",
     "db:push": "turbo -F @bun-mono/db db:push",
     "db:studio": "turbo -F @bun-mono/db db:studio",

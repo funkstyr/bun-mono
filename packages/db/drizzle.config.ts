@@ -10,6 +10,6 @@ export default defineConfig({
   out: "./src/migrations",
   dialect: "turso",
   dbCredentials: {
-    url: process.env.DATABASE_URL || "",
+    url: process.env["DATABASE_URL"] || "",
   },
 });

@@ -7,13 +7,13 @@ import { NodeSDK } from "@opentelemetry/sdk-node";
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from "@opentelemetry/semantic-conventions";
 
 // Service configuration from environment variables
-const serviceName = process.env.OTEL_SERVICE_NAME || "bun-mono-server";
-const serviceVersion = process.env.OTEL_SERVICE_VERSION || "1.0.0";
+const serviceName = process.env["OTEL_SERVICE_NAME"] || "bun-mono-server";
+const serviceVersion = process.env["OTEL_SERVICE_VERSION"] || "1.0.0";
 const environment = process.env.NODE_ENV || "development";
 
 // OTLP endpoint configuration
 // Default to localhost:4318 for local development with Jaeger or OTEL Collector
-const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "http://localhost:4318";
+const otlpEndpoint = process.env["OTEL_EXPORTER_OTLP_ENDPOINT"] || "http://localhost:4318";
 
 // Create resource with service information
 const resource = resourceFromAttributes({
