@@ -299,6 +299,7 @@ export function RunnerView(props: RunnerViewProps) {
             phase={currentKind}
             phaseDurationMs={currentDescriptor.durationMs}
             remainingMs={state.remainingMs}
+            phaseKey={state.phaseIndex}
           >
             <div className="flex flex-col items-center gap-1">
               <div className="font-bold tabular-nums" style={remainingTimeStyle}>

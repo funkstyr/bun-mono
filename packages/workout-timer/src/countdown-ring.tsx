@@ -20,6 +20,7 @@ export type CountdownRingProps = {
   phase: PhaseKind;
   phaseDurationMs: number;
   remainingMs: number;
+  phaseKey?: string | number;
   children?: ReactNode;
 };
 
@@ -27,6 +28,7 @@ export function CountdownRing({
   phase,
   phaseDurationMs,
   remainingMs,
+  phaseKey,
   children,
 }: CountdownRingProps) {
   const elapsed = Math.max(0, phaseDurationMs - remainingMs);
@@ -52,6 +54,7 @@ export function CountdownRing({
           strokeWidth={STROKE}
         />
         <circle
+          key={phaseKey}
           cx={SIZE / 2}
           cy={SIZE / 2}
           r={RADIUS}
