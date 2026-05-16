@@ -10,15 +10,16 @@ import {
 } from "lucide-react";
 
 import { Button } from "@bun-mono/core-ui/button";
+import { toast } from "@bun-mono/core-ui/sonner";
 
 import { isMuted, playComplete, playPhaseChange, playTick, setMuted } from "./audio";
 import { CountdownRing } from "./countdown-ring";
-import { buildPhaseSequence, type PhaseKind } from "./engine";
+import { buildPhaseSequence, type PhaseDescriptor, type PhaseKind } from "./engine";
 import { formatMmSs } from "./format";
-import type { SavedSet } from "./schemas";
-import type { TimerAppNavigate } from "./timer-app";
+import type { SavedSet, SavedWorkout } from "./schemas";
+import type { TimerAppNavigate, TimerKind } from "./timer-app";
 import { useTimerEngine } from "./use-timer-engine";
-import { useTimers } from "./use-timers";
+import { useTimers, useWorkouts } from "./use-timers";
 import { useWakeLock } from "./use-wake-lock";
 
 export type RunnerHostProps = {
@@ -35,13 +36,60 @@ export function RunnerHost({ setId, onNavigate }: RunnerHostProps) {
   }, [snapshot, onNavigate]);
 
   if (!snapshot) return null;
-  return <RunnerView set={snapshot} onNavigate={onNavigate} />;
+  return <RunnerView kind="set" set={snapshot} onNavigate={onNavigate} />;
 }
 
-export type RunnerViewProps = {
-  set: SavedSet;
+export type WorkoutRunnerHostProps = {
+  workoutId: string;
   onNavigate: TimerAppNavigate;
 };
+
+type WorkoutSnapshot = { workout: SavedWorkout; resolvedSets: SavedSet[] };
+
+export function WorkoutRunnerHost({ workoutId, onNavigate }: WorkoutRunnerHostProps) {
+  const workouts = useWorkouts();
+  const sets = useTimers();
+  const [snapshot] = useState<WorkoutSnapshot | null>(() => {
+    const workout = workouts.find((w) => w.id === workoutId);
+    if (!workout) return null;
+    const resolved: SavedSet[] = [];
+    for (const slot of workout.slots) {
+      const found = sets.find((s) => s.id === slot.setId);
+      if (!found) return null;
+      resolved.push(found);
+    }
+    if (resolved.length === 0) return null;
+    return { workout, resolvedSets: resolved };
+  });
+  const failedRef = useRef(false);
+
+  useEffect(() => {
+    if (snapshot) return;
+    if (failedRef.current) return;
+    failedRef.current = true;
+    toast.error("Couldn't start workout — a referenced set is missing.");
+    onNavigate({ view: "list", kind: "workout", id: null });
+  }, [snapshot, onNavigate]);
+
+  if (!snapshot) return null;
+  return (
+    <RunnerView
+      kind="workout"
+      workout={snapshot.workout}
+      resolvedSets={snapshot.resolvedSets}
+      onNavigate={onNavigate}
+    />
+  );
+}
+
+export type RunnerViewProps =
+  | { kind: "set"; set: SavedSet; onNavigate: TimerAppNavigate }
+  | {
+      kind: "workout";
+      workout: SavedWorkout;
+      resolvedSets: SavedSet[];
+      onNavigate: TimerAppNavigate;
+    };
 
 const phaseLabel = (kind: PhaseKind): string => {
   switch (kind) {
@@ -99,6 +147,11 @@ const roundIndicatorStyle = {
   minHeight: "1.5em",
 } as const;
 
+const subLineStyle = {
+  fontSize: "calc(var(--ring-size) * 0.055)",
+  lineHeight: 1.2,
+} as const;
+
 const sideButtonStyle = { width: "var(--btn-size)", height: "var(--btn-size)" } as const;
 const sideIconStyle = {
   width: "calc(var(--btn-size) * 0.4)",
@@ -117,8 +170,21 @@ const totalLineStyle = {
   lineHeight: 1.4,
 } as const;
 
-export function RunnerView({ set, onNavigate }: RunnerViewProps) {
-  const sequence = useMemo(() => buildPhaseSequence({ kind: "set", set }), [set]);
+export function RunnerView(props: RunnerViewProps) {
+  const { kind, onNavigate } = props;
+  const sourceKind: TimerKind = kind;
+  const sequence = useMemo(
+    () =>
+      props.kind === "set"
+        ? buildPhaseSequence({ kind: "set", set: props.set })
+        : buildPhaseSequence({
+            kind: "workout",
+            workout: props.workout,
+            sets: props.resolvedSets,
+          }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [props.kind, props.kind === "set" ? props.set : props.workout],
+  );
 
   const workoutStartedAtRef = useRef<number>(0);
   const [elapsedMs, setElapsedMs] = useState<number | null>(null);
@@ -149,8 +215,8 @@ export function RunnerView({ set, onNavigate }: RunnerViewProps) {
   useWakeLock(!engine.state.isComplete);
 
   const goHome = useCallback(() => {
-    onNavigate({ view: "list", kind: "set", id: null });
-  }, [onNavigate]);
+    onNavigate({ view: "list", kind: sourceKind, id: null });
+  }, [onNavigate, sourceKind]);
 
   const currentDescriptor = sequence[engine.state.phaseIndex]!;
   const currentKind = currentDescriptor.kind;
@@ -177,10 +243,17 @@ export function RunnerView({ set, onNavigate }: RunnerViewProps) {
   const { state } = engine;
 
   if (state.isComplete) {
-    return (
+    return props.kind === "workout" ? (
       <CompleteView
         elapsedMs={elapsedMs ?? 0}
-        rounds={set.config.rounds}
+        heading={`${props.workout.name} · ${props.workout.slots.length} sets × ${props.workout.repeats} passes`}
+        onRepeat={startWorkout}
+        onDone={goHome}
+      />
+    ) : (
+      <CompleteView
+        elapsedMs={elapsedMs ?? 0}
+        heading={props.set.name}
         onRepeat={startWorkout}
         onDone={goHome}
       />
@@ -188,8 +261,9 @@ export function RunnerView({ set, onNavigate }: RunnerViewProps) {
   }
 
   const totalSeconds = Math.ceil(state.totalRemainingMs / 1000);
-  const showRoundIndicator = currentKind === "active" || currentKind === "rest";
   const isPaused = state.isPaused;
+
+  const positional = computePositional(props, currentDescriptor);
 
   return (
     <div className="bg-background fixed inset-0 z-50 flex flex-col" style={rootStyle}>
@@ -242,10 +316,15 @@ export function RunnerView({ set, onNavigate }: RunnerViewProps) {
           </CountdownRing>
         </div>
 
-        <div className="text-muted-foreground" style={roundIndicatorStyle}>
-          {showRoundIndicator && currentDescriptor.round
-            ? `Round ${currentDescriptor.round} of ${set.config.rounds}`
-            : ""}
+        <div className="flex flex-col items-center">
+          <div className="text-muted-foreground" style={roundIndicatorStyle}>
+            {positional.upper}
+          </div>
+          {positional.lower ? (
+            <div className="text-muted-foreground" style={subLineStyle}>
+              {positional.lower}
+            </div>
+          ) : null}
         </div>
 
         <div className="flex items-center" style={rhythmGapStyle}>
@@ -291,28 +370,23 @@ export function RunnerView({ set, onNavigate }: RunnerViewProps) {
 
 type CompleteViewProps = {
   elapsedMs: number;
-  rounds: number;
+  heading: string;
   onRepeat: () => void;
   onDone: () => void;
 };
 
-function CompleteView({ elapsedMs, rounds, onRepeat, onDone }: CompleteViewProps) {
+function CompleteView({ elapsedMs, heading, onRepeat, onDone }: CompleteViewProps) {
   const elapsedSeconds = Math.round(elapsedMs / 1000);
   return (
     <div className="bg-background fixed inset-0 z-50 flex flex-col">
       <div className="flex flex-1 flex-col items-center justify-center gap-8 px-4 text-center">
         <div className="text-5xl font-bold tracking-wide">DONE</div>
         <div className="flex flex-col items-center gap-3">
+          <div className="text-xl font-semibold">{heading}</div>
           <div className="flex flex-col items-center">
             <div className="text-4xl font-semibold tabular-nums">{formatMmSs(elapsedSeconds)}</div>
             <div className="text-muted-foreground text-xs tracking-widest uppercase">
               Total time
-            </div>
-          </div>
-          <div className="flex flex-col items-center">
-            <div className="text-4xl font-semibold tabular-nums">{rounds}</div>
-            <div className="text-muted-foreground text-xs tracking-widest uppercase">
-              Rounds completed
             </div>
           </div>
         </div>
@@ -333,4 +407,41 @@ function CompleteView({ elapsedMs, rounds, onRepeat, onDone }: CompleteViewProps
       </div>
     </div>
   );
+}
+
+function computePositional(
+  props: RunnerViewProps,
+  d: PhaseDescriptor,
+): { upper: string; lower: string } {
+  if (props.kind === "set") {
+    if (d.kind === "active" || d.kind === "rest") {
+      return { upper: `Round ${d.round} of ${props.set.config.rounds}`, lower: "" };
+    }
+    return { upper: "", lower: "" };
+  }
+  const { workout } = props;
+  const M = workout.slots.length;
+  const R = workout.repeats;
+  if (d.kind === "active" || d.kind === "rest") {
+    const setIdx = d.setIdx ?? 0;
+    const repeatIdx = d.repeatIdx ?? 0;
+    const set = props.resolvedSets[setIdx];
+    const totalRounds = set?.config.rounds ?? 0;
+    return {
+      upper: `${d.setName ?? ""} · Round ${d.round} of ${totalRounds}`,
+      lower: `Set ${setIdx + 1} of ${M} · Pass ${repeatIdx + 1} of ${R}`,
+    };
+  }
+  if (d.kind === "prep") {
+    const setIdx = d.setIdx ?? 0;
+    const repeatIdx = d.repeatIdx ?? 0;
+    const isWorkoutStart = setIdx === 0 && repeatIdx === 0;
+    return {
+      upper: `Up next: ${d.upNextSetName ?? ""}`,
+      lower: isWorkoutStart
+        ? `Pass 1 of ${R}`
+        : `Set ${setIdx + 1} of ${M} · Pass ${repeatIdx + 1} of ${R}`,
+    };
+  }
+  return { upper: "", lower: "" };
 }

@@ -2,7 +2,7 @@ import { useCallback, useMemo } from "react";
 
 import { EditorSheet, type EditorInitialValues } from "./editor-sheet";
 import { ListView } from "./list-view";
-import { RunnerHost } from "./runner-view";
+import { RunnerHost, WorkoutRunnerHost } from "./runner-view";
 import { useTimers } from "./use-timers";
 import { WorkoutEditor } from "./workout-editor";
 
@@ -53,6 +53,9 @@ export function TimerApp({ view, kind, id, onNavigate }: TimerAppProps) {
       ) : null}
       {view === "run" && kind === "set" && id ? (
         <RunnerHost key={id} setId={id} onNavigate={onNavigate} />
+      ) : null}
+      {view === "run" && kind === "workout" && id ? (
+        <WorkoutRunnerHost key={id} workoutId={id} onNavigate={onNavigate} />
       ) : null}
     </>
   );

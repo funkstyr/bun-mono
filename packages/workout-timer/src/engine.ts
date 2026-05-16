@@ -1,4 +1,4 @@
-import type { SavedSet } from "./schemas";
+import type { SavedSet, SavedWorkout } from "./schemas";
 
 export type PhaseKind = "prep" | "active" | "rest" | "complete";
 
@@ -12,21 +12,67 @@ export type PhaseDescriptor = {
   upNextSetName?: string;
 };
 
-export type BuildSequenceInput = { kind: "set"; set: SavedSet };
+export type BuildSequenceInput =
+  | { kind: "set"; set: SavedSet }
+  | { kind: "workout"; workout: SavedWorkout; sets: SavedSet[] };
 
 export function buildPhaseSequence(input: BuildSequenceInput): PhaseDescriptor[] {
   const sequence: PhaseDescriptor[] = [];
-  const { config } = input.set;
 
-  if (config.prepSec > 0) {
-    sequence.push({ kind: "prep", durationMs: config.prepSec * 1000 });
-  }
+  if (input.kind === "set") {
+    const { config } = input.set;
 
-  for (let r = 1; r <= config.rounds; r++) {
-    sequence.push({ kind: "active", durationMs: config.activeSec * 1000, round: r });
-    const isLastRound = r === config.rounds;
-    if (!isLastRound && config.restSec > 0) {
-      sequence.push({ kind: "rest", durationMs: config.restSec * 1000, round: r });
+    if (config.prepSec > 0) {
+      sequence.push({ kind: "prep", durationMs: config.prepSec * 1000 });
+    }
+
+    for (let r = 1; r <= config.rounds; r++) {
+      sequence.push({ kind: "active", durationMs: config.activeSec * 1000, round: r });
+      const isLastRound = r === config.rounds;
+      if (!isLastRound && config.restSec > 0) {
+        sequence.push({ kind: "rest", durationMs: config.restSec * 1000, round: r });
+      }
+    }
+  } else {
+    const { workout, sets } = input;
+    const prepMs = workout.prepSec * 1000;
+    for (let p = 0; p < workout.repeats; p++) {
+      for (let i = 0; i < workout.slots.length; i++) {
+        const set = sets[i]!;
+        const { config } = set;
+
+        if (prepMs > 0) {
+          sequence.push({
+            kind: "prep",
+            durationMs: prepMs,
+            setIdx: i,
+            repeatIdx: p,
+            upNextSetName: set.name,
+          });
+        }
+
+        for (let r = 1; r <= config.rounds; r++) {
+          sequence.push({
+            kind: "active",
+            durationMs: config.activeSec * 1000,
+            setIdx: i,
+            setName: set.name,
+            repeatIdx: p,
+            round: r,
+          });
+          const isLastRound = r === config.rounds;
+          if (!isLastRound && config.restSec > 0) {
+            sequence.push({
+              kind: "rest",
+              durationMs: config.restSec * 1000,
+              setIdx: i,
+              setName: set.name,
+              repeatIdx: p,
+              round: r,
+            });
+          }
+        }
+      }
     }
   }
 

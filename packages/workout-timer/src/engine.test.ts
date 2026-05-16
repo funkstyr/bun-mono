@@ -12,7 +12,7 @@ import {
   type EngineAnchor,
   type PhaseDescriptor,
 } from "./engine";
-import type { SavedSet, SetConfig } from "./schemas";
+import type { SavedSet, SavedWorkout, SetConfig } from "./schemas";
 
 const baseConfig: SetConfig = {
   rounds: 3,
@@ -489,5 +489,213 @@ describe("engine — reset", () => {
     expect(descriptor.kind).toBe("active");
     expect(descriptor.round).toBe(1);
     expect(descriptor.durationMs).toBe(baseConfig.activeSec * 1000);
+  });
+});
+
+function makeNamedSet(id: string, name: string, config: SetConfig): SavedSet {
+  return { id, name, createdAt: 0, updatedAt: 0, config };
+}
+
+function makeWorkout(prepSec: number, repeats: number, slotSetIds: string[]): SavedWorkout {
+  return {
+    id: "w1",
+    name: "Test Workout",
+    createdAt: 0,
+    updatedAt: 0,
+    prepSec,
+    repeats,
+    slots: slotSetIds.map((setId) => ({ setId })),
+  };
+}
+
+describe("buildPhaseSequence — workout variant", () => {
+  const setA = makeNamedSet("a", "Squats", { rounds: 2, prepSec: 99, activeSec: 30, restSec: 10 });
+  const setB = makeNamedSet("b", "Lunges", { rounds: 1, prepSec: 99, activeSec: 20, restSec: 0 });
+  const setC = makeNamedSet("c", "Calves", { rounds: 3, prepSec: 99, activeSec: 15, restSec: 5 });
+
+  it("single pass, single slot: prep(upNext=A) → A body → complete", () => {
+    const workout = makeWorkout(5, 1, [setA.id]);
+    const sequence = buildPhaseSequence({ kind: "workout", workout, sets: [setA] });
+    expect(
+      sequence.map((d) => ({
+        kind: d.kind,
+        setIdx: d.setIdx,
+        repeatIdx: d.repeatIdx,
+        round: d.round,
+        upNextSetName: d.upNextSetName,
+        setName: d.setName,
+      })),
+    ).toEqual([
+      {
+        kind: "prep",
+        setIdx: 0,
+        repeatIdx: 0,
+        round: undefined,
+        upNextSetName: "Squats",
+        setName: undefined,
+      },
+      {
+        kind: "active",
+        setIdx: 0,
+        repeatIdx: 0,
+        round: 1,
+        upNextSetName: undefined,
+        setName: "Squats",
+      },
+      {
+        kind: "rest",
+        setIdx: 0,
+        repeatIdx: 0,
+        round: 1,
+        upNextSetName: undefined,
+        setName: "Squats",
+      },
+      {
+        kind: "active",
+        setIdx: 0,
+        repeatIdx: 0,
+        round: 2,
+        upNextSetName: undefined,
+        setName: "Squats",
+      },
+      {
+        kind: "complete",
+        setIdx: undefined,
+        repeatIdx: undefined,
+        round: undefined,
+        upNextSetName: undefined,
+        setName: undefined,
+      },
+    ]);
+  });
+
+  it("multiple slots single pass: workout-level prep appears before every set, including first", () => {
+    const workout = makeWorkout(5, 1, [setA.id, setB.id, setC.id]);
+    const sequence = buildPhaseSequence({ kind: "workout", workout, sets: [setA, setB, setC] });
+    const preps = sequence.filter((d) => d.kind === "prep");
+    expect(preps).toHaveLength(3);
+    expect(preps.map((d) => d.upNextSetName)).toEqual(["Squats", "Lunges", "Calves"]);
+    expect(preps.map((d) => d.setIdx)).toEqual([0, 1, 2]);
+    expect(sequence[0]!.kind).toBe("prep");
+    expect(sequence[sequence.length - 1]!.kind).toBe("complete");
+  });
+
+  it("multiple slots, multiple passes: emits A,B,A,B,A,B preceded by prep", () => {
+    const workout = makeWorkout(5, 3, [setA.id, setB.id]);
+    const sequence = buildPhaseSequence({ kind: "workout", workout, sets: [setA, setB] });
+    const preps = sequence.filter((d) => d.kind === "prep");
+    expect(preps).toHaveLength(6);
+    expect(preps.map((d) => `${d.upNextSetName}:${d.repeatIdx}`)).toEqual([
+      "Squats:0",
+      "Lunges:0",
+      "Squats:1",
+      "Lunges:1",
+      "Squats:2",
+      "Lunges:2",
+    ]);
+    expect(sequence[sequence.length - 1]!.kind).toBe("complete");
+  });
+
+  it("workout.prepSec === 0 omits all prep descriptors (workout-start AND between-set)", () => {
+    const workout = makeWorkout(0, 2, [setA.id, setB.id]);
+    const sequence = buildPhaseSequence({ kind: "workout", workout, sets: [setA, setB] });
+    expect(sequence.some((d) => d.kind === "prep")).toBe(false);
+    expect(sequence[0]!.kind).toBe("active");
+    expect(sequence[0]!.setName).toBe("Squats");
+  });
+
+  it("set.config.prepSec is ignored inside a workout", () => {
+    const setWithPrep = makeNamedSet("a", "Squats", {
+      rounds: 1,
+      prepSec: 99,
+      activeSec: 30,
+      restSec: 0,
+    });
+    const workout = makeWorkout(5, 1, [setWithPrep.id]);
+    const sequence = buildPhaseSequence({ kind: "workout", workout, sets: [setWithPrep] });
+    const preps = sequence.filter((d) => d.kind === "prep");
+    expect(preps).toHaveLength(1);
+    expect(preps[0]!.durationMs).toBe(5_000);
+  });
+
+  it("set.config.restSec === 0 omits intra-set rest, but between-set prep still appears", () => {
+    const zeroRest = makeNamedSet("a", "Quick", {
+      rounds: 3,
+      prepSec: 99,
+      activeSec: 10,
+      restSec: 0,
+    });
+    const workout = makeWorkout(5, 1, [zeroRest.id, zeroRest.id]);
+    const sequence = buildPhaseSequence({ kind: "workout", workout, sets: [zeroRest, zeroRest] });
+    expect(sequence.some((d) => d.kind === "rest")).toBe(false);
+    expect(sequence.filter((d) => d.kind === "prep")).toHaveLength(2);
+  });
+
+  it("same setId in two slots produces two independent slot instances", () => {
+    const workout = makeWorkout(5, 1, [setA.id, setA.id]);
+    const sequence = buildPhaseSequence({ kind: "workout", workout, sets: [setA, setA] });
+    const setIdxsForActive = sequence.filter((d) => d.kind === "active").map((d) => d.setIdx);
+    expect(setIdxsForActive).toEqual([0, 0, 1, 1]);
+    const preps = sequence.filter((d) => d.kind === "prep");
+    expect(preps.map((d) => d.setIdx)).toEqual([0, 1]);
+    expect(preps.every((d) => d.upNextSetName === "Squats")).toBe(true);
+  });
+
+  it("positional metadata is correct for every descriptor in [A,B]×2", () => {
+    const workout = makeWorkout(5, 2, [setA.id, setB.id]);
+    const sequence = buildPhaseSequence({ kind: "workout", workout, sets: [setA, setB] });
+    const nonComplete = sequence.filter((d) => d.kind !== "complete");
+    expect(nonComplete.every((d) => typeof d.setIdx === "number")).toBe(true);
+    expect(nonComplete.every((d) => typeof d.repeatIdx === "number")).toBe(true);
+    const preps = sequence.filter((d) => d.kind === "prep");
+    expect(preps.every((d) => d.upNextSetName !== undefined && d.setName === undefined)).toBe(true);
+    const activesAndRests = sequence.filter((d) => d.kind === "active" || d.kind === "rest");
+    expect(activesAndRests.every((d) => d.setName !== undefined && (d.round ?? 0) >= 1)).toBe(true);
+    const actives = sequence.filter((d) => d.kind === "active");
+    expect(actives.map((d) => `${d.setIdx}/${d.repeatIdx}/r${d.round}`)).toEqual([
+      "0/0/r1",
+      "0/0/r2",
+      "1/0/r1",
+      "0/1/r1",
+      "0/1/r2",
+      "1/1/r1",
+    ]);
+  });
+
+  it("final descriptor is always complete with durationMs 0", () => {
+    const workout = makeWorkout(0, 2, [setA.id, setC.id]);
+    const sequence = buildPhaseSequence({ kind: "workout", workout, sets: [setA, setC] });
+    const last = sequence[sequence.length - 1]!;
+    expect(last.kind).toBe("complete");
+    expect(last.durationMs).toBe(0);
+  });
+});
+
+describe("buildPhaseSequence — standalone Set parallel-correctness against workout pipeline", () => {
+  it("a standalone Set produces a sequence whose computeState matches across ticks", () => {
+    const setSequence = makeSequence(baseConfig);
+    let anchor = initialAnchor(setSequence, 0);
+    const samples: number[] = [];
+    for (let t = 0; t <= 120_000; t += 1_000) {
+      const { state, phaseEnded } = computeState(setSequence, anchor, t);
+      samples.push(state.remainingMs);
+      if (phaseEnded) anchor = advancePhase(setSequence, anchor, t);
+    }
+    expect(samples.length).toBeGreaterThan(0);
+    expect(samples[samples.length - 1]).toBe(0);
+  });
+});
+
+describe("engine — workout advancePhase clamp at complete", () => {
+  it("clamps and does not overflow past the final complete descriptor", () => {
+    const setA = makeNamedSet("a", "A", { rounds: 1, prepSec: 99, activeSec: 5, restSec: 0 });
+    const workout = makeWorkout(0, 1, [setA.id]);
+    const sequence = buildPhaseSequence({ kind: "workout", workout, sets: [setA] });
+    const completeAnchor: EngineAnchor = {
+      phaseIndex: sequence.length - 1,
+      phaseStartTs: 1_000,
+      pausedRemainingMs: null,
+    };
+    expect(advancePhase(sequence, completeAnchor, 2_000)).toEqual(completeAnchor);
   });
 });

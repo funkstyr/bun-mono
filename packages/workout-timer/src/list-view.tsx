@@ -114,6 +114,11 @@ function WorkoutsList({ onNavigate }: { onNavigate: TimerAppNavigate }) {
     [onNavigate],
   );
 
+  const handleStart = useCallback(
+    (id: string) => onNavigate({ view: "run", kind: "workout", id }),
+    [onNavigate],
+  );
+
   const handleDuplicate = useCallback((id: string) => {
     duplicateWorkout(id);
   }, []);
@@ -157,6 +162,7 @@ function WorkoutsList({ onNavigate }: { onNavigate: TimerAppNavigate }) {
             <WorkoutCard
               workout={workout}
               setsById={setsById}
+              onStart={handleStart}
               onEdit={handleEdit}
               onDuplicate={handleDuplicate}
               onDelete={handleDelete}
@@ -171,12 +177,14 @@ function WorkoutsList({ onNavigate }: { onNavigate: TimerAppNavigate }) {
 function WorkoutCard({
   workout,
   setsById,
+  onStart,
   onEdit,
   onDuplicate,
   onDelete,
 }: {
   workout: SavedWorkout;
   setsById: Map<string, SavedSet>;
+  onStart: (id: string) => void;
   onEdit: (id: string) => void;
   onDuplicate: (id: string) => void;
   onDelete: (workout: SavedWorkout) => void;
@@ -187,6 +195,7 @@ function WorkoutCard({
   );
   const durationMs = useMemo(() => computeWorkoutDuration(workout, resolved), [workout, resolved]);
   const summary = `${workout.slots.length} sets · ${workout.repeats} passes · ~${formatMmSs(Math.round(durationMs / 1000))}`;
+  const handleStart = useCallback(() => onStart(workout.id), [onStart, workout.id]);
   const handleEdit = useCallback(() => onEdit(workout.id), [onEdit, workout.id]);
   const handleDuplicate = useCallback(() => onDuplicate(workout.id), [onDuplicate, workout.id]);
   const handleDelete = useCallback(() => onDelete(workout), [onDelete, workout]);
@@ -202,11 +211,18 @@ function WorkoutCard({
     [workout.name],
   );
   return (
-    <Card className="focus-within:ring-ring relative transition-colors focus-within:ring-2">
-      <CardContent className="space-y-1 pr-10">
-        <CardTitle className="text-base">{workout.name}</CardTitle>
-        <CardDescription>{summary}</CardDescription>
-      </CardContent>
+    <Card className="hover:bg-accent/40 focus-within:ring-ring relative transition-colors focus-within:ring-2">
+      <button
+        type="button"
+        onClick={handleStart}
+        className="w-full cursor-pointer bg-transparent text-left focus-visible:outline-none"
+        aria-label={`Start ${workout.name}`}
+      >
+        <CardContent className="space-y-1 pr-10">
+          <CardTitle className="text-base">{workout.name}</CardTitle>
+          <CardDescription>{summary}</CardDescription>
+        </CardContent>
+      </button>
       <div className="absolute top-2 right-2">
         <DropdownMenu>
           <DropdownMenuTrigger render={triggerRender}>
