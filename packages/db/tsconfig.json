@@ -1,10 +1,14 @@
 {
   "extends": "@bun-mono/config/tsconfig.base.json",
+  "include": ["src/**/*.ts"],
+  "exclude": ["dist", "node_modules", "src/migrations"],
   "compilerOptions": {
+    "composite": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true,
-    "outDir": "dist",
-    "composite": true
+    "emitDeclarationOnly": true,
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
   }
 }

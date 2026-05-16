@@ -1,16 +1,26 @@
 {
   "name": "@bun-mono/db",
+  "version": "0.0.0",
+  "private": true,
+  "files": [
+    "src",
+    "dist"
+  ],
   "type": "module",
   "exports": {
     ".": {
-      "default": "./src/index.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     },
     "./*": {
-      "default": "./src/*.ts"
+      "types": "./dist/*.d.ts",
+      "import": "./dist/*.js"
     }
   },
   "scripts": {
-    "check-types": "tsgo --noEmit",
+    "dev": "tsdown --watch",
+    "build": "tsdown",
+    "check-types": "tsgo --build",
     "db:local": "turso dev --db-file local.db",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
@@ -28,6 +38,7 @@
   "devDependencies": {
     "@bun-mono/config": "workspace:*",
     "@typescript/native-preview": "catalog:",
-    "drizzle-kit": "^0.31.10"
+    "drizzle-kit": "^0.31.10",
+    "tsdown": "catalog:"
   }
 }

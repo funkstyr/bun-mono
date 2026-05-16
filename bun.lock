@@ -141,6 +141,7 @@
     },
     "packages/api": {
       "name": "@bun-mono/api",
+      "version": "0.0.0",
       "dependencies": {
         "@bun-mono/auth": "workspace:*",
         "@bun-mono/db": "workspace:*",
@@ -166,11 +167,13 @@
         "@vitest/ui": "catalog:",
         "jsdom": "catalog:",
         "playwright": "catalog:",
+        "tsdown": "catalog:",
         "vitest": "catalog:",
       },
     },
     "packages/auth": {
       "name": "@bun-mono/auth",
+      "version": "0.0.0",
       "dependencies": {
         "@better-auth/drizzle-adapter": "^1.6.9",
         "@bun-mono/db": "workspace:*",
@@ -182,6 +185,7 @@
       "devDependencies": {
         "@bun-mono/config": "workspace:*",
         "@typescript/native-preview": "catalog:",
+        "tsdown": "catalog:",
       },
     },
     "packages/config": {
@@ -216,6 +220,7 @@
     },
     "packages/db": {
       "name": "@bun-mono/db",
+      "version": "0.0.0",
       "dependencies": {
         "@bun-mono/env": "workspace:*",
         "@libsql/client": "catalog:",
@@ -228,6 +233,7 @@
         "@bun-mono/config": "workspace:*",
         "@typescript/native-preview": "catalog:",
         "drizzle-kit": "^0.31.10",
+        "tsdown": "catalog:",
       },
     },
     "packages/env": {
@@ -242,6 +248,7 @@
         "@bun-mono/config": "workspace:*",
         "@types/bun": "catalog:",
         "@typescript/native-preview": "catalog:",
+        "tsdown": "catalog:",
       },
     },
     "packages/workout-timer": {

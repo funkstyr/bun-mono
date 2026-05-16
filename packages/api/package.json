@@ -1,16 +1,26 @@
 {
   "name": "@bun-mono/api",
+  "version": "0.0.0",
+  "private": true,
+  "files": [
+    "src",
+    "dist"
+  ],
   "type": "module",
   "exports": {
     ".": {
-      "default": "./src/index.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     },
     "./*": {
-      "default": "./src/*.ts"
+      "types": "./dist/*.d.ts",
+      "import": "./dist/*.js"
     }
   },
   "scripts": {
-    "check-types": "tsgo --noEmit",
+    "dev": "tsdown --watch",
+    "build": "tsdown",
+    "check-types": "tsgo --build",
     "test": "vitest run"
   },
   "dependencies": {
@@ -38,6 +48,7 @@
     "@vitest/ui": "catalog:",
     "jsdom": "catalog:",
     "playwright": "catalog:",
+    "tsdown": "catalog:",
     "vitest": "catalog:"
   }
 }
