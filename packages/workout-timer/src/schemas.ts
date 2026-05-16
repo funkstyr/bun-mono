@@ -32,7 +32,7 @@ export const savedWorkoutSchema = type({
   updatedAt: "number",
   prepSec: "0 <= number.integer <= 60",
   repeats: "1 <= number.integer <= 99",
-  slots: slotSchema.array().atLeastLength(1).atMostLength(50),
+  slots: slotSchema.array().atMostLength(50),
 });
 
 export type SavedWorkout = typeof savedWorkoutSchema.infer;

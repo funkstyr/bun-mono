@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 
+import { cascadeDeleteSet, type RemovedSlot } from "./cascade";
 import {
   defaultSetConfig,
   emptyStore,
@@ -153,22 +154,48 @@ export function duplicateSet(id: string): SavedSet | null {
   return copy;
 }
 
-export function restoreSet(snapshot: SavedSet): SavedSet {
-  const { sets, workouts } = read();
-  if (!sets.some((s) => s.id === snapshot.id)) {
-    sets.push({ ...snapshot, config: { ...snapshot.config } });
-    write(sets, workouts);
-  }
-  return snapshot;
-}
+export type DeleteSetResult = {
+  removedSet: SavedSet;
+  removedSlots: RemovedSlot[];
+};
 
-export function deleteSet(id: string): SavedSet | null {
+export function deleteSet(id: string): DeleteSetResult | null {
   const { sets, workouts } = read();
   const idx = sets.findIndex((s) => s.id === id);
   if (idx === -1) return null;
-  const [removed] = sets.splice(idx, 1);
-  write(sets, workouts);
-  return removed ?? null;
+  const removedSet: SavedSet = { ...sets[idx]!, config: { ...sets[idx]!.config } };
+  const nextSets = sets.filter((s) => s.id !== id);
+  const { nextWorkouts, removedSlots } = cascadeDeleteSet(workouts, id);
+  write(nextSets, nextWorkouts);
+  return { removedSet, removedSlots };
+}
+
+export function restoreSet(snapshot: SavedSet, removedSlots: readonly RemovedSlot[] = []): void {
+  const { sets, workouts } = read();
+  if (!sets.some((s) => s.id === snapshot.id)) {
+    sets.push({ ...snapshot, config: { ...snapshot.config } });
+  }
+  if (removedSlots.length > 0) {
+    const workoutsById = new Map<string, SavedWorkout>();
+    for (const w of workouts) workoutsById.set(w.id, w);
+    const touched = new Set<string>();
+    for (const removed of removedSlots) {
+      const target = workoutsById.get(removed.workoutId);
+      if (!target) continue;
+      if (!touched.has(target.id)) {
+        const cloned: SavedWorkout = { ...target, slots: target.slots.map((s) => ({ ...s })) };
+        workoutsById.set(target.id, cloned);
+        touched.add(target.id);
+      }
+      const current = workoutsById.get(removed.workoutId)!;
+      const insertAt = Math.min(removed.slotIndex, current.slots.length);
+      current.slots.splice(insertAt, 0, { ...removed.slot });
+    }
+    const nextWorkouts = workouts.map((w) => workoutsById.get(w.id) ?? w);
+    write(sets, nextWorkouts);
+  } else {
+    write(sets, workouts);
+  }
 }
 
 export type CreateWorkoutInput = {

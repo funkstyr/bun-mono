@@ -243,8 +243,22 @@ function WorkoutCard({
 
 function SetsList({ onNavigate }: { onNavigate: TimerAppNavigate }) {
   const sets = useTimers();
+  const workouts = useWorkouts();
 
   const sorted = useMemo(() => sets.toSorted((a, b) => b.updatedAt - a.updatedAt), [sets]);
+
+  const usedByCount = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const workout of workouts) {
+      const seen = new Set<string>();
+      for (const slot of workout.slots) {
+        if (seen.has(slot.setId)) continue;
+        seen.add(slot.setId);
+        counts.set(slot.setId, (counts.get(slot.setId) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [workouts]);
 
   const handleCreate = useCallback(
     () => onNavigate({ view: "edit", kind: "set", id: null }),
@@ -266,13 +280,19 @@ function SetsList({ onNavigate }: { onNavigate: TimerAppNavigate }) {
   }, []);
 
   const handleDelete = useCallback((set: SavedSet) => {
-    const snapshot: SavedSet = { ...set, config: { ...set.config } };
-    deleteSet(set.id);
-    toast(`Deleted "${snapshot.name}"`, {
+    const result = deleteSet(set.id);
+    if (!result) return;
+    const { removedSet, removedSlots } = result;
+    const distinctWorkouts = new Set(removedSlots.map((r) => r.workoutId)).size;
+    const message =
+      distinctWorkouts > 0
+        ? `Deleted "${removedSet.name}" (removed from ${distinctWorkouts} workout${distinctWorkouts === 1 ? "" : "s"})`
+        : `Deleted "${removedSet.name}"`;
+    toast(message, {
       action: {
         label: "Undo",
         onClick: () => {
-          restoreSet(snapshot);
+          restoreSet(removedSet, removedSlots);
         },
       },
     });
@@ -300,6 +320,7 @@ function SetsList({ onNavigate }: { onNavigate: TimerAppNavigate }) {
           <li key={set.id}>
             <SetCard
               set={set}
+              usedInCount={usedByCount.get(set.id) ?? 0}
               onStart={handleStart}
               onEdit={handleEdit}
               onDuplicate={handleDuplicate}
@@ -316,12 +337,14 @@ const stopEvent = (event: React.SyntheticEvent) => event.stopPropagation();
 
 function SetCard({
   set,
+  usedInCount,
   onStart,
   onEdit,
   onDuplicate,
   onDelete,
 }: {
   set: SavedSet;
+  usedInCount: number;
   onStart: (id: string) => void;
   onEdit: (id: string) => void;
   onDuplicate: (id: string) => void;
@@ -329,6 +352,8 @@ function SetCard({
 }) {
   const config = set.config;
   const summary = `${config.rounds} rounds · ${formatMmSs(config.activeSec)} active / ${formatMmSs(config.restSec)} rest`;
+  const usedInLabel =
+    usedInCount > 0 ? `Used in ${usedInCount} workout${usedInCount === 1 ? "" : "s"}` : null;
   const handleStart = useCallback(() => onStart(set.id), [onStart, set.id]);
   const handleEdit = useCallback(() => onEdit(set.id), [onEdit, set.id]);
   const handleDuplicate = useCallback(() => onDuplicate(set.id), [onDuplicate, set.id]);
@@ -355,6 +380,7 @@ function SetCard({
         <CardContent className="space-y-1 pr-10">
           <CardTitle className="text-base">{set.name}</CardTitle>
           <CardDescription>{summary}</CardDescription>
+          {usedInLabel ? <CardDescription>{usedInLabel}</CardDescription> : null}
         </CardContent>
       </button>
       <div className="absolute top-2 right-2">
