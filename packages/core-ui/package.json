@@ -3,10 +3,19 @@
   "type": "module",
   "exports": {
     "./styles.css": "./src/styles.css",
-    "./*": [
-      "./src/*.tsx",
-      "./src/*.ts"
-    ]
+    "./button": "./src/button.tsx",
+    "./card": "./src/card.tsx",
+    "./checkbox": "./src/checkbox.tsx",
+    "./dialog": "./src/dialog.tsx",
+    "./dropdown-menu": "./src/dropdown-menu.tsx",
+    "./form": "./src/form.tsx",
+    "./input": "./src/input.tsx",
+    "./label": "./src/label.tsx",
+    "./radio-group": "./src/radio-group.tsx",
+    "./skeleton": "./src/skeleton.tsx",
+    "./sonner": "./src/sonner.tsx",
+    "./theme-provider": "./src/theme-provider.tsx",
+    "./utils": "./src/utils.ts"
   },
   "scripts": {
     "check-types": "tsgo --noEmit"

@@ -1,23 +1,46 @@
 import { useSyncExternalStore } from "react";
 
-import { defaultSetConfig, emptyStore, type SavedSet, type SetConfig } from "./schemas";
+import {
+  defaultSetConfig,
+  emptyStore,
+  type SavedSet,
+  type SavedWorkout,
+  type SetConfig,
+} from "./schemas";
 import { loadAndMigrate, saveAll, STORAGE_KEY, subscribe } from "./storage";
 
 const EMPTY_SETS: readonly SavedSet[] = [];
+const EMPTY_WORKOUTS: readonly SavedWorkout[] = [];
 
 let cachedRaw: string | null | undefined = undefined;
-let cachedSnapshot: readonly SavedSet[] = EMPTY_SETS;
+let cachedSets: readonly SavedSet[] = EMPTY_SETS;
+let cachedWorkouts: readonly SavedWorkout[] = EMPTY_WORKOUTS;
 
-function getSnapshot(): readonly SavedSet[] {
+function refreshCache(): void {
   const raw = typeof window === "undefined" ? null : window.localStorage.getItem(STORAGE_KEY);
-  if (raw === cachedRaw) return cachedSnapshot;
+  if (raw === cachedRaw) return;
   cachedRaw = raw;
-  cachedSnapshot = loadAndMigrate().sets;
-  return cachedSnapshot;
+  const state = loadAndMigrate();
+  cachedSets = state.sets;
+  cachedWorkouts = state.workouts;
 }
 
-function getServerSnapshot(): readonly SavedSet[] {
+function getSetsSnapshot(): readonly SavedSet[] {
+  refreshCache();
+  return cachedSets;
+}
+
+function getWorkoutsSnapshot(): readonly SavedWorkout[] {
+  refreshCache();
+  return cachedWorkouts;
+}
+
+function getServerSetsSnapshot(): readonly SavedSet[] {
   return EMPTY_SETS;
+}
+
+function getServerWorkoutsSnapshot(): readonly SavedWorkout[] {
+  return EMPTY_WORKOUTS;
 }
 
 function subscribeBoth(listener: () => void): () => void {
@@ -37,15 +60,19 @@ function subscribeBoth(listener: () => void): () => void {
 }
 
 export function useTimers(): readonly SavedSet[] {
-  return useSyncExternalStore(subscribeBoth, getSnapshot, getServerSnapshot);
+  return useSyncExternalStore(subscribeBoth, getSetsSnapshot, getServerSetsSnapshot);
 }
 
-function read(): { sets: SavedSet[]; workouts: ReturnType<typeof loadAndMigrate>["workouts"] } {
+export function useWorkouts(): readonly SavedWorkout[] {
+  return useSyncExternalStore(subscribeBoth, getWorkoutsSnapshot, getServerWorkoutsSnapshot);
+}
+
+function read(): { sets: SavedSet[]; workouts: SavedWorkout[] } {
   const state = loadAndMigrate();
   return { sets: [...state.sets], workouts: [...state.workouts] };
 }
 
-function write(sets: SavedSet[], workouts: ReturnType<typeof loadAndMigrate>["workouts"]): void {
+function write(sets: SavedSet[], workouts: SavedWorkout[]): void {
   saveAll({ ...emptyStore(), sets, workouts });
 }
 

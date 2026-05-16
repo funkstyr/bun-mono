@@ -1,5 +1,7 @@
 import { useCallback, useMemo } from "react";
 
+import { Button } from "@bun-mono/core-ui/button";
+
 import { EditorSheet, type EditorInitialValues } from "./editor-sheet";
 import { ListView } from "./list-view";
 import { RunnerHost } from "./runner-view";
@@ -31,22 +33,39 @@ export function TimerApp({ view, kind, id, onNavigate }: TimerAppProps) {
     return { id: found.id, name: found.name, config: found.config };
   }, [view, kind, id, sets]);
 
-  const closeEditor = useCallback(
+  const closeSetEditor = useCallback(
     () => onNavigate({ view: "list", kind: "set", id: null }),
+    [onNavigate],
+  );
+
+  const closeWorkoutEditor = useCallback(
+    () => onNavigate({ view: "list", kind: "workout", id: null }),
     [onNavigate],
   );
 
   return (
     <>
-      <ListView onNavigate={onNavigate} />
-      <EditorSheet
-        open={view === "edit" && kind === "set"}
-        onClose={closeEditor}
-        initialValues={initialValues}
-      />
+      {view === "list" ? <ListView kind={kind} onNavigate={onNavigate} /> : null}
+      {view === "edit" && kind === "set" ? (
+        <EditorSheet open onClose={closeSetEditor} initialValues={initialValues} />
+      ) : null}
+      {view === "edit" && kind === "workout" ? (
+        <WorkoutEditorPlaceholder onClose={closeWorkoutEditor} />
+      ) : null}
       {view === "run" && kind === "set" && id ? (
         <RunnerHost key={id} setId={id} onNavigate={onNavigate} />
       ) : null}
     </>
+  );
+}
+
+function WorkoutEditorPlaceholder({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="mx-auto w-full max-w-2xl space-y-4 px-4 py-8 text-center">
+      <p className="text-muted-foreground">Workout editor coming next.</p>
+      <Button variant="outline" onClick={onClose}>
+        Back
+      </Button>
+    </div>
   );
 }

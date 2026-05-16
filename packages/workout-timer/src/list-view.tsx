@@ -10,17 +10,103 @@ import {
   DropdownMenuTrigger,
 } from "@bun-mono/core-ui/dropdown-menu";
 import { toast } from "@bun-mono/core-ui/sonner";
+import { cn } from "@bun-mono/core-ui/utils";
 
 import { formatMmSs } from "./format";
 import type { SavedSet } from "./schemas";
-import type { TimerAppNavigate } from "./timer-app";
-import { deleteSet, duplicateSet, restoreSet, useTimers } from "./use-timers";
+import type { TimerAppNavigate, TimerKind } from "./timer-app";
+import { deleteSet, duplicateSet, restoreSet, useTimers, useWorkouts } from "./use-timers";
 
 export type ListViewProps = {
+  kind: TimerKind;
   onNavigate: TimerAppNavigate;
 };
 
-export function ListView({ onNavigate }: ListViewProps) {
+export function ListView({ kind, onNavigate }: ListViewProps) {
+  return (
+    <div className="mx-auto w-full max-w-2xl space-y-4 px-4 py-8">
+      <TabBar kind={kind} onNavigate={onNavigate} />
+      {kind === "workout" ? (
+        <WorkoutsList onNavigate={onNavigate} />
+      ) : (
+        <SetsList onNavigate={onNavigate} />
+      )}
+    </div>
+  );
+}
+
+function TabBar({ kind, onNavigate }: { kind: TimerKind; onNavigate: TimerAppNavigate }) {
+  const goWorkouts = useCallback(
+    () => onNavigate({ view: "list", kind: "workout", id: null }),
+    [onNavigate],
+  );
+  const goSets = useCallback(
+    () => onNavigate({ view: "list", kind: "set", id: null }),
+    [onNavigate],
+  );
+  return (
+    <div role="tablist" aria-label="Timer library" className="flex border-b">
+      <TabButton selected={kind === "workout"} onClick={goWorkouts}>
+        Workouts
+      </TabButton>
+      <TabButton selected={kind === "set"} onClick={goSets}>
+        Sets
+      </TabButton>
+    </div>
+  );
+}
+
+function TabButton({
+  selected,
+  onClick,
+  children,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={selected}
+      onClick={onClick}
+      className={cn(
+        "-mb-px cursor-pointer border-b-2 px-4 py-2 text-sm font-medium transition-colors",
+        selected
+          ? "border-foreground text-foreground"
+          : "text-muted-foreground hover:text-foreground border-transparent",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function WorkoutsList({ onNavigate }: { onNavigate: TimerAppNavigate }) {
+  const workouts = useWorkouts();
+
+  const handleBuild = useCallback(
+    () => onNavigate({ view: "edit", kind: "workout", id: null }),
+    [onNavigate],
+  );
+
+  if (workouts.length === 0) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center gap-4 py-8 text-center">
+          <CardTitle>No workouts yet</CardTitle>
+          <CardDescription>Build one to chain your sets together.</CardDescription>
+          <Button onClick={handleBuild}>Build a workout</Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return null;
+}
+
+function SetsList({ onNavigate }: { onNavigate: TimerAppNavigate }) {
   const sets = useTimers();
 
   const sorted = useMemo(() => sets.toSorted((a, b) => b.updatedAt - a.updatedAt), [sets]);
@@ -59,20 +145,18 @@ export function ListView({ onNavigate }: ListViewProps) {
 
   if (sorted.length === 0) {
     return (
-      <div className="mx-auto w-full max-w-2xl px-4 py-8">
-        <Card>
-          <CardContent className="flex flex-col items-center gap-4 py-8 text-center">
-            <CardTitle>No saved sets yet</CardTitle>
-            <CardDescription>Create one to get started.</CardDescription>
-            <Button onClick={handleCreate}>+ Create</Button>
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardContent className="flex flex-col items-center gap-4 py-8 text-center">
+          <CardTitle>No saved sets yet</CardTitle>
+          <CardDescription>Create one to get started.</CardDescription>
+          <Button onClick={handleCreate}>+ Create</Button>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-4 px-4 py-8">
+    <div className="space-y-4">
       <div className="flex justify-end">
         <Button onClick={handleCreate}>+ Create</Button>
       </div>

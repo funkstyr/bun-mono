@@ -3,10 +3,19 @@
   "type": "module",
   "exports": {
     "./styles.css": "./src/styles.css",
-    "./*": [
-      "./src/*.tsx",
-      "./src/*.ts"
-    ]
+    "./audio": "./src/audio.ts",
+    "./countdown-ring": "./src/countdown-ring.tsx",
+    "./editor-sheet": "./src/editor-sheet.tsx",
+    "./engine": "./src/engine.ts",
+    "./format": "./src/format.ts",
+    "./list-view": "./src/list-view.tsx",
+    "./runner-view": "./src/runner-view.tsx",
+    "./schemas": "./src/schemas.ts",
+    "./storage": "./src/storage.ts",
+    "./timer-app": "./src/timer-app.tsx",
+    "./use-timer-engine": "./src/use-timer-engine.ts",
+    "./use-timers": "./src/use-timers.ts",
+    "./use-wake-lock": "./src/use-wake-lock.ts"
   },
   "scripts": {
     "check-types": "tsgo --noEmit",
