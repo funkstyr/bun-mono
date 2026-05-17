@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAutoAnimate } from "@formkit/auto-animate/react";
 import {
   PauseIcon,
   PlayIcon,
@@ -242,129 +243,157 @@ export function RunnerView(props: RunnerViewProps) {
 
   const { state } = engine;
 
-  if (state.isComplete) {
-    return props.kind === "workout" ? (
-      <CompleteView
-        elapsedMs={elapsedMs ?? 0}
-        heading={`${props.workout.name} · ${props.workout.slots.length} sets × ${props.workout.repeats} passes`}
-        onRepeat={startWorkout}
-        onDone={goHome}
-      />
-    ) : (
-      <CompleteView
-        elapsedMs={elapsedMs ?? 0}
-        heading={props.set.name}
-        onRepeat={startWorkout}
-        onDone={goHome}
-      />
-    );
-  }
+  const animationOptions = { duration: 200, easing: "ease-out" } as const;
+  const [swapParent] = useAutoAnimate<HTMLDivElement>(animationOptions);
+  const [labelParent] = useAutoAnimate<HTMLDivElement>(animationOptions);
+  const [positionalParent] = useAutoAnimate<HTMLDivElement>(animationOptions);
+  const [pausedParent] = useAutoAnimate<HTMLDivElement>(animationOptions);
 
   const totalSeconds = Math.ceil(state.totalRemainingMs / 1000);
   const isPaused = state.isPaused;
-
   const positional = computePositional(props, currentDescriptor);
+  const completeHeading =
+    props.kind === "workout"
+      ? `${props.workout.name} · ${props.workout.slots.length} sets × ${props.workout.repeats} passes`
+      : props.set.name;
 
   return (
-    <div className="bg-background fixed inset-0 z-50 flex flex-col" style={rootStyle}>
-      <div className="flex items-center justify-between px-4 py-3">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label="Cancel workout"
-          onClick={goHome}
-        >
-          <XIcon />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label={muted ? "Unmute sounds" : "Mute sounds"}
-          aria-pressed={muted}
-          onClick={toggleMuted}
-        >
-          {muted ? <VolumeXIcon /> : <Volume2Icon />}
-        </Button>
-      </div>
-
-      <div className="flex flex-1 flex-col items-center justify-center px-4" style={rhythmGapStyle}>
-        <div className="font-semibold tracking-wide uppercase" style={phaseLabelDynamicStyle}>
-          {phaseLabel(currentKind)}
-        </div>
-
-        <div className={isPaused ? "relative opacity-60" : "relative"}>
-          <CountdownRing
-            phase={currentKind}
-            phaseDurationMs={currentDescriptor.durationMs}
-            remainingMs={state.remainingMs}
-            phaseKey={state.phaseIndex}
-          >
-            <div className="flex flex-col items-center gap-1">
-              <div className="font-bold tabular-nums" style={remainingTimeStyle}>
-                {formatMmSs(state.remainingMs / 1000)}
-              </div>
-              {isPaused ? (
-                <div
-                  className="text-muted-foreground font-semibold tracking-widest uppercase"
-                  style={pausedLabelStyle}
-                >
-                  Paused
-                </div>
-              ) : null}
-            </div>
-          </CountdownRing>
-        </div>
-
-        <div className="flex flex-col items-center">
-          <div className="text-muted-foreground" style={roundIndicatorStyle}>
-            {positional.upper}
+    <div
+      ref={swapParent}
+      className="bg-background fixed inset-0 z-50"
+      style={rootStyle}
+    >
+      {state.isComplete ? (
+        <CompleteView
+          key="complete"
+          elapsedMs={elapsedMs ?? 0}
+          heading={completeHeading}
+          onRepeat={startWorkout}
+          onDone={goHome}
+        />
+      ) : (
+        <div key="runner" className="absolute inset-0 flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="Cancel workout"
+              onClick={goHome}
+            >
+              <XIcon />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={muted ? "Unmute sounds" : "Mute sounds"}
+              aria-pressed={muted}
+              onClick={toggleMuted}
+            >
+              {muted ? <VolumeXIcon /> : <Volume2Icon />}
+            </Button>
           </div>
-          {positional.lower ? (
-            <div className="text-muted-foreground" style={subLineStyle}>
-              {positional.lower}
+
+          <div
+            className="flex flex-1 flex-col items-center justify-center px-4"
+            style={rhythmGapStyle}
+          >
+            <div ref={labelParent}>
+              <div
+                key={state.phaseIndex}
+                className="font-semibold tracking-wide uppercase"
+                style={phaseLabelDynamicStyle}
+              >
+                {phaseLabel(currentKind)}
+              </div>
             </div>
-          ) : null}
-        </div>
 
-        <div className="flex items-center" style={rhythmGapStyle}>
-          <Button
-            type="button"
-            variant="outline"
-            size="lg"
-            aria-label="Reset workout"
-            onClick={engine.controls.reset}
-            style={sideButtonStyle}
-          >
-            <RotateCcwIcon style={sideIconStyle} />
-          </Button>
-          <Button
-            type="button"
-            size="lg"
-            className="rounded-full"
-            aria-label={isPaused ? "Resume workout" : "Pause workout"}
-            onClick={isPaused ? engine.controls.resume : engine.controls.pause}
-            style={pauseButtonStyle}
-          >
-            {isPaused ? <PlayIcon style={pauseIconStyle} /> : <PauseIcon style={pauseIconStyle} />}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="lg"
-            aria-label="Skip phase"
-            onClick={engine.controls.skip}
-            style={sideButtonStyle}
-          >
-            <SkipForwardIcon style={sideIconStyle} />
-          </Button>
-        </div>
-      </div>
+            <div
+              className={
+                isPaused
+                  ? "relative opacity-60 transition-opacity duration-200"
+                  : "relative transition-opacity duration-200"
+              }
+            >
+              <CountdownRing
+                phase={currentKind}
+                phaseDurationMs={currentDescriptor.durationMs}
+                remainingMs={state.remainingMs}
+                phaseKey={state.phaseIndex}
+              >
+                <div ref={pausedParent} className="flex flex-col items-center gap-1">
+                  <div className="font-bold tabular-nums" style={remainingTimeStyle}>
+                    {formatMmSs(state.remainingMs / 1000)}
+                  </div>
+                  {isPaused ? (
+                    <div
+                      className="text-muted-foreground font-semibold tracking-widest uppercase"
+                      style={pausedLabelStyle}
+                    >
+                      Paused
+                    </div>
+                  ) : null}
+                </div>
+              </CountdownRing>
+            </div>
 
-      <div className="text-muted-foreground px-4 py-6 text-center" style={totalLineStyle}>
-        Total: {formatMmSs(totalSeconds)} left
-      </div>
+            <div ref={positionalParent}>
+              <div key={state.phaseIndex} className="flex flex-col items-center">
+                <div className="text-muted-foreground" style={roundIndicatorStyle}>
+                  {positional.upper}
+                </div>
+                {positional.lower ? (
+                  <div className="text-muted-foreground" style={subLineStyle}>
+                    {positional.lower}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="flex items-center" style={rhythmGapStyle}>
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                aria-label="Reset workout"
+                onClick={engine.controls.reset}
+                style={sideButtonStyle}
+              >
+                <RotateCcwIcon style={sideIconStyle} />
+              </Button>
+              <Button
+                type="button"
+                size="lg"
+                className="rounded-full"
+                aria-label={isPaused ? "Resume workout" : "Pause workout"}
+                onClick={isPaused ? engine.controls.resume : engine.controls.pause}
+                style={pauseButtonStyle}
+              >
+                {isPaused ? (
+                  <PlayIcon style={pauseIconStyle} />
+                ) : (
+                  <PauseIcon style={pauseIconStyle} />
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                aria-label="Skip phase"
+                onClick={engine.controls.skip}
+                style={sideButtonStyle}
+              >
+                <SkipForwardIcon style={sideIconStyle} />
+              </Button>
+            </div>
+          </div>
+
+          <div className="text-muted-foreground px-4 py-6 text-center" style={totalLineStyle}>
+            Total: {formatMmSs(totalSeconds)} left
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -379,7 +408,7 @@ type CompleteViewProps = {
 function CompleteView({ elapsedMs, heading, onRepeat, onDone }: CompleteViewProps) {
   const elapsedSeconds = Math.round(elapsedMs / 1000);
   return (
-    <div className="bg-background fixed inset-0 z-50 flex flex-col">
+    <div className="absolute inset-0 flex flex-col">
       <div className="flex flex-1 flex-col items-center justify-center gap-8 px-4 text-center">
         <div className="text-5xl font-bold tracking-wide">DONE</div>
         <div className="flex flex-col items-center gap-3">
