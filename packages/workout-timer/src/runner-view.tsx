@@ -13,7 +13,8 @@ import {
 import { Button } from "@bun-mono/core-ui/button";
 import { toast } from "@bun-mono/core-ui/sonner";
 
-import { isMuted, playComplete, playPhaseChange, playTick, setMuted } from "./audio";
+import { isMuted, playFanfare, playPhaseChange, playTick, setMuted } from "./audio";
+import { Confetti } from "./confetti";
 import { CountdownRing } from "./countdown-ring";
 import { buildPhaseSequence, type PhaseDescriptor, type PhaseKind } from "./engine";
 import { formatMmSs } from "./format";
@@ -208,7 +209,7 @@ export function RunnerView(props: RunnerViewProps) {
       playPhaseChange();
     },
     onComplete: () => {
-      playComplete();
+      playFanfare();
       setElapsedMs(Date.now() - workoutStartedAtRef.current);
     },
   });
@@ -258,19 +259,18 @@ export function RunnerView(props: RunnerViewProps) {
       : props.set.name;
 
   return (
-    <div
-      ref={swapParent}
-      className="bg-background fixed inset-0 z-50"
-      style={rootStyle}
-    >
+    <div ref={swapParent} className="bg-background fixed inset-0 z-50" style={rootStyle}>
       {state.isComplete ? (
-        <CompleteView
-          key="complete"
-          elapsedMs={elapsedMs ?? 0}
-          heading={completeHeading}
-          onRepeat={startWorkout}
-          onDone={goHome}
-        />
+        <>
+          <CompleteView
+            key="complete"
+            elapsedMs={elapsedMs ?? 0}
+            heading={completeHeading}
+            onRepeat={startWorkout}
+            onDone={goHome}
+          />
+          <Confetti />
+        </>
       ) : (
         <div key="runner" className="absolute inset-0 flex flex-col">
           <div className="flex items-center justify-between px-4 py-3">

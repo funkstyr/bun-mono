@@ -103,6 +103,23 @@ export function playComplete(): void {
   playTone({ frequency: 783.99, durationMs: 800, type: "sine", gain: 0.2 }, 0.24);
 }
 
+export function playFanfare(): void {
+  if (muted) return;
+  // I (tonic) at t=0: C5 E5 G5
+  playTone({ frequency: 523.25, durationMs: 350, type: "sine", gain: 0.18 }, 0);
+  playTone({ frequency: 659.25, durationMs: 350, type: "sine", gain: 0.18 }, 0);
+  playTone({ frequency: 783.99, durationMs: 350, type: "sine", gain: 0.18 }, 0);
+  // V (dominant) at t=0.4: G3 D4 G4
+  playTone({ frequency: 196.0, durationMs: 350, type: "triangle", gain: 0.16 }, 0.4);
+  playTone({ frequency: 293.66, durationMs: 350, type: "sine", gain: 0.16 }, 0.4);
+  playTone({ frequency: 392.0, durationMs: 350, type: "sine", gain: 0.16 }, 0.4);
+  // I resolved high at t=0.8: C5 E5 G5 C6 (held)
+  playTone({ frequency: 523.25, durationMs: 900, type: "sine", gain: 0.18 }, 0.8);
+  playTone({ frequency: 659.25, durationMs: 900, type: "sine", gain: 0.18 }, 0.8);
+  playTone({ frequency: 783.99, durationMs: 900, type: "sine", gain: 0.18 }, 0.8);
+  playTone({ frequency: 1046.5, durationMs: 1000, type: "triangle", gain: 0.2 }, 0.8);
+}
+
 export function resetForTests(): void {
   ctx = null;
   muted = readPersistedMute();
