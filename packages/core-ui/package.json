@@ -24,6 +24,10 @@
       "types": "./dist/checkbox.d.ts",
       "import": "./dist/checkbox.js"
     },
+    "./confetti": {
+      "types": "./dist/confetti.d.ts",
+      "import": "./dist/confetti.js"
+    },
     "./dialog": {
       "types": "./dist/dialog.d.ts",
       "import": "./dist/dialog.js"

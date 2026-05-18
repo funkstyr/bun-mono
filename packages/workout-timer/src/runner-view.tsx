@@ -11,10 +11,10 @@ import {
 } from "lucide-react";
 
 import { Button } from "@bun-mono/core-ui/button";
+import { Confetti } from "@bun-mono/core-ui/confetti";
 import { toast } from "@bun-mono/core-ui/sonner";
 
 import { isMuted, playFanfare, playPhaseChange, playTick, setMuted } from "./audio";
-import { Confetti } from "./confetti";
 import { CountdownRing } from "./countdown-ring";
 import { buildPhaseSequence, type PhaseDescriptor, type PhaseKind } from "./engine";
 import { formatMmSs } from "./format";
