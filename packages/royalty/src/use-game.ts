@@ -12,17 +12,17 @@ function newGame(): GameState {
 
 export type UseRoyaltyGameResult = {
   game: GameState;
-  onPlay: (seat: Seat, card: Card) => void;
+  onPlay: (seat: Seat, cards: readonly Card[]) => void;
   restart: () => void;
 };
 
 export function useRoyaltyGame(): UseRoyaltyGameResult {
   const [game, setGame] = useState<GameState>(() => newGame());
 
-  const onPlay = useCallback((seat: Seat, c: Card) => {
+  const onPlay = useCallback((seat: Seat, cards: readonly Card[]) => {
     setGame((current) => {
       if (seat !== current.turn) return current;
-      const hand = classifyHand([c]);
+      const hand = classifyHand(cards);
       if (hand === null) return current;
       return applyPlay(current, seat, { kind: "play", hand });
     });

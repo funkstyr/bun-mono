@@ -106,21 +106,93 @@ export function dealGame(seed: number, opener: Seat | "three-of-clubs-holder"): 
 }
 
 export function classifyHand(cards: readonly Card[]): Hand | null {
+  if (cards.length === 0) return null;
   if (cards.length === 1) {
     return { type: "single", cards: [cards[0]!] };
   }
-  return null;
+  if (cards.length > 4) return null;
+
+  const rank = cards[0]!.rank;
+  if (!cards.every((c) => c.rank === rank)) return null;
+
+  const suits = new Set(cards.map((c) => c.suit));
+  if (suits.size !== cards.length) return null;
+
+  const sorted = cards.toSorted(compareCards);
+  if (cards.length === 2) return { type: "pair", cards: sorted };
+  if (cards.length === 3) return { type: "triple", cards: sorted };
+  return { type: "bomb", cards: sorted };
 }
 
-function compareSingles(a: Card, b: Card): number {
-  return compareCards(a, b);
+function topCard(hand: Hand): Card {
+  return hand.cards[hand.cards.length - 1]!;
 }
 
 export function beats(challenger: Hand, top: Hand): boolean {
-  if (challenger.type === "single" && top.type === "single") {
-    return compareSingles(challenger.cards[0]!, top.cards[0]!) > 0;
+  if (challenger.type === "bomb" && top.type !== "bomb") return true;
+  if (challenger.type !== "bomb" && top.type === "bomb") return false;
+  if (challenger.type !== top.type) return false;
+
+  switch (challenger.type) {
+    case "single":
+      return compareCards(challenger.cards[0]!, top.cards[0]!) > 0;
+    case "pair": {
+      const rankDiff = rankIndex(challenger.cards[0]!.rank) - rankIndex(top.cards[0]!.rank);
+      if (rankDiff !== 0) return rankDiff > 0;
+      return compareCards(topCard(challenger), topCard(top)) > 0;
+    }
+    case "triple":
+    case "bomb":
+      return rankIndex(challenger.cards[0]!.rank) - rankIndex(top.cards[0]!.rank) > 0;
+    case "straight":
+      return false;
   }
-  return false;
+}
+
+export function enumerateLegalPlays(holding: readonly Card[], top: Hand | null): Hand[] {
+  const out: Hand[] = [];
+  const consider = (hand: Hand) => {
+    if (top === null || beats(hand, top)) out.push(hand);
+  };
+
+  for (const c of holding) {
+    consider({ type: "single", cards: [c] });
+  }
+
+  const byRank = new Map<Rank, Card[]>();
+  for (const c of holding) {
+    let arr = byRank.get(c.rank);
+    if (!arr) {
+      arr = [];
+      byRank.set(c.rank, arr);
+    }
+    arr.push(c);
+  }
+
+  for (const group of byRank.values()) {
+    const sorted = group.toSorted(compareCards);
+    if (sorted.length >= 2) {
+      for (let i = 0; i < sorted.length; i++) {
+        for (let j = i + 1; j < sorted.length; j++) {
+          consider({ type: "pair", cards: [sorted[i]!, sorted[j]!] });
+        }
+      }
+    }
+    if (sorted.length >= 3) {
+      for (let i = 0; i < sorted.length; i++) {
+        for (let j = i + 1; j < sorted.length; j++) {
+          for (let k = j + 1; k < sorted.length; k++) {
+            consider({ type: "triple", cards: [sorted[i]!, sorted[j]!, sorted[k]!] });
+          }
+        }
+      }
+    }
+    if (sorted.length === 4) {
+      consider({ type: "bomb", cards: sorted });
+    }
+  }
+
+  return out;
 }
 
 function sameCard(a: Card, b: Card): boolean {

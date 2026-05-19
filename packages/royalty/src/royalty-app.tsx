@@ -1,8 +1,8 @@
-import { useCallback } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { Button } from "@bun-mono/core-ui/button";
 
-import type { Card, Seat, Suit } from "./engine";
+import { beats, classifyHand, type Card, type Hand, type Seat, type Suit } from "./engine";
 import { useRoyaltyGame } from "./use-game";
 
 const SEATS: readonly Seat[] = [0, 1, 2, 3];
@@ -38,7 +38,7 @@ export function RoyaltyApp() {
         </Button>
       </header>
 
-      <TopCard top={game.trick.top?.cards[0] ?? null} lastPlayer={game.trick.lastPlayer} />
+      <TopHand top={game.trick.top} lastPlayer={game.trick.lastPlayer} />
 
       <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2">
         {SEATS.map((seat) => (
@@ -47,6 +47,7 @@ export function RoyaltyApp() {
             seat={seat}
             hand={game.players[seat].hand}
             active={seat === game.turn}
+            top={game.trick.top}
             onPlay={onPlay}
           />
         ))}
@@ -55,18 +56,24 @@ export function RoyaltyApp() {
   );
 }
 
-type TopCardProps = {
-  top: Card | null;
+type TopHandProps = {
+  top: Hand | null;
   lastPlayer: Seat | null;
 };
 
-function TopCard({ top, lastPlayer }: TopCardProps) {
+function TopHand({ top, lastPlayer }: TopHandProps) {
   return (
     <div className="border-border flex min-h-20 w-full items-center justify-center gap-3 rounded-md border-2 border-dashed px-4 py-3">
       {top ? (
         <>
-          <span className="text-muted-foreground text-xs">Top — Seat {lastPlayer}</span>
-          <CardFace card={top} />
+          <span className="text-muted-foreground text-xs">
+            Top — Seat {lastPlayer} ({top.type})
+          </span>
+          <div className="flex gap-1">
+            {top.cards.map((c) => (
+              <CardFace key={cardKey(c)} card={c} />
+            ))}
+          </div>
         </>
       ) : (
         <span className="text-muted-foreground text-sm">No play yet</span>
@@ -79,17 +86,36 @@ type SeatPanelProps = {
   seat: Seat;
   hand: readonly Card[];
   active: boolean;
-  onPlay: (seat: Seat, card: Card) => void;
+  top: Hand | null;
+  onPlay: (seat: Seat, cards: readonly Card[]) => void;
 };
 
-function SeatPanel({ seat, hand, active, onPlay }: SeatPanelProps) {
-  const handleClick = useCallback(
-    (card: Card) => {
-      if (!active) return;
-      onPlay(seat, card);
-    },
-    [active, onPlay, seat],
+function SeatPanel({ seat, hand, active, top, onPlay }: SeatPanelProps) {
+  const [selectedKeys, setSelectedKeys] = useState<ReadonlySet<string>>(() => new Set());
+
+  const selectedCards = useMemo(
+    () => hand.filter((c) => selectedKeys.has(cardKey(c))),
+    [hand, selectedKeys],
   );
+
+  const candidate = useMemo(() => classifyHand(selectedCards), [selectedCards]);
+  const canPlay = active && candidate !== null && (top === null || beats(candidate, top));
+
+  const toggleCard = useCallback((card: Card) => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      const key = cardKey(card);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const submitPlay = useCallback(() => {
+    if (!canPlay) return;
+    onPlay(seat, selectedCards);
+    setSelectedKeys(new Set());
+  }, [canPlay, onPlay, seat, selectedCards]);
 
   return (
     <section
@@ -100,11 +126,29 @@ function SeatPanel({ seat, hand, active, onPlay }: SeatPanelProps) {
     >
       <header className="flex items-center justify-between">
         <span className="text-sm font-medium">Seat {seat}</span>
-        {active ? <span className="text-primary text-xs font-semibold uppercase">Turn</span> : null}
+        <div className="flex items-center gap-2">
+          {active ? (
+            <span className="text-primary text-xs font-semibold uppercase">Turn</span>
+          ) : null}
+          <Button
+            type="button"
+            size="sm"
+            variant="default"
+            disabled={!canPlay}
+            onClick={submitPlay}
+          >
+            Play
+          </Button>
+        </div>
       </header>
       <div className="flex flex-wrap gap-1">
         {hand.map((c) => (
-          <CardButton key={cardKey(c)} card={c} disabled={!active} onClick={handleClick} />
+          <CardButton
+            key={cardKey(c)}
+            card={c}
+            selected={selectedKeys.has(cardKey(c))}
+            onClick={toggleCard}
+          />
         ))}
         {hand.length === 0 ? (
           <span className="text-muted-foreground text-xs">Empty hand</span>
@@ -116,21 +160,23 @@ function SeatPanel({ seat, hand, active, onPlay }: SeatPanelProps) {
 
 type CardButtonProps = {
   card: Card;
-  disabled: boolean;
+  selected: boolean;
   onClick: (card: Card) => void;
 };
 
-function CardButton({ card, disabled, onClick }: CardButtonProps) {
+function CardButton({ card, selected, onClick }: CardButtonProps) {
   const handleClick = useCallback(() => onClick(card), [onClick, card]);
   return (
     <button
       type="button"
-      disabled={disabled}
       onClick={handleClick}
       aria-label={`${rankLabel(card.rank)} of ${SUIT_LABEL[card.suit]}`}
+      aria-pressed={selected}
       className={[
-        "bg-background border-border flex h-12 w-9 flex-col items-center justify-center rounded border text-sm font-semibold",
-        "enabled:hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60",
+        "flex h-12 w-9 flex-col items-center justify-center rounded border text-sm font-semibold",
+        selected
+          ? "border-primary bg-primary/20 -translate-y-1"
+          : "bg-background border-border hover:bg-accent",
         isRedSuit(card.suit) ? "text-red-600" : "text-foreground",
       ].join(" ")}
     >
