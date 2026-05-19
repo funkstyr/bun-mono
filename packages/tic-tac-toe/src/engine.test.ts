@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   applyMove,
   emptyBoard,
+  legalMoves,
   nextAiMove,
   status,
   type Board,
@@ -109,5 +110,130 @@ describe("nextAiMove — Easy", () => {
       const move = nextAiMove(board, "O", "easy");
       expect(board[move]).toBeNull();
     }
+  });
+});
+
+describe("nextAiMove — Medium", () => {
+  it("takes an immediate-win move when one exists", () => {
+    // O can win at index 2 to complete row 0
+    const board = boardFrom("OO.XX....");
+    const move = nextAiMove(board, "O", "medium");
+    expect(move).toBe(2);
+  });
+
+  it("prefers its own win over blocking the opponent", () => {
+    // O wins at 6 to complete col 0 (0=O, 3=O). X threatens to win at 7
+    // (col 1: 1=X, 4=X). It's O's turn (X has moved 3 times, O 2 times).
+    const board = boardFrom("OX.OX...X");
+    const move = nextAiMove(board, "O", "medium");
+    expect(move).toBe(6);
+  });
+
+  it("blocks the opponent's immediate win when no win is available", () => {
+    // X threatens to win at 2 (row 0). O has no immediate win.
+    const board = boardFrom("XX...O.O.");
+    const move = nextAiMove(board, "O", "medium");
+    expect(move).toBe(2);
+  });
+
+  it("falls back to a legal random cell when neither win nor block is available", () => {
+    const board = boardFrom("X...O....");
+    for (let i = 0; i < 50; i++) {
+      const move = nextAiMove(board, "O", "medium");
+      expect(board[move]).toBeNull();
+    }
+  });
+});
+
+function opposite(side: Side): Side {
+  return side === "X" ? "O" : "X";
+}
+
+function findImmediateWin(board: Board, side: Side): number | null {
+  for (const m of legalMoves(board)) {
+    const next = applyMove(board, m, side);
+    const s = status(next);
+    if (s.kind === "won" && s.winner === side) return m;
+  }
+  return null;
+}
+
+describe("nextAiMove — Hard", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("never hands the opponent an immediate win (no slip)", () => {
+    // Disable slip by forcing Math.random > 0.2.
+    vi.spyOn(Math, "random").mockReturnValue(0.99);
+
+    // Walk many random games; on every Hard move, record any position
+    // where the opponent has an immediate winning reply. Use a seeded
+    // helper so positions vary across iterations even with Math.random mocked.
+    let seed = 1;
+    const rand = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 0x100000000;
+    };
+
+    const violations: { game: number; board: Board; winAt: number }[] = [];
+
+    for (let game = 0; game < 50; game++) {
+      let board = emptyBoard();
+      const hardSide: Side = rand() < 0.5 ? "X" : "O";
+      const oppSide = opposite(hardSide);
+      while (status(board).kind === "playing") {
+        const s = status(board);
+        if (s.kind !== "playing") break;
+        if (s.turn === hardSide) {
+          const move = nextAiMove(board, hardSide, "hard");
+          board = applyMove(board, move, hardSide);
+          const after = status(board);
+          const oppWin = after.kind === "playing" ? findImmediateWin(board, oppSide) : null;
+          if (oppWin !== null) violations.push({ game, board, winAt: oppWin });
+        } else {
+          const moves = legalMoves(board);
+          const pick = moves[Math.floor(rand() * moves.length)]!;
+          board = applyMove(board, pick, oppSide);
+        }
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
+
+  it("never loses a 100-game tournament against a uniformly random opponent", () => {
+    // Sanity test for minimax correctness. Slip is disabled here (mocked to
+    // > 0.2) so the test is deterministic and isolates minimax behavior;
+    // the assertion is losses=0, not wins=100, because draws are fine.
+    vi.spyOn(Math, "random").mockReturnValue(0.99);
+
+    let seed = 42;
+    const rand = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 0x100000000;
+    };
+
+    let losses = 0;
+    for (let g = 0; g < 100; g++) {
+      let board = emptyBoard();
+      const hardSide: Side = g % 2 === 0 ? "X" : "O";
+      while (status(board).kind === "playing") {
+        const s = status(board);
+        if (s.kind !== "playing") break;
+        const toMove = s.turn;
+        let move: number;
+        if (toMove === hardSide) {
+          move = nextAiMove(board, hardSide, "hard");
+        } else {
+          const moves = legalMoves(board);
+          move = moves[Math.floor(rand() * moves.length)]!;
+        }
+        board = applyMove(board, move, toMove);
+      }
+      const final = status(board);
+      if (final.kind === "won" && final.winner !== hardSide) losses++;
+    }
+    expect(losses).toBe(0);
   });
 });

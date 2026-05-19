@@ -7,11 +7,72 @@ import { useTicTacToeGame } from "./use-game";
 
 const CELL_KEYS = ["c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8"] as const;
 
+const DIFFICULTIES: readonly { value: Difficulty; label: string }[] = [
+  { value: "easy", label: "Easy" },
+  { value: "medium", label: "Medium" },
+  { value: "hard", label: "Hard" },
+];
+
 export type TicTacToeAppProps = {
-  difficulty?: Difficulty;
+  difficulty: Difficulty;
+  onDifficultyChange?: (next: Difficulty) => void;
 };
 
-export function TicTacToeApp({ difficulty = "easy" }: TicTacToeAppProps) {
+export function TicTacToeApp({ difficulty, onDifficultyChange }: TicTacToeAppProps) {
+  return (
+    <div className="mx-auto flex w-full max-w-md flex-col items-center gap-6 px-4 py-8">
+      <h1 className="text-2xl font-semibold">Tic-tac-toe</h1>
+      <DifficultySelector value={difficulty} onChange={onDifficultyChange} />
+      <Game key={difficulty} difficulty={difficulty} />
+    </div>
+  );
+}
+
+type DifficultySelectorProps = {
+  value: Difficulty;
+  onChange: ((next: Difficulty) => void) | undefined;
+};
+
+function DifficultySelector({ value, onChange }: DifficultySelectorProps) {
+  return (
+    <div aria-label="Difficulty" className="flex gap-1">
+      {DIFFICULTIES.map((d) => (
+        <DifficultyOption
+          key={d.value}
+          value={d.value}
+          label={d.label}
+          selected={d.value === value}
+          onChange={onChange}
+        />
+      ))}
+    </div>
+  );
+}
+
+type DifficultyOptionProps = {
+  value: Difficulty;
+  label: string;
+  selected: boolean;
+  onChange: ((next: Difficulty) => void) | undefined;
+};
+
+function DifficultyOption({ value, label, selected, onChange }: DifficultyOptionProps) {
+  const handleClick = useCallback(() => {
+    if (!selected) onChange?.(value);
+  }, [selected, onChange, value]);
+  return (
+    <Button
+      variant={selected ? "default" : "outline"}
+      size="sm"
+      aria-pressed={selected}
+      onClick={handleClick}
+    >
+      {label}
+    </Button>
+  );
+}
+
+function Game({ difficulty }: { difficulty: Difficulty }) {
   const { board, status, isAiThinking, onCellClick, restart } = useTicTacToeGame({
     difficulty,
     playerSide: "X",
@@ -22,8 +83,7 @@ export function TicTacToeApp({ difficulty = "easy" }: TicTacToeAppProps) {
   const winningLine = status.kind === "won" ? new Set<number>(status.line) : null;
 
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col items-center gap-6 px-4 py-8">
-      <h1 className="text-2xl font-semibold">Tic-tac-toe</h1>
+    <div className="flex w-full flex-col items-center gap-6">
       <p aria-live="polite" className="text-muted-foreground min-h-6 text-center text-sm">
         {statusText}
       </p>

@@ -23,12 +23,25 @@ export function emptyBoard(): Board {
   return [null, null, null, null, null, null, null, null, null];
 }
 
-function legalMoves(board: Board): number[] {
+export function legalMoves(board: Board): number[] {
   const moves: number[] = [];
   for (let i = 0; i < 9; i++) {
     if (board[i] === null) moves.push(i);
   }
   return moves;
+}
+
+function opposite(side: Side): Side {
+  return side === "X" ? "O" : "X";
+}
+
+function findImmediateWin(board: Board, side: Side): number | null {
+  for (const move of legalMoves(board)) {
+    const next = applyMove(board, move, side);
+    const s = status(next);
+    if (s.kind === "won" && s.winner === side) return move;
+  }
+  return null;
 }
 
 function findWinner(board: Board): { winner: Side; line: WinningLine } | null {
@@ -65,7 +78,62 @@ function pickEasy(board: Board): number {
   return moves[Math.floor(Math.random() * moves.length)]!;
 }
 
-export function nextAiMove(board: Board, _aiSide: Side, difficulty: Difficulty): number {
-  if (difficulty === "easy") return pickEasy(board);
+function pickMedium(board: Board, aiSide: Side): number {
+  const win = findImmediateWin(board, aiSide);
+  if (win !== null) return win;
+  const block = findImmediateWin(board, opposite(aiSide));
+  if (block !== null) return block;
   return pickEasy(board);
+}
+
+function minimax(
+  board: Board,
+  toMove: Side,
+  aiSide: Side,
+  alpha: number,
+  beta: number,
+): { score: number; move: number } {
+  const s = status(board);
+  if (s.kind === "won") {
+    return { score: s.winner === aiSide ? 1 : -1, move: -1 };
+  }
+  if (s.kind === "draw") return { score: 0, move: -1 };
+  const moves = legalMoves(board);
+  const isMaxi = toMove === aiSide;
+  let bestScore = isMaxi ? -Infinity : Infinity;
+  let bestMove = moves[0]!;
+  let a = alpha;
+  let b = beta;
+  for (const move of moves) {
+    const next = applyMove(board, move, toMove);
+    const { score } = minimax(next, opposite(toMove), aiSide, a, b);
+    if (isMaxi) {
+      if (score > bestScore) {
+        bestScore = score;
+        bestMove = move;
+      }
+      if (bestScore > a) a = bestScore;
+    } else {
+      if (score < bestScore) {
+        bestScore = score;
+        bestMove = move;
+      }
+      if (bestScore < b) b = bestScore;
+    }
+    if (a >= b) break;
+  }
+  return { score: bestScore, move: bestMove };
+}
+
+const HARD_SLIP_PROBABILITY = 0.2;
+
+function pickHard(board: Board, aiSide: Side): number {
+  if (Math.random() < HARD_SLIP_PROBABILITY) return pickEasy(board);
+  return minimax(board, aiSide, aiSide, -Infinity, Infinity).move;
+}
+
+export function nextAiMove(board: Board, aiSide: Side, difficulty: Difficulty): number {
+  if (difficulty === "easy") return pickEasy(board);
+  if (difficulty === "medium") return pickMedium(board, aiSide);
+  return pickHard(board, aiSide);
 }
