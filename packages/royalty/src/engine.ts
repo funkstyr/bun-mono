@@ -1,3 +1,6 @@
+export const BOT_PASS_MS = 250;
+export const BOT_PLAY_MS = 500;
+
 export type Suit = "C" | "S" | "D" | "H";
 export type Rank = 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | "J" | "Q" | "K" | "A" | "2";
 export type Card = { rank: Rank; suit: Suit };

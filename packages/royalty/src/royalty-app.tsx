@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@bun-mono/core-ui/button";
 
@@ -11,9 +11,10 @@ import {
   type Suit,
   type Title,
 } from "./engine";
-import { useRoyaltyGame } from "./use-game";
+import { useRoyaltyGame, type PassEvent } from "./use-game";
 
 const SEATS: readonly Seat[] = [0, 1, 2, 3];
+const PASS_INDICATOR_MS = 900;
 
 const TITLE_LABEL: Record<Title, string> = {
   king: "King",
@@ -41,47 +42,76 @@ function isRedSuit(suit: Suit): boolean {
   return suit === "D" || suit === "H";
 }
 
+function usePassIndicator(event: PassEvent | null): Seat | null {
+  const [visible, setVisible] = useState<{ seat: Seat; key: number } | null>(null);
+
+  useEffect(() => {
+    if (event === null) return;
+    setVisible(event);
+    const id = setTimeout(() => setVisible(null), PASS_INDICATOR_MS);
+    return () => clearTimeout(id);
+  }, [event]);
+
+  return visible?.seat ?? null;
+}
+
 export function RoyaltyApp() {
-  const { game, finishedTitles, onPlay, onPass, restart } = useRoyaltyGame();
+  const { game, finishedTitles, humanSeat, lastPassEvent, onPlay, onPass, restart } =
+    useRoyaltyGame({ mode: "play" });
   const isOver = finishedTitles !== null;
+  const passingSeat = usePassIndicator(lastPassEvent);
+
+  const opponentSeats = SEATS.filter((s) => s !== humanSeat);
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-6 px-4 py-8">
       <header className="flex w-full items-center justify-between">
-        <h1 className="text-2xl font-semibold">Royalty — debug</h1>
+        <h1 className="text-2xl font-semibold">Royalty</h1>
         <Button onClick={restart} size="sm" variant="outline">
           Restart
         </Button>
       </header>
 
-      <TopHand top={game.trick.top} lastPlayer={game.trick.lastPlayer} />
-
-      <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2">
-        {SEATS.map((seat) => (
-          <SeatPanel
+      <div className="grid w-full grid-cols-3 gap-3">
+        {opponentSeats.map((seat) => (
+          <OpponentSeat
             key={seat}
             seat={seat}
-            hand={game.players[seat].hand}
+            cardCount={game.players[seat].hand.length}
             active={!isOver && seat === game.turn}
-            top={game.trick.top}
             finished={game.players[seat].finishedAt !== null}
-            onPlay={onPlay}
-            onPass={onPass}
+            passing={passingSeat === seat}
           />
         ))}
       </div>
 
-      {finishedTitles ? <EndGameOverlay titles={finishedTitles} onRestart={restart} /> : null}
+      <TopHand top={game.trick.top} lastPlayer={game.trick.lastPlayer} />
+
+      <HumanSeat
+        seat={humanSeat}
+        hand={game.players[humanSeat].hand}
+        active={!isOver && humanSeat === game.turn}
+        top={game.trick.top}
+        finished={game.players[humanSeat].finishedAt !== null}
+        passing={passingSeat === humanSeat}
+        onPlay={onPlay}
+        onPass={onPass}
+      />
+
+      {finishedTitles ? (
+        <EndGameOverlay titles={finishedTitles} humanSeat={humanSeat} onRestart={restart} />
+      ) : null}
     </div>
   );
 }
 
 type EndGameOverlayProps = {
   titles: Record<Seat, Title>;
+  humanSeat: Seat;
   onRestart: () => void;
 };
 
-function EndGameOverlay({ titles, onRestart }: EndGameOverlayProps) {
+function EndGameOverlay({ titles, humanSeat, onRestart }: EndGameOverlayProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="bg-background flex w-full max-w-md flex-col gap-4 rounded-lg p-6 shadow-lg">
@@ -89,7 +119,12 @@ function EndGameOverlay({ titles, onRestart }: EndGameOverlayProps) {
         <ul className="flex flex-col gap-1 text-sm">
           {SEATS.map((seat) => (
             <li key={seat} className="flex items-center justify-between">
-              <span>Seat {seat}</span>
+              <span>
+                Seat {seat}
+                {seat === humanSeat ? (
+                  <span className="text-muted-foreground ml-1">(you)</span>
+                ) : null}
+              </span>
               <span className="font-semibold">{TITLE_LABEL[titles[seat]]}</span>
             </li>
           ))}
@@ -128,17 +163,57 @@ function TopHand({ top, lastPlayer }: TopHandProps) {
   );
 }
 
-type SeatPanelProps = {
+type OpponentSeatProps = {
+  seat: Seat;
+  cardCount: number;
+  active: boolean;
+  finished: boolean;
+  passing: boolean;
+};
+
+function OpponentSeat({ seat, cardCount, active, finished, passing }: OpponentSeatProps) {
+  return (
+    <section
+      className={[
+        "relative flex flex-col items-center gap-1 rounded-md border p-3",
+        active ? "border-primary bg-primary/5" : "border-border",
+        finished ? "opacity-60" : "",
+      ].join(" ")}
+    >
+      <header className="flex w-full items-center justify-between">
+        <span className="text-xs font-medium">
+          Seat {seat}
+          {finished ? <span className="text-muted-foreground ml-1">finished</span> : null}
+        </span>
+        {active ? (
+          <span className="text-primary text-[10px] font-semibold uppercase">Turn</span>
+        ) : null}
+      </header>
+      <div className="flex items-center gap-2">
+        <div className="bg-muted border-border h-10 w-7 rounded border" aria-hidden="true" />
+        <span className="text-sm font-semibold tabular-nums">{cardCount}</span>
+      </div>
+      {passing ? (
+        <span className="bg-foreground text-background absolute -top-2 right-2 rounded px-2 py-0.5 text-[10px] font-semibold uppercase shadow">
+          Pass
+        </span>
+      ) : null}
+    </section>
+  );
+}
+
+type HumanSeatProps = {
   seat: Seat;
   hand: readonly Card[];
   active: boolean;
   top: Hand | null;
   finished: boolean;
-  onPlay: (seat: Seat, cards: readonly Card[]) => void;
-  onPass: (seat: Seat) => void;
+  passing: boolean;
+  onPlay: (cards: readonly Card[]) => void;
+  onPass: () => void;
 };
 
-function SeatPanel({ seat, hand, active, top, finished, onPlay, onPass }: SeatPanelProps) {
+function HumanSeat({ seat, hand, active, top, finished, passing, onPlay, onPass }: HumanSeatProps) {
   const [selectedKeys, setSelectedKeys] = useState<ReadonlySet<string>>(() => new Set());
 
   const selectedCards = useMemo(
@@ -162,32 +237,32 @@ function SeatPanel({ seat, hand, active, top, finished, onPlay, onPass }: SeatPa
 
   const submitPlay = useCallback(() => {
     if (!canPlay) return;
-    onPlay(seat, selectedCards);
+    onPlay(selectedCards);
     setSelectedKeys(new Set());
-  }, [canPlay, onPlay, seat, selectedCards]);
+  }, [canPlay, onPlay, selectedCards]);
 
   const submitPass = useCallback(() => {
     if (!canPass) return;
-    onPass(seat);
+    onPass();
     setSelectedKeys(new Set());
-  }, [canPass, onPass, seat]);
+  }, [canPass, onPass]);
 
   return (
     <section
       className={[
-        "flex flex-col gap-2 rounded-md border p-3",
+        "relative flex w-full flex-col gap-2 rounded-md border p-3",
         active ? "border-primary bg-primary/5" : "border-border",
         finished ? "opacity-60" : "",
       ].join(" ")}
     >
       <header className="flex items-center justify-between">
         <span className="text-sm font-medium">
-          Seat {seat}
+          You (Seat {seat})
           {finished ? <span className="text-muted-foreground ml-2 text-xs">finished</span> : null}
         </span>
         <div className="flex items-center gap-2">
           {active ? (
-            <span className="text-primary text-xs font-semibold uppercase">Turn</span>
+            <span className="text-primary text-xs font-semibold uppercase">Your turn</span>
           ) : null}
           <Button
             type="button"
@@ -222,6 +297,11 @@ function SeatPanel({ seat, hand, active, top, finished, onPlay, onPass }: SeatPa
           <span className="text-muted-foreground text-xs">Empty hand</span>
         ) : null}
       </div>
+      {passing ? (
+        <span className="bg-foreground text-background absolute -top-2 right-3 rounded px-2 py-0.5 text-[10px] font-semibold uppercase shadow">
+          Pass
+        </span>
+      ) : null}
     </section>
   );
 }

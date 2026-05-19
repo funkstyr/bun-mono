@@ -12,6 +12,10 @@
       "types": "./dist/engine.d.ts",
       "import": "./dist/engine.js"
     },
+    "./bot": {
+      "types": "./dist/bot.d.ts",
+      "import": "./dist/bot.js"
+    },
     "./use-game": {
       "types": "./dist/use-game.d.ts",
       "import": "./dist/use-game.js"
