@@ -41,11 +41,11 @@ royalty/src/
 
 ### File-size guidance
 
-| Size | Action |
-|---|---|
-| ≤ 200 lines | Fine as-is |
+| Size          | Action                                                                                          |
+| ------------- | ----------------------------------------------------------------------------------------------- |
+| ≤ 200 lines   | Fine as-is                                                                                      |
 | 200–400 lines | Acceptable if one concern (pure domain module, single complex component tree). Otherwise split. |
-| > 400 lines | Split, unless it's a single cohesive algorithm (e.g. `engine.ts`). |
+| > 400 lines   | Split, unless it's a single cohesive algorithm (e.g. `engine.ts`).                              |
 
 **Cohesion beats size.** A 629-line game engine with 30 small pure functions is fine; a 400-line component file that mixes 5 sub-components, 3 hooks, and 6 utils is not. The rule isn't line count — it's "if I rename this file, do all its contents move together?"
 
@@ -81,7 +81,7 @@ Base config is `packages/config/tsconfig.base.json`. All strict flags are on:
 - `noUncheckedSideEffectImports`, `erasableSyntaxOnly`, `verbatimModuleSyntax`
 - `allowUnreachableCode: false`, `allowUnusedLabels: false`
 
-`isolatedDeclarations` is enabled **per library package**, not on the base config (apps `noEmit` and can't use it). See [Enabling `isolatedDeclarations` on a library package](#enabling-isolateddeclarations-on-a-library-package) for the recipe — currently on in `packages/royalty`.
+`isolatedDeclarations` is enabled **per library package**, not on the base config (apps `noEmit` and can't use it). It's also not enabled everywhere — see [the schema-builder caveat](#schema-builders-and-isolateddeclarations). Currently on in `packages/royalty` and `packages/tic-tac-toe`. See [the recipe](#enabling-isolateddeclarations-on-a-library-package).
 
 ### Conventions
 
@@ -108,24 +108,48 @@ Adoption recipe (see `packages/royalty/tsconfig.json` for the working example):
      "compilerOptions": {
        "composite": true,
        "declaration": true,
-       "isolatedDeclarations": true
+       "isolatedDeclarations": true,
        // ...
-     }
+     },
    }
    ```
    Excluding tests is required: `tsgo` (the `@typescript/native-preview` build) currently fails to resolve `vitest` imports when `isolatedDeclarations` is on. Tests get type-checked by vitest at runtime — no coverage lost. Bonus: no useless `*.test.d.ts` files emitted to `dist/`.
 2. Run `bun tsgo --build --force` from the package directory. The remaining errors are missing return types on **exported** declarations only. Internal helpers and unexported sub-components are unaffected.
 3. Fix each export. For React components, the idiom is:
+
    ```ts
    import { type JSX, useCallback, useState } from "react";
 
-   export function MyComponent(): JSX.Element { /* ... */ }
+   export function MyComponent(): JSX.Element {
+     /* ... */
+   }
    ```
+
    `verbatimModuleSyntax` is on, so use the inline `type` modifier rather than a separate `import type` line.
+
 4. For pure functions, just annotate the return type. Most engine/util code in this repo already has them.
 5. Verify with `bun check-types` (turbo, full repo) and the package's tests (`bunx vitest run` from the package — not `bun test`, which uses Bun's runner and doesn't honor the vitest setup).
 
-Per-package cost in this codebase is typically 1–3 annotations.
+Per-package cost for hand-written code is typically 1–3 annotations. **For packages built around schema/DSL builders, the flag is impractical — read on.**
+
+### Schema builders and `isolatedDeclarations`
+
+The flag fights any library whose value proposition is _inferring complex types from a declarative config_. There's no per-file escape hatch (TS follows imports; the flag applies project-wide).
+
+Builders in this codebase that block `isolatedDeclarations`:
+
+| Package         | Builder                                                            | Why it blocks                                                                                                |
+| --------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `db`            | `drizzle-orm` `sqliteTable(...)`                                   | Each table's type is inferred from its column definitions; annotating requires writing the full schema twice |
+| `auth`          | `better-auth` `betterAuth({...})`                                  | Same shape — config object → inferred auth instance type                                                     |
+| `api`           | `oRPC` router/procedure builders                                   | Same — chained builders produce complex inferred types                                                       |
+| `env`           | `@t3-oss/env-core` `createEnv({...})` with zod schemas             | Same                                                                                                         |
+| `core-ui`       | `class-variance-authority` `cva(...)` + Radix/Base-UI `forwardRef` | Same — variant configs and ref-forwarding generics                                                           |
+| `workout-timer` | `arktype` `type({...})` schemas                                    | Same                                                                                                         |
+
+**Rule of thumb**: if the package's public surface is "hand-written types and functions" → enable `isolatedDeclarations`. If it's "a config object passed to a framework builder, with the return value re-exported" → don't.
+
+Forcing it anyway means duplicating the schema in a type annotation — defeats the builder's whole point and creates a sync hazard on every schema edit.
 
 ## Tests
 
@@ -166,7 +190,7 @@ When refactoring a package to match this style:
 4. **Move, don't rewrite.** Cut symbols to new files in a single commit per split. Don't change behavior in the same commit.
 5. **Delete any `index.ts` you find.** Update imports to point at the concrete file.
 6. **Tighten test scope.** When splitting a file, ask: does the existing test file still match? If a test reaches into newly-private internals, it was testing implementation — rewrite to use the public surface.
-7. **Flip on `isolatedDeclarations`** if the package ships types (library, not app). Follow the [adoption recipe](#enabling-isolateddeclarations-on-a-library-package). Best done after splitting, since smaller files mean smaller diffs when adding return-type annotations.
+7. **Flip on `isolatedDeclarations`** _if_ the package's public surface is hand-written code (pure functions, types, simple components) — not if it wraps a schema/DSL builder (see the [caveat table](#schema-builders-and-isolateddeclarations)). Follow the [adoption recipe](#enabling-isolateddeclarations-on-a-library-package). Best done after splitting, since smaller files mean smaller diffs.
 8. **Run `bun check`** (full suite) before declaring the package done.
 
 For the largest current offenders see [refactor-targets.md](refactor-targets.md).

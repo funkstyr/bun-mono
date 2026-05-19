@@ -14,32 +14,32 @@ done
 
 These files clearly mix components + hooks + utils + constants and exceed the 400-line threshold. Each needs feature-directory restructure per the [main skill](SKILL.md).
 
-| File | Lines | Notes |
-|---|---|---|
-| `packages/royalty/src/royalty-app.tsx` | 861 | 14 sub-components, 1 hook, 6 utils, 5 constants |
-| `packages/workout-timer/src/workout-editor.tsx` | 600 | |
-| `packages/royalty/src/use-game.ts` | 529 | hook + helper functions + types |
-| `packages/workout-timer/src/editor-sheet.tsx` | 512 | |
-| `packages/workout-timer/src/runner-view.tsx` | 477 | |
-| `packages/royalty/src/royalty-watch.tsx` | 414 | |
-| `packages/workout-timer/src/list-view.tsx` | 402 | |
+| File                                            | Lines | Notes                                           |
+| ----------------------------------------------- | ----- | ----------------------------------------------- |
+| `packages/royalty/src/royalty-app.tsx`          | 861   | 14 sub-components, 1 hook, 6 utils, 5 constants |
+| `packages/workout-timer/src/workout-editor.tsx` | 600   |                                                 |
+| `packages/royalty/src/use-game.ts`              | 529   | hook + helper functions + types                 |
+| `packages/workout-timer/src/editor-sheet.tsx`   | 512   |                                                 |
+| `packages/workout-timer/src/runner-view.tsx`    | 477   |                                                 |
+| `packages/royalty/src/royalty-watch.tsx`        | 414   |                                                 |
+| `packages/workout-timer/src/list-view.tsx`      | 402   |                                                 |
 
 ## Borderline (200–400, classify before splitting)
 
-| File | Lines |
-|---|---|
-| `packages/workout-timer/src/use-timers.ts` | 281 |
-| `packages/tic-tac-toe/src/tic-tac-toe-app.tsx` | 259 |
-| `packages/core-ui/src/dropdown-menu.tsx` | 241 |
-| `packages/royalty/src/storage.ts` | 230 |
+| File                                           | Lines |
+| ---------------------------------------------- | ----- |
+| `packages/workout-timer/src/use-timers.ts`     | 281   |
+| `packages/tic-tac-toe/src/tic-tac-toe-app.tsx` | 259   |
+| `packages/core-ui/src/dropdown-menu.tsx`       | 241   |
+| `packages/royalty/src/storage.ts`              | 230   |
 
 ## Keep as-is (cohesive single-concern)
 
-| File | Lines | Why |
-|---|---|---|
-| `packages/royalty/src/engine.ts` | 629 | Pure game engine — single concern, all functions tightly related |
-| `packages/royalty/src/engine.test.ts` | 1315 | Behavior coverage of the engine |
-| `packages/core-ui/src/confetti.tsx` | 168 | Single component |
+| File                                  | Lines | Why                                                              |
+| ------------------------------------- | ----- | ---------------------------------------------------------------- |
+| `packages/royalty/src/engine.ts`      | 629   | Pure game engine — single concern, all functions tightly related |
+| `packages/royalty/src/engine.test.ts` | 1315  | Behavior coverage of the engine                                  |
+| `packages/core-ui/src/confetti.tsx`   | 168   | Single component                                                 |
 
 ## Barrel `index.ts` files
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { type JSX, useCallback, useEffect, useState } from "react";
 
 import { Button } from "@bun-mono/core-ui/button";
 import { Confetti } from "@bun-mono/core-ui/confetti";
@@ -24,7 +24,7 @@ export type TicTacToeAppProps = {
   onDifficultyChange?: (next: Difficulty) => void;
 };
 
-export function TicTacToeApp({ difficulty, onDifficultyChange }: TicTacToeAppProps) {
+export function TicTacToeApp({ difficulty, onDifficultyChange }: TicTacToeAppProps): JSX.Element {
   const [playerSide, setPlayerSide] = useState<Side>("X");
 
   useEffect(() => {

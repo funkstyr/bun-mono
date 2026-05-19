@@ -1,11 +1,12 @@
 {
   "extends": "@bun-mono/config/tsconfig.base.json",
   "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["dist", "node_modules"],
+  "exclude": ["dist", "node_modules", "**/*.test.ts", "**/*.test.tsx"],
   "compilerOptions": {
     "composite": true,
     "declaration": true,
     "declarationMap": true,
+    "isolatedDeclarations": true,
     "emitDeclarationOnly": true,
     "rootDir": "./src",
     "outDir": "./dist",
