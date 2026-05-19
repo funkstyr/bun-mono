@@ -743,6 +743,7 @@ function customGame(hands: readonly [Card[], Card[], Card[], Card[]], turn: Seat
     turn,
     trick: { top: null, lastPlayer: null, passedThisTrick: new Set() },
     finishingOrder: [],
+    log: [],
   };
 }
 
@@ -931,6 +932,86 @@ describe("applyPlay — going out mid-trick", () => {
   });
 });
 
+describe("play log", () => {
+  it("dealGame starts with an empty log", () => {
+    expect(dealGame(7, 0).log).toEqual([]);
+  });
+
+  it("appends a play entry on each successful play", () => {
+    const state = customGame(
+      [
+        [card(3, "C"), card("A", "C")],
+        [card(4, "C"), card(4, "D")],
+        [card(5, "C"), card(5, "D")],
+        [card(6, "C"), card(6, "D")],
+      ],
+      0,
+    );
+    const after = applyPlay(state, 0, { kind: "play", hand: single(card(3, "C")) });
+    expect(after.log).toHaveLength(1);
+    expect(after.log[0]).toEqual({
+      tick: 0,
+      seat: 0,
+      action: "play",
+      hand: single(card(3, "C")),
+    });
+  });
+
+  it("appends a pass entry on each successful pass", () => {
+    const state = customGame(
+      [
+        [card(3, "C"), card("A", "C")],
+        [card(4, "C"), card(4, "D")],
+        [card(5, "C"), card(5, "D")],
+        [card(6, "C"), card(6, "D")],
+      ],
+      0,
+    );
+    let s = applyPlay(state, 0, { kind: "play", hand: single(card(3, "C")) });
+    s = applyPlay(s, 1, { kind: "pass" });
+    expect(s.log).toHaveLength(2);
+    expect(s.log[1]).toEqual({ tick: 1, seat: 1, action: "pass" });
+  });
+
+  it("preserves order of entries across a full trick", () => {
+    const state = customGame(
+      [
+        [card(3, "C"), card("A", "C")],
+        [card(4, "C"), card(4, "D")],
+        [card(5, "C"), card(5, "D")],
+        [card(6, "C"), card(6, "D")],
+      ],
+      0,
+    );
+    let s = applyPlay(state, 0, { kind: "play", hand: single(card(3, "C")) });
+    s = applyPlay(s, 1, { kind: "pass" });
+    s = applyPlay(s, 2, { kind: "pass" });
+    s = applyPlay(s, 3, { kind: "pass" });
+    const kinds = s.log.map((e) => `${e.seat}:${e.action}`);
+    expect(kinds).toEqual(["0:play", "1:pass", "2:pass", "3:pass"]);
+    const ticks = s.log.map((e) => e.tick);
+    expect(ticks).toEqual([0, 1, 2, 3]);
+  });
+
+  it("does not append on a no-op (rejected) action", () => {
+    const state = dealGame(7, 0);
+    const blocked = applyPlay(state, 1, {
+      kind: "play",
+      hand: single(state.players[1].hand[0]!),
+    });
+    expect(blocked.log).toEqual([]);
+  });
+
+  it("finalizeTribute resets the log on the new game", () => {
+    const prev = finishedGameWithSeatOrder([0, 1, 2, 3]);
+    const seed = 99;
+    const king = completedTribute(prev, seed, "king", 2, 2);
+    const queen = completedTribute(prev, seed, "queen", 1, 1);
+    const next = finalizeTribute(prev, king, queen, seed);
+    expect(next.log).toEqual([]);
+  });
+});
+
 describe("gameIsOver and finalTitles", () => {
   it("gameIsOver is false until three players have finished", () => {
     const state = customGame(
@@ -1004,6 +1085,7 @@ function finishedGameWithSeatOrder(order: readonly [Seat, Seat, Seat, Seat]): Ga
     turn: order[3],
     trick: { top: null, lastPlayer: null, passedThisTrick: new Set() },
     finishingOrder: [order[0], order[1], order[2]],
+    log: [],
   };
 }
 

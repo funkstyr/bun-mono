@@ -26,11 +26,15 @@ export type TrickState = {
   lastPlayer: Seat | null;
   passedThisTrick: ReadonlySet<Seat>;
 };
+export type LogEntry =
+  | { tick: number; seat: Seat; action: "play"; hand: Hand }
+  | { tick: number; seat: Seat; action: "pass" };
 export type GameState = {
   players: readonly [PlayerState, PlayerState, PlayerState, PlayerState];
   turn: Seat;
   trick: TrickState;
   finishingOrder: readonly Seat[];
+  log: readonly LogEntry[];
 };
 
 export type Title = "king" | "queen" | "third" | "joker";
@@ -119,6 +123,7 @@ export function dealGame(seed: number, opener: Seat | "three-of-clubs-holder"): 
     turn,
     trick: { top: null, lastPlayer: null, passedThisTrick: new Set() },
     finishingOrder: [],
+    log: [],
   };
 }
 
@@ -368,15 +373,21 @@ export function applyPlay(state: GameState, seat: Seat, action: Action): GameSta
     const newPassed = new Set(state.trick.passedThisTrick);
     newPassed.add(seat);
 
+    const passLog: readonly LogEntry[] = [
+      ...state.log,
+      { tick: state.log.length, seat, action: "pass" },
+    ];
+
     const nextActor = findNextResponder(state, seat, newPassed, state.trick.lastPlayer);
     if (nextActor === null) {
-      return closeTrick(state, state.trick.lastPlayer ?? seat);
+      return closeTrick({ ...state, log: passLog }, state.trick.lastPlayer ?? seat);
     }
 
     return {
       ...state,
       turn: nextActor,
       trick: { ...state.trick, passedThisTrick: newPassed },
+      log: passLog,
     };
   }
 
@@ -411,6 +422,7 @@ export function applyPlay(state: GameState, seat: Seat, action: Action): GameSta
       passedThisTrick: state.trick.passedThisTrick,
     },
     finishingOrder,
+    log: [...state.log, { tick: state.log.length, seat, action: "play", hand: action.hand }],
   };
 
   const nextActor = findNextResponder(afterPlay, seat, afterPlay.trick.passedThisTrick, seat);
@@ -612,5 +624,6 @@ export function finalizeTribute(
     turn: kingSeat,
     trick: { top: null, lastPlayer: null, passedThisTrick: new Set() },
     finishingOrder: [],
+    log: [],
   };
 }

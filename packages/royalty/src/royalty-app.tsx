@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@bun-mono/core-ui/button";
+import { Confetti } from "@bun-mono/core-ui/confetti";
 
 import {
   beats,
@@ -10,6 +11,7 @@ import {
   type Card,
   type Hand,
   type HandType,
+  type LogEntry,
   type Rank,
   type Seat,
   type Suit,
@@ -116,7 +118,7 @@ export function RoyaltyApp() {
   const opponentSeats = SEATS.filter((s) => s !== humanSeat);
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-6 px-4 py-8">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8">
       <header className="flex w-full items-center justify-between">
         <h1 className="text-2xl font-semibold">Royalty</h1>
         <div className="flex items-center gap-2">
@@ -130,38 +132,51 @@ export function RoyaltyApp() {
         </div>
       </header>
 
-      <div className="grid w-full grid-cols-3 gap-3">
-        {opponentSeats.map((seat) => (
-          <OpponentSeat
-            key={seat}
-            seat={seat}
-            cardCount={game.players[seat].hand.length}
-            active={!isOver && tribute === null && seat === game.turn}
-            finished={game.players[seat].finishedAt !== null}
-            passing={passingSeat === seat}
-            titles={finishedTitles}
-          />
-        ))}
+      <div className="flex w-full flex-col gap-4 lg:flex-row lg:items-start">
+        <aside className="w-full lg:sticky lg:top-4 lg:w-72 lg:shrink-0">
+          <PlayLog log={game.log} humanSeat={humanSeat} />
+        </aside>
+
+        <div className="flex min-w-0 flex-1 flex-col items-center gap-6">
+          <div className="grid w-full grid-cols-3 gap-3">
+            {opponentSeats.map((seat) => (
+              <OpponentSeat
+                key={seat}
+                seat={seat}
+                cardCount={game.players[seat].hand.length}
+                active={!isOver && tribute === null && seat === game.turn}
+                finished={game.players[seat].finishedAt !== null}
+                passing={passingSeat === seat}
+                titles={finishedTitles}
+              />
+            ))}
+          </div>
+
+          {tribute ? (
+            <TributePanel
+              tribute={tribute}
+              humanSeat={humanSeat}
+              onAsk={onAsk}
+              onReturn={onReturn}
+            />
+          ) : (
+            <>
+              <TopHand top={game.trick.top} lastPlayer={game.trick.lastPlayer} />
+
+              <HumanSeat
+                seat={humanSeat}
+                hand={game.players[humanSeat].hand}
+                active={!isOver && humanSeat === game.turn}
+                top={game.trick.top}
+                finished={game.players[humanSeat].finishedAt !== null}
+                passing={passingSeat === humanSeat}
+                onPlay={onPlay}
+                onPass={onPass}
+              />
+            </>
+          )}
+        </div>
       </div>
-
-      {tribute ? (
-        <TributePanel tribute={tribute} humanSeat={humanSeat} onAsk={onAsk} onReturn={onReturn} />
-      ) : (
-        <>
-          <TopHand top={game.trick.top} lastPlayer={game.trick.lastPlayer} />
-
-          <HumanSeat
-            seat={humanSeat}
-            hand={game.players[humanSeat].hand}
-            active={!isOver && humanSeat === game.turn}
-            top={game.trick.top}
-            finished={game.players[humanSeat].finishedAt !== null}
-            passing={passingSeat === humanSeat}
-            onPlay={onPlay}
-            onPass={onPass}
-          />
-        </>
-      )}
 
       {finishedTitles && !tribute ? (
         <EndGameOverlay titles={finishedTitles} humanSeat={humanSeat} onRestart={restart} />
@@ -221,28 +236,123 @@ type EndGameOverlayProps = {
 };
 
 function EndGameOverlay({ titles, humanSeat, onRestart }: EndGameOverlayProps) {
+  const humanTitle = titles[humanSeat];
+  const isKing = humanTitle === "king";
+  const isJoker = humanTitle === "joker";
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="bg-background flex w-full max-w-md flex-col gap-4 rounded-lg p-6 shadow-lg">
-        <h2 className="text-xl font-semibold">Game over</h2>
+      {isKing ? <Confetti /> : null}
+      <div className="bg-background relative flex w-full max-w-md flex-col gap-4 rounded-lg p-6 shadow-lg">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-semibold">Game over</h2>
+          {isJoker ? (
+            <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium">
+              Joker — better luck next round
+            </span>
+          ) : null}
+        </div>
         <ul className="flex flex-col gap-1 text-sm">
-          {SEATS.map((seat) => (
-            <li key={seat} className="flex items-center justify-between">
-              <span>
-                Seat {seat}
-                {seat === humanSeat ? (
-                  <span className="text-muted-foreground ml-1">(you)</span>
-                ) : null}
-              </span>
-              <span className="font-semibold">{TITLE_LABEL[titles[seat]]}</span>
-            </li>
-          ))}
+          {SEATS.map((seat) => {
+            const title = titles[seat];
+            const isHuman = seat === humanSeat;
+            const muted = isHuman && !isKing;
+            return (
+              <li key={seat} className="flex items-center justify-between">
+                <span>
+                  Seat {seat}
+                  {isHuman ? <span className="text-muted-foreground ml-1">(you)</span> : null}
+                </span>
+                <span
+                  className={[
+                    "font-semibold",
+                    muted ? "text-muted-foreground" : "",
+                    isHuman && isKing ? "text-primary" : "",
+                  ].join(" ")}
+                >
+                  {TITLE_LABEL[title]}
+                </span>
+              </li>
+            );
+          })}
         </ul>
         <Button onClick={onRestart} className="self-end">
           Restart
         </Button>
       </div>
     </div>
+  );
+}
+
+type PlayLogProps = {
+  log: readonly LogEntry[];
+  humanSeat: Seat;
+};
+
+function PlayLog({ log, humanSeat }: PlayLogProps) {
+  const [expanded, setExpanded] = useState(true);
+  const toggle = useCallback(() => setExpanded((v) => !v), []);
+  return (
+    <section className="border-border w-full rounded-md border">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={expanded}
+        className="hover:bg-accent flex w-full items-center justify-between px-3 py-2 text-sm font-medium"
+      >
+        <span>
+          Play log
+          <span className="text-muted-foreground ml-2 text-xs tabular-nums">({log.length})</span>
+        </span>
+        <span aria-hidden className="text-muted-foreground text-xs">
+          {expanded ? "▾" : "▸"}
+        </span>
+      </button>
+      {expanded ? (
+        log.length === 0 ? (
+          <p className="text-muted-foreground px-3 pb-3 text-xs">No plays yet.</p>
+        ) : (
+          <ol
+            reversed
+            className="flex max-h-[70vh] flex-col gap-1 overflow-y-auto px-3 pb-3 text-xs"
+          >
+            {log.toReversed().map((entry) => (
+              <li key={entry.tick} className="flex flex-wrap items-center gap-1.5">
+                <span className="text-muted-foreground w-6 tabular-nums">{entry.tick + 1}.</span>
+                <span className="shrink-0">
+                  Seat {entry.seat}
+                  {entry.seat === humanSeat ? (
+                    <span className="text-muted-foreground ml-1">(you)</span>
+                  ) : null}
+                </span>
+                {entry.action === "pass" ? (
+                  <span className="text-muted-foreground ml-auto">Pass</span>
+                ) : (
+                  <>
+                    <span className="bg-primary/10 text-primary rounded px-1.5 py-0.5 text-[10px] font-semibold">
+                      {handLabel(entry.hand)}
+                    </span>
+                    <span className="ml-auto flex flex-wrap justify-end gap-1">
+                      {entry.hand.cards.map((c) => (
+                        <span
+                          key={cardKey(c)}
+                          className={[
+                            "border-border bg-background inline-flex items-center rounded border px-1 text-[10px] font-semibold",
+                            isRedSuit(c.suit) ? "text-red-600" : "text-foreground",
+                          ].join(" ")}
+                        >
+                          {rankLabel(c.rank)}
+                          {SUIT_LABEL[c.suit]}
+                        </span>
+                      ))}
+                    </span>
+                  </>
+                )}
+              </li>
+            ))}
+          </ol>
+        )
+      ) : null}
+    </section>
   );
 }
 

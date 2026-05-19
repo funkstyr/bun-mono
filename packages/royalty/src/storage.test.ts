@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { dealGame, type GameState, type Seat, type Title } from "./engine";
+import { applyPlay, dealGame, type GameState, type Hand, type Seat, type Title } from "./engine";
 import {
   emptyLifetime,
   emptyRoleCounts,
@@ -60,6 +60,28 @@ describe("storage load/save", () => {
       JSON.stringify({ currentSession: null, lifetime: emptyLifetime() }),
     );
     expect(load()).toEqual(emptyStorage());
+  });
+
+  it("round-trips a session's play log", () => {
+    const seed = 12345;
+    const dealt: GameState = dealGame(seed, "three-of-clubs-holder");
+    const firstCard = dealt.players[dealt.turn].hand[0]!;
+    const hand: Hand = { type: "single", cards: [firstCard] };
+    const afterPlay = applyPlay(dealt, dealt.turn, { kind: "play", hand });
+    expect(afterPlay.log).toHaveLength(1);
+
+    const session = {
+      humanSeat: dealt.turn,
+      seed,
+      game: afterPlay,
+      tribute: null,
+      titlesFromLastGame: null,
+      gameCount: 1,
+      sessionRoleCounts: { king: 0, queen: 0, third: 0, joker: 0 },
+    };
+    save({ schemaVersion: 1, currentSession: session, lifetime: emptyLifetime() });
+    const loaded = load();
+    expect(loaded.currentSession?.game.log).toEqual(afterPlay.log);
   });
 
   it("round-trips a session with non-empty passedThisTrick set", () => {
