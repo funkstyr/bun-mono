@@ -28,4 +28,17 @@ jobs:
           restore-keys: |
             turbo-${{ runner.os }}-
 
-      - run: bun check
+      - name: Lint
+        run: bun run lint
+
+      - name: Format
+        run: bun run format
+
+      - name: Build
+        run: bun run build
+
+      - name: Check types
+        run: bun run check-types
+
+      - name: Test
+        run: bun run test
