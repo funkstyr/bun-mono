@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@bun-mono/core-ui/button";
 
 import type { Cell, Difficulty, Side } from "./engine";
-import { readLastUsedSide, useTicTacToeGame } from "./use-game";
+import { readLastUsedSide, useTicTacToeGame, type Score } from "./use-game";
 
 const CELL_KEYS = ["c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8"] as const;
 
@@ -129,7 +129,7 @@ function SideOption({ value, label, selected, onChange }: SideOptionProps) {
 }
 
 function Game({ difficulty, playerSide }: { difficulty: Difficulty; playerSide: Side }) {
-  const { board, status, isAiThinking, onCellClick, restart } = useTicTacToeGame({
+  const { board, status, isAiThinking, score, onCellClick, restart } = useTicTacToeGame({
     difficulty,
     playerSide,
   });
@@ -140,6 +140,7 @@ function Game({ difficulty, playerSide }: { difficulty: Difficulty; playerSide: 
 
   return (
     <div className="flex w-full flex-col items-center gap-6">
+      <ScoreLine score={score} />
       <p aria-live="polite" className="text-muted-foreground min-h-6 text-center text-sm">
         {statusText}
       </p>
@@ -157,6 +158,18 @@ function Game({ difficulty, playerSide }: { difficulty: Difficulty; playerSide: 
       </div>
       {isGameOver ? <Button onClick={restart}>Play again</Button> : null}
     </div>
+  );
+}
+
+function ScoreLine({ score }: { score: Score }) {
+  return (
+    <p aria-label="Score" className="text-muted-foreground text-xs tabular-nums">
+      <span>W {score.wins}</span>
+      <span className="mx-2">·</span>
+      <span>L {score.losses}</span>
+      <span className="mx-2">·</span>
+      <span>D {score.draws}</span>
+    </p>
   );
 }
 
