@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@bun-mono/core-ui/button";
+import { Confetti } from "@bun-mono/core-ui/confetti";
 
-import type { Cell, Difficulty, Side } from "./engine";
+import type { Cell, Difficulty, GameStatus, Side } from "./engine";
 import { readLastUsedSide, useTicTacToeGame, type Score } from "./use-game";
 
 const CELL_KEYS = ["c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8"] as const;
@@ -134,16 +135,21 @@ function Game({ difficulty, playerSide }: { difficulty: Difficulty; playerSide: 
     playerSide,
   });
 
-  const statusText = renderStatus(status, isAiThinking, playerSide);
   const isGameOver = status.kind === "won" || status.kind === "draw";
   const winningLine = status.kind === "won" ? new Set<number>(status.line) : null;
+  const playerWon = status.kind === "won" && status.winner === playerSide;
+  const highlightTone: "win" | "loss" | null = !winningLine ? null : playerWon ? "win" : "loss";
 
   return (
     <div className="flex w-full flex-col items-center gap-6">
       <ScoreLine score={score} />
-      <p aria-live="polite" className="text-muted-foreground min-h-6 text-center text-sm">
-        {statusText}
-      </p>
+      {isGameOver ? (
+        <EndGameBanner status={status} playerSide={playerSide} />
+      ) : (
+        <p aria-live="polite" className="text-muted-foreground min-h-6 text-center text-sm">
+          {isAiThinking ? "AI's turn" : "Your turn"}
+        </p>
+      )}
       <div className="grid w-full grid-cols-3 gap-2">
         {board.map((cell, index) => (
           <BoardCell
@@ -151,12 +157,57 @@ function Game({ difficulty, playerSide }: { difficulty: Difficulty; playerSide: 
             index={index}
             value={cell}
             disabled={cell !== null || isAiThinking || isGameOver}
-            highlight={winningLine?.has(index) ?? false}
+            highlight={winningLine?.has(index) ? highlightTone : null}
             onClick={onCellClick}
           />
         ))}
       </div>
       {isGameOver ? <Button onClick={restart}>Play again</Button> : null}
+      {playerWon ? (
+        <div className="pointer-events-none fixed inset-0 z-50">
+          <Confetti />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+type EndGameBannerProps = {
+  status: Extract<GameStatus, { kind: "won" } | { kind: "draw" }>;
+  playerSide: Side;
+};
+
+function EndGameBanner({ status, playerSide }: EndGameBannerProps) {
+  if (status.kind === "draw") {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="border-border flex flex-col items-center gap-1 rounded-md border-2 border-dashed px-6 py-3"
+      >
+        <span className="text-lg font-semibold">Draw</span>
+        <span className="text-muted-foreground text-xs">No three in a row</span>
+      </div>
+    );
+  }
+  if (status.winner === playerSide) {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="bg-primary text-primary-foreground flex flex-col items-center gap-1 rounded-md px-6 py-3"
+      >
+        <span className="text-lg font-semibold">You won!</span>
+      </div>
+    );
+  }
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="border-border text-muted-foreground flex flex-col items-center gap-1 rounded-md border px-6 py-3"
+    >
+      <span className="text-base font-medium">AI wins</span>
     </div>
   );
 }
@@ -177,12 +228,18 @@ type BoardCellProps = {
   index: number;
   value: Cell;
   disabled: boolean;
-  highlight: boolean;
+  highlight: "win" | "loss" | null;
   onClick: (index: number) => void;
 };
 
 function BoardCell({ index, value, disabled, highlight, onClick }: BoardCellProps) {
   const handleClick = useCallback(() => onClick(index), [onClick, index]);
+  const highlightClass =
+    highlight === "win"
+      ? "bg-primary text-primary-foreground border-primary"
+      : highlight === "loss"
+        ? "bg-muted text-muted-foreground border-muted"
+        : "";
   return (
     <button
       type="button"
@@ -194,7 +251,7 @@ function BoardCell({ index, value, disabled, highlight, onClick }: BoardCellProp
         "flex items-center justify-center transition-colors",
         "disabled:cursor-not-allowed",
         "enabled:hover:bg-accent",
-        highlight ? "bg-accent text-accent-foreground" : "",
+        highlightClass,
       ]
         .filter(Boolean)
         .join(" ")}
@@ -202,17 +259,4 @@ function BoardCell({ index, value, disabled, highlight, onClick }: BoardCellProp
       {value ?? ""}
     </button>
   );
-}
-
-function renderStatus(
-  status: ReturnType<typeof useTicTacToeGame>["status"],
-  isAiThinking: boolean,
-  playerSide: Side,
-): string {
-  if (status.kind === "won") {
-    return status.winner === playerSide ? "You won!" : "AI won";
-  }
-  if (status.kind === "draw") return "Draw";
-  if (isAiThinking) return "AI's turn";
-  return "Your turn";
 }

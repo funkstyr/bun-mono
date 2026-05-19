@@ -19,7 +19,8 @@
     "./tic-tac-toe-app": {
       "types": "./dist/tic-tac-toe-app.d.ts",
       "import": "./dist/tic-tac-toe-app.js"
-    }
+    },
+    "./styles.css": "./src/styles.css"
   },
   "scripts": {
     "dev": "tsdown --watch",
