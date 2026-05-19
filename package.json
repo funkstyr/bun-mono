@@ -8,31 +8,31 @@
     ],
     "catalog": {
       "dotenv": "^17.4.2",
-      "zod": "^4.3.6",
+      "zod": "^4.4.3",
       "@typescript/native-preview": "7.0.0-dev.20260515.1",
-      "@types/bun": "^1.3.13",
-      "hono": "^4.12.15",
-      "@orpc/server": "^1.14.0",
-      "@orpc/openapi": "^1.14.0",
-      "@orpc/zod": "^1.14.0",
-      "better-auth": "^1.6.9",
-      "react": "^19.2.5",
-      "ai": "^6.0.168",
+      "@types/bun": "^1.3.14",
+      "hono": "^4.12.19",
+      "@orpc/server": "^1.14.3",
+      "@orpc/openapi": "^1.14.3",
+      "@orpc/zod": "^1.14.3",
+      "better-auth": "^1.6.11",
+      "react": "^19.2.6",
+      "ai": "^6.0.185",
       "effect": "^3.21.2",
       "@effect/schema": "^0.75.5",
       "@effect/platform": "^0.96.1",
       "arktype": "^2.2.0",
       "@types/react": "^19.2.14",
       "@effect/vitest": "^0.29.0",
-      "vitest": "^4.1.5",
-      "@vitest/ui": "^4.1.5",
-      "@vitest/coverage-v8": "^4.1.5",
-      "jsdom": "^29.1.0",
-      "@playwright/test": "^1.59.1",
-      "playwright": "^1.59.1",
+      "vitest": "^4.1.6",
+      "@vitest/ui": "^4.1.6",
+      "@vitest/coverage-v8": "^4.1.6",
+      "jsdom": "^29.1.1",
+      "@playwright/test": "^1.60.0",
+      "playwright": "^1.60.0",
       "@libsql/client": "^0.17.3",
       "libsql": "^0.5.29",
-      "@orpc/client": "^1.14.0",
+      "@orpc/client": "^1.14.3",
       "tsdown": "^0.22.0"
     }
   },
@@ -57,7 +57,9 @@
     "db:generate": "turbo -F @bun-mono/db db:generate",
     "db:migrate": "turbo -F @bun-mono/db db:migrate",
     "db:local": "turbo -F @bun-mono/db db:local",
-    "postinstall": "lefthook install"
+    "postinstall": "lefthook install",
+    "up-deps": "bunx taze -r -w minor",
+    "up-deps:major": "bunx taze -r -w major"
   },
   "dependencies": {
     "@bun-mono/env": "workspace:*",
@@ -69,9 +71,9 @@
     "@types/bun": "catalog:",
     "@typescript/native-preview": "catalog:",
     "lefthook": "^2.1.6",
-    "oxfmt": "^0.48.0",
-    "oxlint": "^1.63.0",
-    "turbo": "^2.9.9"
+    "oxfmt": "^0.50.0",
+    "oxlint": "^1.65.0",
+    "turbo": "^2.9.14"
   },
-  "packageManager": "bun@1.3.13"
+  "packageManager": "bun@1.3.14"
 }

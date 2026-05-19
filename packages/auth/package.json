@@ -23,7 +23,7 @@
     "check-types": "tsgo --build"
   },
   "dependencies": {
-    "@better-auth/drizzle-adapter": "^1.6.9",
+    "@better-auth/drizzle-adapter": "^1.6.11",
     "@bun-mono/db": "workspace:*",
     "@bun-mono/env": "workspace:*",
     "better-auth": "catalog:",
