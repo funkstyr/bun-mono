@@ -5,14 +5,17 @@ import { Button } from "@bun-mono/core-ui/button";
 import {
   beats,
   classifyHand,
+  RANK_ORDER,
+  SUIT_ORDER,
   type Card,
   type Hand,
   type HandType,
+  type Rank,
   type Seat,
   type Suit,
   type Title,
 } from "./engine";
-import { useRoyaltyGame, type PassEvent } from "./use-game";
+import { useRoyaltyGame, type PassEvent, type TributeView } from "./use-game";
 
 const SEATS: readonly Seat[] = [0, 1, 2, 3];
 const PASS_INDICATOR_MS = 900;
@@ -72,8 +75,18 @@ function usePassIndicator(event: PassEvent | null): Seat | null {
 }
 
 export function RoyaltyApp() {
-  const { game, finishedTitles, humanSeat, lastPassEvent, onPlay, onPass, restart } =
-    useRoyaltyGame({ mode: "play" });
+  const {
+    game,
+    finishedTitles,
+    humanSeat,
+    lastPassEvent,
+    tribute,
+    onPlay,
+    onPass,
+    onAsk,
+    onReturn,
+    restart,
+  } = useRoyaltyGame({ mode: "play" });
   const isOver = finishedTitles !== null;
   const passingSeat = usePassIndicator(lastPassEvent);
 
@@ -94,27 +107,34 @@ export function RoyaltyApp() {
             key={seat}
             seat={seat}
             cardCount={game.players[seat].hand.length}
-            active={!isOver && seat === game.turn}
+            active={!isOver && tribute === null && seat === game.turn}
             finished={game.players[seat].finishedAt !== null}
             passing={passingSeat === seat}
+            titles={finishedTitles}
           />
         ))}
       </div>
 
-      <TopHand top={game.trick.top} lastPlayer={game.trick.lastPlayer} />
+      {tribute ? (
+        <TributePanel tribute={tribute} humanSeat={humanSeat} onAsk={onAsk} onReturn={onReturn} />
+      ) : (
+        <>
+          <TopHand top={game.trick.top} lastPlayer={game.trick.lastPlayer} />
 
-      <HumanSeat
-        seat={humanSeat}
-        hand={game.players[humanSeat].hand}
-        active={!isOver && humanSeat === game.turn}
-        top={game.trick.top}
-        finished={game.players[humanSeat].finishedAt !== null}
-        passing={passingSeat === humanSeat}
-        onPlay={onPlay}
-        onPass={onPass}
-      />
+          <HumanSeat
+            seat={humanSeat}
+            hand={game.players[humanSeat].hand}
+            active={!isOver && humanSeat === game.turn}
+            top={game.trick.top}
+            finished={game.players[humanSeat].finishedAt !== null}
+            passing={passingSeat === humanSeat}
+            onPlay={onPlay}
+            onPass={onPass}
+          />
+        </>
+      )}
 
-      {finishedTitles ? (
+      {finishedTitles && !tribute ? (
         <EndGameOverlay titles={finishedTitles} humanSeat={humanSeat} onRestart={restart} />
       ) : null}
     </div>
@@ -188,9 +208,11 @@ type OpponentSeatProps = {
   active: boolean;
   finished: boolean;
   passing: boolean;
+  titles: Record<Seat, Title> | null;
 };
 
-function OpponentSeat({ seat, cardCount, active, finished, passing }: OpponentSeatProps) {
+function OpponentSeat({ seat, cardCount, active, finished, passing, titles }: OpponentSeatProps) {
+  const title = titles?.[seat] ?? null;
   return (
     <section
       className={[
@@ -202,7 +224,8 @@ function OpponentSeat({ seat, cardCount, active, finished, passing }: OpponentSe
       <header className="flex w-full items-center justify-between">
         <span className="text-xs font-medium">
           Seat {seat}
-          {finished ? <span className="text-muted-foreground ml-1">finished</span> : null}
+          {title ? <span className="text-muted-foreground ml-1">{TITLE_LABEL[title]}</span> : null}
+          {finished && !title ? <span className="text-muted-foreground ml-1">finished</span> : null}
         </span>
         {active ? (
           <span className="text-primary text-[10px] font-semibold uppercase">Turn</span>
@@ -218,6 +241,271 @@ function OpponentSeat({ seat, cardCount, active, finished, passing }: OpponentSe
         </span>
       ) : null}
     </section>
+  );
+}
+
+type TributePanelProps = {
+  tribute: TributeView;
+  humanSeat: Seat;
+  onAsk: (card: Card) => void;
+  onReturn: (cards: readonly Card[]) => void;
+};
+
+function TributePanel({ tribute, humanSeat, onAsk, onReturn }: TributePanelProps) {
+  const { current, role, askerHand, targetHand } = tribute;
+  const isHumanAsker = current.asker === humanSeat;
+  const isHumanTarget = current.target === humanSeat;
+  const roleLabel = role === "king" ? "King" : "Queen";
+  const phaseLabel =
+    current.phase === "ask"
+      ? `Asking — ${current.received.length}/${current.cardsToReceive} received`
+      : current.returnsRemaining === 0
+        ? "Complete"
+        : `Returning — ${current.returnsRemaining} card${current.returnsRemaining === 1 ? "" : "s"}`;
+
+  return (
+    <section className="border-border flex w-full flex-col gap-3 rounded-md border-2 border-dashed p-4">
+      <header className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="bg-primary/10 text-primary rounded px-2 py-0.5 text-xs font-semibold uppercase">
+            {roleLabel} tribute
+          </span>
+          <span className="text-muted-foreground text-xs">
+            Asker: Seat {current.asker}
+            {current.asker === humanSeat ? " (you)" : ""} → Target: Seat {current.target}
+            {current.target === humanSeat ? " (you)" : ""}
+          </span>
+        </div>
+        <span className="text-xs font-medium">{phaseLabel}</span>
+      </header>
+
+      <CardGrid
+        askerHand={isHumanTarget ? targetHand : askerHand}
+        missed={current.missed}
+        received={current.received}
+        interactive={isHumanAsker && current.phase === "ask"}
+        onPick={onAsk}
+        viewerIsTarget={isHumanTarget}
+      />
+
+      {current.phase === "return" && current.returnsRemaining > 0 && isHumanAsker ? (
+        <ReturnSelector
+          hand={askerHand}
+          returnsRemaining={current.returnsRemaining}
+          onReturn={onReturn}
+        />
+      ) : null}
+
+      {current.received.length > 0 || current.missed.length > 0 ? (
+        <AskHistory received={current.received} missed={current.missed} />
+      ) : null}
+    </section>
+  );
+}
+
+type CardGridProps = {
+  askerHand: readonly Card[];
+  missed: readonly Card[];
+  received: readonly Card[];
+  interactive: boolean;
+  onPick: (card: Card) => void;
+  viewerIsTarget: boolean;
+};
+
+const GRID_STYLE = {
+  gridTemplateColumns: `repeat(${RANK_ORDER.length}, minmax(0, 1fr))`,
+};
+
+const ALL_CARDS: readonly Card[] = SUIT_ORDER.flatMap((suit) =>
+  RANK_ORDER.map((rank) => ({ rank: rank as Rank, suit })),
+);
+
+function CardGrid({
+  askerHand,
+  missed,
+  received,
+  interactive,
+  onPick,
+  viewerIsTarget,
+}: CardGridProps) {
+  const dimmedKeys = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of askerHand) set.add(cardKey(c));
+    for (const c of missed) set.add(cardKey(c));
+    for (const c of received) set.add(cardKey(c));
+    return set;
+  }, [askerHand, missed, received]);
+
+  const receivedKeys = useMemo(() => new Set(received.map(cardKey)), [received]);
+  const missedKeys = useMemo(() => new Set(missed.map(cardKey)), [missed]);
+
+  return (
+    <div
+      className="grid w-full gap-1"
+      style={GRID_STYLE}
+      role="grid"
+      aria-label={viewerIsTarget ? "Asker's pick grid (read-only)" : "Tribute card grid"}
+    >
+      {ALL_CARDS.map((c) => {
+        const k = cardKey(c);
+        const isReceived = receivedKeys.has(k);
+        const isMissed = missedKeys.has(k);
+        const dim = dimmedKeys.has(k) && !isReceived && !isMissed;
+        const disabled = !interactive || isReceived || isMissed || dim;
+        return (
+          <GridCell
+            key={k}
+            card={c}
+            isReceived={isReceived}
+            isMissed={isMissed}
+            dim={dim}
+            disabled={disabled}
+            interactive={interactive}
+            onPick={onPick}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+type GridCellProps = {
+  card: Card;
+  isReceived: boolean;
+  isMissed: boolean;
+  dim: boolean;
+  disabled: boolean;
+  interactive: boolean;
+  onPick: (card: Card) => void;
+};
+
+function GridCell({
+  card,
+  isReceived,
+  isMissed,
+  dim,
+  disabled,
+  interactive,
+  onPick,
+}: GridCellProps) {
+  const handleClick = useCallback(() => onPick(card), [onPick, card]);
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={handleClick}
+      aria-label={`${rankLabel(card.rank)} of ${SUIT_LABEL[card.suit]}`}
+      className={[
+        "flex h-10 w-full flex-col items-center justify-center rounded border text-xs font-semibold transition",
+        isReceived
+          ? "border-green-500 bg-green-100 text-green-800"
+          : isMissed
+            ? "border-red-300 bg-red-50 text-red-600 line-through"
+            : dim
+              ? "border-border text-muted-foreground bg-muted opacity-50"
+              : interactive
+                ? "bg-background border-border hover:bg-accent"
+                : "border-border bg-background",
+        isRedSuit(card.suit) && !isMissed ? "text-red-600" : "",
+      ].join(" ")}
+    >
+      <span>{rankLabel(card.rank)}</span>
+      <span>{SUIT_LABEL[card.suit]}</span>
+    </button>
+  );
+}
+
+type ReturnSelectorProps = {
+  hand: readonly Card[];
+  returnsRemaining: number;
+  onReturn: (cards: readonly Card[]) => void;
+};
+
+function ReturnSelector({ hand, returnsRemaining, onReturn }: ReturnSelectorProps) {
+  const [selectedKeys, setSelectedKeys] = useState<ReadonlySet<string>>(() => new Set());
+
+  const toggleCard = useCallback((card: Card) => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      const key = cardKey(card);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const selected = useMemo(
+    () => hand.filter((c) => selectedKeys.has(cardKey(c))),
+    [hand, selectedKeys],
+  );
+
+  const canSubmit = selected.length === returnsRemaining;
+
+  const submit = useCallback(() => {
+    if (!canSubmit) return;
+    onReturn(selected);
+    setSelectedKeys(new Set());
+  }, [canSubmit, onReturn, selected]);
+
+  return (
+    <div className="border-border flex flex-col gap-2 rounded-md border p-3">
+      <header className="flex items-center justify-between">
+        <span className="text-sm font-medium">
+          Pick {returnsRemaining} card{returnsRemaining === 1 ? "" : "s"} to return
+        </span>
+        <Button type="button" size="sm" disabled={!canSubmit} onClick={submit}>
+          Return ({selected.length}/{returnsRemaining})
+        </Button>
+      </header>
+      <div className="flex flex-wrap gap-1">
+        {hand.map((c) => (
+          <CardButton
+            key={cardKey(c)}
+            card={c}
+            selected={selectedKeys.has(cardKey(c))}
+            onClick={toggleCard}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type AskHistoryProps = {
+  received: readonly Card[];
+  missed: readonly Card[];
+};
+
+function AskHistory({ received, missed }: AskHistoryProps) {
+  return (
+    <div className="flex flex-wrap gap-3 text-xs">
+      {received.length > 0 ? (
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground">Hits:</span>
+          <div className="flex gap-1">
+            {received.map((c) => (
+              <CardFace key={cardKey(c)} card={c} />
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {missed.length > 0 ? (
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground">Misses:</span>
+          <div className="flex gap-1">
+            {missed.map((c) => (
+              <span
+                key={cardKey(c)}
+                className="border-border bg-muted text-muted-foreground inline-flex h-8 w-6 flex-col items-center justify-center rounded border text-[10px] line-through"
+              >
+                <span>{rankLabel(c.rank)}</span>
+                <span>{SUIT_LABEL[c.suit]}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

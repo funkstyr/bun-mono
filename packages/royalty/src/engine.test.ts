@@ -2,15 +2,23 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyPlay,
+  askCard,
   beats,
   classifyHand,
   compareCards,
   dealGame,
   enumerateLegalPlays,
   finalTitles,
+  finalizeTribute,
   freshDeck,
   gameIsOver,
+  KING_ASK_CAP,
+  QUEEN_ASK_CAP,
+  returnCards,
   shuffle,
+  startKingTribute,
+  startQueenTribute,
+  tributeComplete,
   type Card,
   type GameState,
   type Hand,
@@ -18,6 +26,7 @@ import {
   type Rank,
   type Seat,
   type Suit,
+  type TributeState,
 } from "./engine";
 
 function card(rank: Rank, suit: Suit): Card {
@@ -976,5 +985,249 @@ describe("gameIsOver and finalTitles", () => {
   it("finalTitles is null while the game is in progress", () => {
     const state = dealGame(7, 0);
     expect(finalTitles(state)).toBeNull();
+  });
+});
+
+function finishedGameWithSeatOrder(order: readonly [Seat, Seat, Seat, Seat]): GameState {
+  const players: [PlayerState, PlayerState, PlayerState, PlayerState] = [
+    { hand: [], finishedAt: null },
+    { hand: [], finishedAt: null },
+    { hand: [], finishedAt: null },
+    { hand: [], finishedAt: null },
+  ];
+  for (let i = 0; i < 3; i++) {
+    players[order[i]!] = { hand: [], finishedAt: i };
+  }
+  players[order[3]!] = { hand: [card(7, "C")], finishedAt: null };
+  return {
+    players,
+    turn: order[3],
+    trick: { top: null, lastPlayer: null, passedThisTrick: new Set() },
+    finishingOrder: [order[0], order[1], order[2]],
+  };
+}
+
+describe("startKingTribute", () => {
+  it("targets the Joker, asker is King, with cap 4 and 2 cards to receive", () => {
+    const prev = finishedGameWithSeatOrder([0, 1, 2, 3]);
+    const t = startKingTribute(prev);
+    expect(t.asker).toBe(0);
+    expect(t.target).toBe(3);
+    expect(t.cardsToReceive).toBe(2);
+    expect(t.capRemaining).toBe(KING_ASK_CAP);
+    expect(t.returnsRemaining).toBe(2);
+    expect(t.phase).toBe("ask");
+    expect(t.received).toEqual([]);
+    expect(t.missed).toEqual([]);
+    expect(t.returned).toEqual([]);
+  });
+});
+
+describe("startQueenTribute", () => {
+  it("targets 3rd, asker is Queen, with cap 2 and 1 card to receive", () => {
+    const prev = finishedGameWithSeatOrder([0, 1, 2, 3]);
+    const t = startQueenTribute(prev);
+    expect(t.asker).toBe(1);
+    expect(t.target).toBe(2);
+    expect(t.cardsToReceive).toBe(1);
+    expect(t.capRemaining).toBe(QUEEN_ASK_CAP);
+    expect(t.returnsRemaining).toBe(1);
+    expect(t.phase).toBe("ask");
+  });
+});
+
+describe("askCard", () => {
+  function freshTribute(): TributeState {
+    return startKingTribute(finishedGameWithSeatOrder([0, 1, 2, 3]));
+  }
+
+  it("hit: moves the asked card into received and decrements cap", () => {
+    const t = freshTribute();
+    const targetHand = [card(8, "H"), card("K", "C")];
+    const { state, hit } = askCard(t, card(8, "H"), targetHand);
+    expect(hit).toBe(true);
+    expect(state.received).toEqual([card(8, "H")]);
+    expect(state.missed).toEqual([]);
+    expect(state.capRemaining).toBe(KING_ASK_CAP - 1);
+  });
+
+  it("miss: leaves received unchanged, records into missed and decrements cap", () => {
+    const t = freshTribute();
+    const targetHand = [card("K", "C")];
+    const { state, hit } = askCard(t, card(8, "H"), targetHand);
+    expect(hit).toBe(false);
+    expect(state.received).toEqual([]);
+    expect(state.missed).toEqual([card(8, "H")]);
+    expect(state.capRemaining).toBe(KING_ASK_CAP - 1);
+  });
+
+  it("transitions phase to return when received quota is met", () => {
+    const t = freshTribute();
+    const targetHand = [card(8, "H"), card("K", "C")];
+    let s = askCard(t, card(8, "H"), targetHand).state;
+    s = askCard(s, card("K", "C"), targetHand).state;
+    expect(s.received).toHaveLength(2);
+    expect(s.phase).toBe("return");
+  });
+
+  it("transitions phase to return once the cap is exhausted by misses", () => {
+    const t = freshTribute();
+    const targetHand = [card("K", "C")];
+    let s = t;
+    for (let i = 0; i < KING_ASK_CAP; i++) {
+      s = askCard(s, card((3 + i) as Rank, "H"), targetHand).state;
+    }
+    expect(s.capRemaining).toBe(0);
+    expect(s.phase).toBe("return");
+    expect(s.missed).toHaveLength(KING_ASK_CAP);
+  });
+
+  it("is a no-op when cap is 0", () => {
+    const t = freshTribute();
+    const targetHand = [card("K", "C")];
+    let s = t;
+    for (let i = 0; i < KING_ASK_CAP; i++) {
+      s = askCard(s, card((3 + i) as Rank, "H"), targetHand).state;
+    }
+    const before = s;
+    const { state, hit } = askCard(s, card("K", "C"), targetHand);
+    expect(hit).toBe(false);
+    expect(state).toBe(before);
+  });
+
+  it("is a no-op once received quota is met", () => {
+    const t = freshTribute();
+    const targetHand = [card(8, "H"), card("K", "C"), card("A", "D")];
+    let s = askCard(t, card(8, "H"), targetHand).state;
+    s = askCard(s, card("K", "C"), targetHand).state;
+    const before = s;
+    const { state, hit } = askCard(s, card("A", "D"), targetHand);
+    expect(hit).toBe(false);
+    expect(state).toBe(before);
+  });
+});
+
+describe("returnCards", () => {
+  function inReturnPhase(): TributeState {
+    const t = startKingTribute(finishedGameWithSeatOrder([0, 1, 2, 3]));
+    const targetHand = [card(8, "H"), card("K", "C")];
+    let s = askCard(t, card(8, "H"), targetHand).state;
+    s = askCard(s, card("K", "C"), targetHand).state;
+    return s;
+  }
+
+  it("accepts the matching count of cards and marks tribute complete", () => {
+    const s = inReturnPhase();
+    const out = returnCards(s, [card(3, "C"), card(4, "D")]);
+    expect(out.returned).toEqual([card(3, "C"), card(4, "D")]);
+    expect(out.returnsRemaining).toBe(0);
+    expect(tributeComplete(out)).toBe(true);
+  });
+
+  it("is a no-op if the count does not match returnsRemaining", () => {
+    const s = inReturnPhase();
+    const out = returnCards(s, [card(3, "C")]);
+    expect(out).toBe(s);
+  });
+
+  it("is a no-op if called while still in ask phase", () => {
+    const t = startKingTribute(finishedGameWithSeatOrder([0, 1, 2, 3]));
+    const out = returnCards(t, [card(3, "C"), card(4, "D")]);
+    expect(out).toBe(t);
+  });
+
+  it("accepts a single card for a Queen tribute", () => {
+    const t = startQueenTribute(finishedGameWithSeatOrder([0, 1, 2, 3]));
+    const targetHand = [card(8, "H")];
+    const s = askCard(t, card(8, "H"), targetHand).state;
+    expect(s.phase).toBe("return");
+    const out = returnCards(s, [card(3, "C")]);
+    expect(out.returned).toEqual([card(3, "C")]);
+    expect(tributeComplete(out)).toBe(true);
+  });
+});
+
+function completedTribute(
+  prev: GameState,
+  seed: number,
+  role: "king" | "queen",
+  receiveCount: number,
+  returnCount: number,
+): TributeState {
+  const fresh = dealGame(seed, 0);
+  let t = role === "king" ? startKingTribute(prev) : startQueenTribute(prev);
+  const targetHand = fresh.players[t.target].hand;
+  for (let i = 0; i < receiveCount; i++) {
+    t = askCard(t, targetHand[i]!, targetHand).state;
+  }
+  const giverHand = fresh.players[t.asker].hand;
+  if (t.returnsRemaining > 0) {
+    t = returnCards(t, giverHand.slice(0, returnCount));
+  }
+  return t;
+}
+
+describe("finalizeTribute", () => {
+  it("produces hands totaling 52 unique cards, each seat with 13", () => {
+    const prev = finishedGameWithSeatOrder([0, 1, 2, 3]);
+    const seed = 99;
+    const king = completedTribute(prev, seed, "king", 2, 2);
+    const queen = completedTribute(prev, seed, "queen", 1, 1);
+    const next = finalizeTribute(prev, king, queen, seed);
+
+    let total = 0;
+    const keys = new Set<string>();
+    for (const seat of [0, 1, 2, 3] as Seat[]) {
+      expect(next.players[seat].hand).toHaveLength(13);
+      total += 13;
+      for (const c of next.players[seat].hand) keys.add(`${c.rank}${c.suit}`);
+    }
+    expect(total).toBe(52);
+    expect(keys.size).toBe(52);
+  });
+
+  it("places received cards in the King's hand and returned cards in the Joker's hand", () => {
+    const prev = finishedGameWithSeatOrder([0, 1, 2, 3]);
+    const seed = 99;
+    const king = completedTribute(prev, seed, "king", 2, 2);
+    const queen = completedTribute(prev, seed, "queen", 1, 1);
+    const next = finalizeTribute(prev, king, queen, seed);
+    const kingHand = next.players[0].hand;
+    const jokerHand = next.players[3].hand;
+    for (const c of king.received) {
+      expect(kingHand.some((h) => h.rank === c.rank && h.suit === c.suit)).toBe(true);
+    }
+    for (const c of king.returned) {
+      expect(jokerHand.some((h) => h.rank === c.rank && h.suit === c.suit)).toBe(true);
+    }
+  });
+
+  it("places queen received in Queen's hand and queen returned in 3rd's hand", () => {
+    const prev = finishedGameWithSeatOrder([0, 1, 2, 3]);
+    const seed = 99;
+    const king = completedTribute(prev, seed, "king", 2, 2);
+    const queen = completedTribute(prev, seed, "queen", 1, 1);
+    const next = finalizeTribute(prev, king, queen, seed);
+    const queenHand = next.players[1].hand;
+    const thirdHand = next.players[2].hand;
+    for (const c of queen.received) {
+      expect(queenHand.some((h) => h.rank === c.rank && h.suit === c.suit)).toBe(true);
+    }
+    for (const c of queen.returned) {
+      expect(thirdHand.some((h) => h.rank === c.rank && h.suit === c.suit)).toBe(true);
+    }
+  });
+
+  it("sets the King as the new turn and resets trick + finishing order", () => {
+    const prev = finishedGameWithSeatOrder([2, 0, 3, 1]);
+    const seed = 17;
+    const king = completedTribute(prev, seed, "king", 0, 0);
+    const queen = completedTribute(prev, seed, "queen", 0, 0);
+    const next = finalizeTribute(prev, king, queen, seed);
+    expect(next.turn).toBe(2);
+    expect(next.trick.top).toBeNull();
+    expect(next.trick.lastPlayer).toBeNull();
+    expect(next.trick.passedThisTrick).toEqual(new Set());
+    expect(next.finishingOrder).toEqual([]);
   });
 });

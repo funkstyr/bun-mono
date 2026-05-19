@@ -1,5 +1,13 @@
 export const BOT_PASS_MS = 250;
 export const BOT_PLAY_MS = 500;
+export const BOT_ASK_MS = 700;
+export const BOT_RETURN_MS = 400;
+export const BETWEEN_GAMES_MS = 1200;
+
+export const KING_ASK_CAP = 4;
+export const QUEEN_ASK_CAP = 2;
+export const KING_RECEIVE_COUNT = 2;
+export const QUEEN_RECEIVE_COUNT = 1;
 
 export type Suit = "C" | "S" | "D" | "H";
 export type Rank = 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | "J" | "Q" | "K" | "A" | "2";
@@ -440,5 +448,169 @@ function closeTrick(state: GameState, leadFallback: Seat): GameState {
     ...state,
     turn: lead,
     trick: { top: null, lastPlayer: null, passedThisTrick: new Set() },
+  };
+}
+
+export type TributeState = {
+  asker: Seat;
+  target: Seat;
+  cardsToReceive: number;
+  capRemaining: number;
+  received: readonly Card[];
+  missed: readonly Card[];
+  returned: readonly Card[];
+  phase: "ask" | "return";
+  returnsRemaining: number;
+};
+
+function seatByTitle(titles: Record<Seat, Title>, title: Title): Seat {
+  for (const seat of ALL_SEATS) {
+    if (titles[seat] === title) return seat;
+  }
+  throw new Error(`no seat with title ${title}`);
+}
+
+export function startKingTribute(prevGame: GameState): TributeState {
+  const titles = finalTitles(prevGame);
+  if (titles === null) throw new Error("startKingTribute called on unfinished game");
+  return {
+    asker: seatByTitle(titles, "king"),
+    target: seatByTitle(titles, "joker"),
+    cardsToReceive: KING_RECEIVE_COUNT,
+    capRemaining: KING_ASK_CAP,
+    received: [],
+    missed: [],
+    returned: [],
+    phase: "ask",
+    returnsRemaining: KING_RECEIVE_COUNT,
+  };
+}
+
+export function startQueenTribute(prevGame: GameState): TributeState {
+  const titles = finalTitles(prevGame);
+  if (titles === null) throw new Error("startQueenTribute called on unfinished game");
+  return {
+    asker: seatByTitle(titles, "queen"),
+    target: seatByTitle(titles, "third"),
+    cardsToReceive: QUEEN_RECEIVE_COUNT,
+    capRemaining: QUEEN_ASK_CAP,
+    received: [],
+    missed: [],
+    returned: [],
+    phase: "ask",
+    returnsRemaining: QUEEN_RECEIVE_COUNT,
+  };
+}
+
+export function tributeAskDone(state: TributeState): boolean {
+  return (
+    state.phase === "return" ||
+    state.capRemaining === 0 ||
+    state.received.length === state.cardsToReceive
+  );
+}
+
+export function tributeComplete(state: TributeState): boolean {
+  return state.phase === "return" && state.returnsRemaining === 0;
+}
+
+export function askCard(
+  state: TributeState,
+  card: Card,
+  targetHand: readonly Card[],
+): { state: TributeState; hit: boolean } {
+  if (state.phase !== "ask") return { state, hit: false };
+  if (state.capRemaining === 0) return { state, hit: false };
+  if (state.received.length === state.cardsToReceive) return { state, hit: false };
+
+  const has = targetHand.some((c) => sameCard(c, card));
+  const capRemaining = state.capRemaining - 1;
+  const received = has ? [...state.received, card] : state.received;
+  const missed = has ? state.missed : [...state.missed, card];
+  const askDone = received.length === state.cardsToReceive || capRemaining === 0;
+  const phase: TributeState["phase"] = askDone ? "return" : "ask";
+  const returnsRemaining = askDone ? received.length : state.returnsRemaining;
+
+  return {
+    state: { ...state, capRemaining, received, missed, phase, returnsRemaining },
+    hit: has,
+  };
+}
+
+export function returnCards(state: TributeState, cards: readonly Card[]): TributeState {
+  if (state.phase !== "return") return state;
+  if (state.returnsRemaining === 0) return state;
+  if (cards.length !== state.returnsRemaining) return state;
+
+  return {
+    ...state,
+    returned: [...state.returned, ...cards],
+    returnsRemaining: 0,
+  };
+}
+
+export function freshDealFor(prevGame: GameState, seed: number): GameState {
+  const titles = finalTitles(prevGame);
+  if (titles === null) throw new Error("freshDealFor called on unfinished game");
+  return dealGame(seed, seatByTitle(titles, "king"));
+}
+
+export function finalizeTribute(
+  prevGame: GameState,
+  kingTribute: TributeState,
+  queenTribute: TributeState,
+  seed: number,
+): GameState {
+  const titles = finalTitles(prevGame);
+  if (titles === null) throw new Error("finalizeTribute called on unfinished game");
+
+  const kingSeat = seatByTitle(titles, "king");
+  const queenSeat = seatByTitle(titles, "queen");
+  const thirdSeat = seatByTitle(titles, "third");
+  const jokerSeat = seatByTitle(titles, "joker");
+
+  const fresh = dealGame(seed, kingSeat);
+  const hands: [Card[], Card[], Card[], Card[]] = [
+    [...fresh.players[0].hand],
+    [...fresh.players[1].hand],
+    [...fresh.players[2].hand],
+    [...fresh.players[3].hand],
+  ];
+
+  const moveCard = (c: Card, fromSeat: Seat, toSeat: Seat) => {
+    const i = hands[fromSeat].findIndex((h) => sameCard(h, c));
+    if (i !== -1) {
+      hands[fromSeat].splice(i, 1);
+      hands[toSeat].push(c);
+      return;
+    }
+    for (const s of ALL_SEATS) {
+      if (s === toSeat) continue;
+      const j = hands[s].findIndex((h) => sameCard(h, c));
+      if (j !== -1) {
+        hands[s].splice(j, 1);
+        hands[toSeat].push(c);
+        return;
+      }
+    }
+  };
+
+  for (const c of kingTribute.received) moveCard(c, jokerSeat, kingSeat);
+  for (const c of kingTribute.returned) moveCard(c, kingSeat, jokerSeat);
+  for (const c of queenTribute.received) moveCard(c, thirdSeat, queenSeat);
+  for (const c of queenTribute.returned) moveCard(c, queenSeat, thirdSeat);
+
+  for (const hand of hands) hand.sort(compareCards);
+
+  return {
+    players: [
+      { hand: hands[0], finishedAt: null },
+      { hand: hands[1], finishedAt: null },
+      { hand: hands[2], finishedAt: null },
+      { hand: hands[3], finishedAt: null },
+    ],
+    turn: kingSeat,
+    trick: { top: null, lastPlayer: null, passedThisTrick: new Set() },
+    finishingOrder: [],
   };
 }
