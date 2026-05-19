@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type JSX, useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@bun-mono/core-ui/button";
 
@@ -73,7 +73,7 @@ function usePassIndicator(event: PassEvent | null): Seat | null {
   return visible?.seat ?? null;
 }
 
-export function RoyaltyWatch() {
+export function RoyaltyWatch(): JSX.Element {
   const { session, game, finishedTitles, lastPassEvent, tribute, restart } = useRoyaltyGame({
     mode: "watch",
   });

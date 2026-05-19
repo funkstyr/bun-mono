@@ -19,10 +19,13 @@
     "noFallthroughCasesInSwitch": true,
     "exactOptionalPropertyTypes": true,
     "noImplicitReturns": true,
+    "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
+    "noUncheckedSideEffectImports": true,
     "noErrorTruncation": true,
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
+    "erasableSyntaxOnly": true,
     "types": ["bun"]
   }
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type JSX, useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@bun-mono/core-ui/button";
 import { Confetti } from "@bun-mono/core-ui/confetti";
@@ -77,7 +77,7 @@ function usePassIndicator(event: PassEvent | null): Seat | null {
   return visible?.seat ?? null;
 }
 
-export function RoyaltyApp() {
+export function RoyaltyApp(): JSX.Element {
   const {
     session,
     game,
