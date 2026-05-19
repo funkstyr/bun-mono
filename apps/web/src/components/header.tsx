@@ -9,6 +9,7 @@ export default function Header() {
     { to: "/ai", label: "AI Chat" },
     { to: "/timer", label: "Workouts" },
     { to: "/tic-tac-toe", label: "Tic-tac-toe" },
+    { to: "/royalty", label: "Royalty" },
   ] as const;
 
   return (

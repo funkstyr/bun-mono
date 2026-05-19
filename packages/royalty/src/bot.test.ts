@@ -60,7 +60,7 @@ describe("decide (play phase)", () => {
       ...base,
       players,
       turn: seat,
-      trick: { top, lastPlayer: 1, consecutivePasses: 0 },
+      trick: { top, lastPlayer: 1, passedThisTrick: new Set() },
     };
     const action = decide({ phase: "play", state, seat });
     expect(action.kind).toBe("pass");
@@ -83,7 +83,7 @@ describe("decide (play phase)", () => {
       ...base,
       players,
       turn: seat,
-      trick: { top, lastPlayer: 1, consecutivePasses: 0 },
+      trick: { top, lastPlayer: 1, passedThisTrick: new Set() },
     };
     const action = decide({ phase: "play", state, seat });
     expect(action.kind).toBe("play");

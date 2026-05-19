@@ -7,6 +7,7 @@ import {
   classifyHand,
   type Card,
   type Hand,
+  type HandType,
   type Seat,
   type Suit,
   type Title,
@@ -29,6 +30,21 @@ const SUIT_LABEL: Record<Suit, string> = {
   D: "♦",
   H: "♥",
 };
+
+const HAND_TYPE_LABEL: Record<HandType, string> = {
+  single: "Single",
+  pair: "Doubles",
+  triple: "Triples",
+  bomb: "Quads",
+  straight: "Run",
+  "doubles-straight": "Doubles run",
+};
+
+function handLabel(hand: Hand): string {
+  if (hand.type === "straight") return `Run of ${hand.cards.length}`;
+  if (hand.type === "doubles-straight") return `Doubles run (${hand.cards.length / 2} pairs)`;
+  return HAND_TYPE_LABEL[hand.type];
+}
 
 function rankLabel(rank: Card["rank"]): string {
   return String(rank);
@@ -144,12 +160,15 @@ type TopHandProps = {
 
 function TopHand({ top, lastPlayer }: TopHandProps) {
   return (
-    <div className="border-border flex min-h-20 w-full items-center justify-center gap-3 rounded-md border-2 border-dashed px-4 py-3">
+    <div className="border-border flex min-h-20 w-full flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed px-4 py-3">
       {top ? (
         <>
-          <span className="text-muted-foreground text-xs">
-            Top — Seat {lastPlayer} ({top.type})
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground text-xs">Top — Seat {lastPlayer}</span>
+            <span className="bg-primary/10 text-primary rounded px-2 py-0.5 text-xs font-semibold">
+              {handLabel(top)}
+            </span>
+          </div>
           <div className="flex gap-1">
             {top.cards.map((c) => (
               <CardFace key={cardKey(c)} card={c} />
@@ -264,6 +283,7 @@ function HumanSeat({ seat, hand, active, top, finished, passing, onPlay, onPass 
           {active ? (
             <span className="text-primary text-xs font-semibold uppercase">Your turn</span>
           ) : null}
+          <SelectionBadge selectedCount={selectedCards.length} candidate={candidate} />
           <Button
             type="button"
             size="sm"
@@ -311,6 +331,27 @@ type CardButtonProps = {
   selected: boolean;
   onClick: (card: Card) => void;
 };
+
+type SelectionBadgeProps = {
+  selectedCount: number;
+  candidate: Hand | null;
+};
+
+function SelectionBadge({ selectedCount, candidate }: SelectionBadgeProps) {
+  if (selectedCount === 0) return null;
+  if (candidate === null) {
+    return (
+      <span className="bg-destructive/10 text-destructive rounded px-2 py-0.5 text-xs font-semibold">
+        Invalid
+      </span>
+    );
+  }
+  return (
+    <span className="bg-primary/10 text-primary rounded px-2 py-0.5 text-xs font-semibold">
+      {handLabel(candidate)}
+    </span>
+  );
+}
 
 function CardButton({ card, selected, onClick }: CardButtonProps) {
   const handleClick = useCallback(() => onClick(card), [onClick, card]);

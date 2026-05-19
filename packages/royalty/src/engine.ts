@@ -5,15 +5,18 @@ export type Suit = "C" | "S" | "D" | "H";
 export type Rank = 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | "J" | "Q" | "K" | "A" | "2";
 export type Card = { rank: Rank; suit: Suit };
 
-export type HandType = "single" | "pair" | "triple" | "bomb" | "straight";
+export type HandType = "single" | "pair" | "triple" | "bomb" | "straight" | "doubles-straight";
 export type Hand = { type: HandType; cards: readonly Card[] };
+
+export const MIN_STRAIGHT_LENGTH = 3;
+export const MIN_DOUBLES_STRAIGHT_PAIRS = 3;
 
 export type Seat = 0 | 1 | 2 | 3;
 export type PlayerState = { hand: readonly Card[]; finishedAt: number | null };
 export type TrickState = {
   top: Hand | null;
   lastPlayer: Seat | null;
-  consecutivePasses: number;
+  passedThisTrick: ReadonlySet<Seat>;
 };
 export type GameState = {
   players: readonly [PlayerState, PlayerState, PlayerState, PlayerState];
@@ -106,7 +109,7 @@ export function dealGame(seed: number, opener: Seat | "three-of-clubs-holder"): 
       { hand: hands[3], finishedAt: null },
     ],
     turn,
-    trick: { top: null, lastPlayer: null, consecutivePasses: 0 },
+    trick: { top: null, lastPlayer: null, passedThisTrick: new Set() },
     finishingOrder: [],
   };
 }
@@ -117,19 +120,29 @@ export function classifyHand(cards: readonly Card[]): Hand | null {
     return { type: "single", cards: [cards[0]!] };
   }
 
-  if (cards.length <= 4) {
-    const rank = cards[0]!.rank;
-    if (!cards.every((c) => c.rank === rank)) return null;
+  const sameRank = classifySameRank(cards);
+  if (sameRank !== null) return sameRank;
 
-    const suits = new Set(cards.map((c) => c.suit));
-    if (suits.size !== cards.length) return null;
+  const straight = classifyStraight(cards);
+  if (straight !== null) return straight;
 
-    const sorted = cards.toSorted(compareCards);
-    if (cards.length === 2) return { type: "pair", cards: sorted };
-    if (cards.length === 3) return { type: "triple", cards: sorted };
-    return { type: "bomb", cards: sorted };
-  }
+  return classifyDoublesStraight(cards);
+}
 
+function classifySameRank(cards: readonly Card[]): Hand | null {
+  if (cards.length < 2 || cards.length > 4) return null;
+  const rank = cards[0]!.rank;
+  if (!cards.every((c) => c.rank === rank)) return null;
+  const suits = new Set(cards.map((c) => c.suit));
+  if (suits.size !== cards.length) return null;
+  const sorted = cards.toSorted(compareCards);
+  if (cards.length === 2) return { type: "pair", cards: sorted };
+  if (cards.length === 3) return { type: "triple", cards: sorted };
+  return { type: "bomb", cards: sorted };
+}
+
+function classifyStraight(cards: readonly Card[]): Hand | null {
+  if (cards.length < MIN_STRAIGHT_LENGTH) return null;
   if (cards.some((c) => c.rank === "2")) return null;
   const sorted = cards.toSorted(compareCards);
   const startIdx = rankIndex(sorted[0]!.rank);
@@ -137,6 +150,25 @@ export function classifyHand(cards: readonly Card[]): Hand | null {
     if (rankIndex(sorted[i]!.rank) !== startIdx + i) return null;
   }
   return { type: "straight", cards: sorted };
+}
+
+function classifyDoublesStraight(cards: readonly Card[]): Hand | null {
+  const minCards = MIN_DOUBLES_STRAIGHT_PAIRS * 2;
+  if (cards.length < minCards || cards.length % 2 !== 0) return null;
+  if (cards.some((c) => c.rank === "2")) return null;
+  const sorted = cards.toSorted(compareCards);
+  const pairs = sorted.length / 2;
+  for (let p = 0; p < pairs; p++) {
+    const a = sorted[p * 2]!;
+    const b = sorted[p * 2 + 1]!;
+    if (a.rank !== b.rank) return null;
+    if (a.suit === b.suit) return null;
+  }
+  const firstRankIdx = rankIndex(sorted[0]!.rank);
+  for (let p = 1; p < pairs; p++) {
+    if (rankIndex(sorted[p * 2]!.rank) !== firstRankIdx + p) return null;
+  }
+  return { type: "doubles-straight", cards: sorted };
 }
 
 function topCard(hand: Hand): Card {
@@ -159,7 +191,8 @@ export function beats(challenger: Hand, top: Hand): boolean {
     case "triple":
     case "bomb":
       return rankIndex(challenger.cards[0]!.rank) - rankIndex(top.cards[0]!.rank) > 0;
-    case "straight": {
+    case "straight":
+    case "doubles-straight": {
       if (challenger.cards.length !== top.cards.length) return false;
       return compareCards(topCard(challenger), topCard(top)) > 0;
     }
@@ -216,17 +249,32 @@ export function enumerateLegalPlays(holding: readonly Card[], top: Hand | null):
   }
   for (const group of byRankIdx) group.sort(compareCards);
 
-  for (let start = 0; start <= 7; start++) {
+  for (let start = 0; start <= 12 - MIN_STRAIGHT_LENGTH; start++) {
     let maxLen = 0;
     for (let i = start; i < 12; i++) {
       if (byRankIdx[i]!.length === 0) break;
       maxLen++;
     }
-    if (maxLen < 5) continue;
-    for (let len = 5; len <= maxLen; len++) {
+    if (maxLen < MIN_STRAIGHT_LENGTH) continue;
+    for (let len = MIN_STRAIGHT_LENGTH; len <= maxLen; len++) {
       const groups = byRankIdx.slice(start, start + len);
       for (const combo of enumerateStraightCombinations(groups)) {
         consider({ type: "straight", cards: combo });
+      }
+    }
+  }
+
+  for (let start = 0; start <= 12 - MIN_DOUBLES_STRAIGHT_PAIRS; start++) {
+    let maxPairs = 0;
+    for (let i = start; i < 12; i++) {
+      if (byRankIdx[i]!.length < 2) break;
+      maxPairs++;
+    }
+    if (maxPairs < MIN_DOUBLES_STRAIGHT_PAIRS) continue;
+    for (let pairs = MIN_DOUBLES_STRAIGHT_PAIRS; pairs <= maxPairs; pairs++) {
+      const groups = byRankIdx.slice(start, start + pairs);
+      for (const combo of enumerateDoublesStraightCombinations(groups)) {
+        consider({ type: "doubles-straight", cards: combo });
       }
     }
   }
@@ -247,16 +295,28 @@ function enumerateStraightCombinations(rankGroups: readonly Card[][]): Card[][] 
   return out;
 }
 
+function enumerateDoublesStraightCombinations(rankGroups: readonly Card[][]): Card[][] {
+  if (rankGroups.length === 0) return [[]];
+  const first = rankGroups[0]!;
+  const subs = enumerateDoublesStraightCombinations(rankGroups.slice(1));
+  const out: Card[][] = [];
+  for (let i = 0; i < first.length; i++) {
+    for (let j = i + 1; j < first.length; j++) {
+      const pair = [first[i]!, first[j]!];
+      for (const sub of subs) {
+        out.push([...pair, ...sub]);
+      }
+    }
+  }
+  return out;
+}
+
 function sameCard(a: Card, b: Card): boolean {
   return a.rank === b.rank && a.suit === b.suit;
 }
 
 function nextSeat(seat: Seat): Seat {
   return ((seat + 1) % 4) as Seat;
-}
-
-function activeCount(state: GameState): number {
-  return 4 - state.finishingOrder.length;
 }
 
 function nextActiveSeat(state: GameState, from: Seat): Seat {
@@ -292,30 +352,23 @@ export function applyPlay(state: GameState, seat: Seat, action: Action): GameSta
   if (gameIsOver(state)) return state;
   if (seat !== state.turn) return state;
   if (state.players[seat].finishedAt !== null) return state;
+  if (state.trick.passedThisTrick.has(seat)) return state;
 
   if (action.kind === "pass") {
     if (state.trick.top === null) return state;
 
-    const nextConsec = state.trick.consecutivePasses + 1;
-    const threshold = activeCount(state) - 1;
+    const newPassed = new Set(state.trick.passedThisTrick);
+    newPassed.add(seat);
 
-    if (nextConsec >= threshold) {
-      const lastPlayer = state.trick.lastPlayer;
-      const lead =
-        lastPlayer !== null && state.players[lastPlayer].finishedAt === null
-          ? lastPlayer
-          : nextActiveSeat(state, lastPlayer ?? seat);
-      return {
-        ...state,
-        turn: lead,
-        trick: { top: null, lastPlayer: null, consecutivePasses: 0 },
-      };
+    const nextActor = findNextResponder(state, seat, newPassed, state.trick.lastPlayer);
+    if (nextActor === null) {
+      return closeTrick(state, state.trick.lastPlayer ?? seat);
     }
 
     return {
       ...state,
-      turn: nextActiveSeat(state, seat),
-      trick: { ...state.trick, consecutivePasses: nextConsec },
+      turn: nextActor,
+      trick: { ...state.trick, passedThisTrick: newPassed },
     };
   }
 
@@ -347,13 +400,45 @@ export function applyPlay(state: GameState, seat: Seat, action: Action): GameSta
     trick: {
       top: action.hand,
       lastPlayer: seat,
-      consecutivePasses: 0,
+      passedThisTrick: state.trick.passedThisTrick,
     },
     finishingOrder,
   };
 
+  const nextActor = findNextResponder(afterPlay, seat, afterPlay.trick.passedThisTrick, seat);
+  if (nextActor === null) {
+    return closeTrick(afterPlay, seat);
+  }
+
+  return { ...afterPlay, turn: nextActor };
+}
+
+function findNextResponder(
+  state: GameState,
+  fromSeat: Seat,
+  passed: ReadonlySet<Seat>,
+  excludeSeat: Seat | null,
+): Seat | null {
+  let s = fromSeat;
+  for (let i = 0; i < 4; i++) {
+    s = nextSeat(s);
+    if (s === excludeSeat) continue;
+    if (state.players[s].finishedAt !== null) continue;
+    if (passed.has(s)) continue;
+    return s;
+  }
+  return null;
+}
+
+function closeTrick(state: GameState, leadFallback: Seat): GameState {
+  const lastPlayer = state.trick.lastPlayer;
+  const lead =
+    lastPlayer !== null && state.players[lastPlayer].finishedAt === null
+      ? lastPlayer
+      : nextActiveSeat(state, lastPlayer ?? leadFallback);
   return {
-    ...afterPlay,
-    turn: nextActiveSeat(afterPlay, seat),
+    ...state,
+    turn: lead,
+    trick: { top: null, lastPlayer: null, passedThisTrick: new Set() },
   };
 }

@@ -115,7 +115,7 @@ describe("dealGame", () => {
     const state = dealGame(7, 0);
     expect(state.trick.top).toBeNull();
     expect(state.trick.lastPlayer).toBeNull();
-    expect(state.trick.consecutivePasses).toBe(0);
+    expect(state.trick.passedThisTrick).toEqual(new Set());
     expect(state.finishingOrder).toEqual([]);
   });
 });
@@ -210,8 +210,20 @@ describe("classifyHand", () => {
     ).toBeNull();
   });
 
-  it("returns null for a 4-card run (too short)", () => {
-    expect(classifyHand([card(3, "C"), card(4, "D"), card(5, "S"), card(6, "H")])).toBeNull();
+  it("classifies a 3-card run as a straight", () => {
+    const result = classifyHand([card(3, "C"), card(4, "D"), card(5, "S")]);
+    expect(result?.type).toBe("straight");
+    expect(result?.cards).toHaveLength(3);
+  });
+
+  it("classifies a 4-card run as a straight (not a bomb when ranks differ)", () => {
+    const result = classifyHand([card(3, "C"), card(4, "D"), card(5, "S"), card(6, "H")]);
+    expect(result?.type).toBe("straight");
+    expect(result?.cards).toHaveLength(4);
+  });
+
+  it("returns null for a 2-card sequence (no 2-length run)", () => {
+    expect(classifyHand([card(3, "C"), card(4, "D")])).toBeNull();
   });
 
   it("returns null for a 5-card sequence with a duplicate rank", () => {
@@ -352,6 +364,142 @@ describe("beats — straights", () => {
   });
 });
 
+function doublesStraight(...cards: Card[]): Hand {
+  return { type: "doubles-straight", cards: cards.toSorted(compareCards) };
+}
+
+describe("doubles-straight (consecutive pairs)", () => {
+  it("classifies six cards as three consecutive pairs", () => {
+    const result = classifyHand([
+      card(3, "C"),
+      card(3, "S"),
+      card(4, "C"),
+      card(4, "S"),
+      card(5, "C"),
+      card(5, "S"),
+    ]);
+    expect(result?.type).toBe("doubles-straight");
+    expect(result?.cards).toHaveLength(6);
+  });
+
+  it("returns null when one of the pairs is broken", () => {
+    expect(
+      classifyHand([
+        card(3, "C"),
+        card(3, "S"),
+        card(4, "C"),
+        card(5, "S"),
+        card(5, "C"),
+        card(6, "S"),
+      ]),
+    ).toBeNull();
+  });
+
+  it("returns null for two consecutive pairs (below minimum of three)", () => {
+    expect(classifyHand([card(3, "C"), card(3, "S"), card(4, "C"), card(4, "S")])).toBeNull();
+  });
+
+  it("returns null when the pairs skip a rank", () => {
+    expect(
+      classifyHand([
+        card(3, "C"),
+        card(3, "S"),
+        card(5, "C"),
+        card(5, "S"),
+        card(7, "C"),
+        card(7, "S"),
+      ]),
+    ).toBeNull();
+  });
+
+  it("returns null when a pair includes a 2", () => {
+    expect(
+      classifyHand([
+        card("K", "C"),
+        card("K", "S"),
+        card("A", "C"),
+        card("A", "S"),
+        card("2", "C"),
+        card("2", "S"),
+      ]),
+    ).toBeNull();
+  });
+
+  it("a higher-top-rank doubles-straight beats a lower one of the same length", () => {
+    const lower = doublesStraight(
+      card(3, "C"),
+      card(3, "S"),
+      card(4, "C"),
+      card(4, "S"),
+      card(5, "C"),
+      card(5, "S"),
+    );
+    const higher = doublesStraight(
+      card(4, "D"),
+      card(4, "H"),
+      card(5, "D"),
+      card(5, "H"),
+      card(6, "D"),
+      card(6, "H"),
+    );
+    expect(beats(higher, lower)).toBe(true);
+    expect(beats(lower, higher)).toBe(false);
+  });
+
+  it("different-length doubles-straights never beat one another", () => {
+    const three = doublesStraight(
+      card(3, "C"),
+      card(3, "S"),
+      card(4, "C"),
+      card(4, "S"),
+      card(5, "C"),
+      card(5, "S"),
+    );
+    const four = doublesStraight(
+      card(3, "D"),
+      card(3, "H"),
+      card(4, "D"),
+      card(4, "H"),
+      card(5, "D"),
+      card(5, "H"),
+      card(6, "C"),
+      card(6, "S"),
+    );
+    expect(beats(four, three)).toBe(false);
+    expect(beats(three, four)).toBe(false);
+  });
+
+  it("a bomb beats a doubles-straight", () => {
+    const ds = doublesStraight(
+      card(3, "C"),
+      card(3, "S"),
+      card(4, "C"),
+      card(4, "S"),
+      card(5, "C"),
+      card(5, "S"),
+    );
+    const aBomb = bomb(card(7, "C"), card(7, "S"), card(7, "D"), card(7, "H"));
+    expect(beats(aBomb, ds)).toBe(true);
+    expect(beats(ds, aBomb)).toBe(false);
+  });
+
+  it("enumerates doubles-straights when leading", () => {
+    const holding = [
+      card(3, "C"),
+      card(3, "S"),
+      card(4, "C"),
+      card(4, "S"),
+      card(5, "C"),
+      card(5, "S"),
+      card(7, "D"),
+    ];
+    const plays = enumerateLegalPlays(holding, null);
+    const ds = plays.filter((p) => p.type === "doubles-straight");
+    expect(ds.length).toBeGreaterThan(0);
+    expect(ds[0]!.cards).toHaveLength(6);
+  });
+});
+
 describe("enumerateLegalPlays", () => {
   it("when leading, enumerates singles, pairs, triples, and bombs in the holding", () => {
     const holding = [
@@ -389,7 +537,7 @@ describe("enumerateLegalPlays", () => {
     expect(plays.some((h) => h.type === "bomb")).toBe(true);
   });
 
-  it("when leading, enumerates a 5-card straight discoverable in holding", () => {
+  it("when leading, enumerates the 5-card straight discoverable in holding", () => {
     const holding = [
       card(3, "C"),
       card(4, "C"),
@@ -400,8 +548,9 @@ describe("enumerateLegalPlays", () => {
     ];
     const plays = enumerateLegalPlays(holding, null);
     const straights = plays.filter((p) => p.type === "straight");
-    expect(straights).toHaveLength(1);
-    expect(straights[0]!.cards).toEqual([
+    expect(straights.some((s) => s.cards.length === 5)).toBe(true);
+    const five = straights.find((s) => s.cards.length === 5);
+    expect(five?.cards).toEqual([
       card(3, "C"),
       card(4, "C"),
       card(5, "C"),
@@ -440,8 +589,10 @@ describe("enumerateLegalPlays", () => {
       card("2", "C"),
     ];
     const straights = enumerateLegalPlays(holding, null).filter((p) => p.type === "straight");
-    expect(straights).toHaveLength(1);
-    expect(straights[0]!.cards[straights[0]!.cards.length - 1]).toEqual(card("A", "C"));
+    expect(straights.length).toBeGreaterThan(0);
+    for (const s of straights) {
+      expect(s.cards.some((c) => c.rank === "2")).toBe(false);
+    }
   });
 
   it("when top is a straight, enumerates only same-length beating straights", () => {
@@ -581,7 +732,7 @@ function customGame(hands: readonly [Card[], Card[], Card[], Card[]], turn: Seat
       { hand: hands[3], finishedAt: null },
     ],
     turn,
-    trick: { top: null, lastPlayer: null, consecutivePasses: 0 },
+    trick: { top: null, lastPlayer: null, passedThisTrick: new Set() },
     finishingOrder: [],
   };
 }
@@ -600,7 +751,7 @@ describe("applyPlay — pass", () => {
     expect(blocked).toEqual(afterLead);
   });
 
-  it("increments consecutivePasses and advances the turn", () => {
+  it("records the passer in passedThisTrick and advances the turn", () => {
     const state = customGame(
       [
         [card(3, "C"), card("A", "C")],
@@ -612,9 +763,50 @@ describe("applyPlay — pass", () => {
     );
     const afterLead = applyPlay(state, 0, { kind: "play", hand: single(card(3, "C")) });
     const afterPass = applyPlay(afterLead, 1, { kind: "pass" });
-    expect(afterPass.trick.consecutivePasses).toBe(1);
+    expect(afterPass.trick.passedThisTrick).toEqual(new Set([1]));
     expect(afterPass.turn).toBe(2);
     expect(afterPass.trick.top).toEqual(single(card(3, "C")));
+  });
+
+  it("a player who has passed cannot play later in the same trick", () => {
+    const state = customGame(
+      [
+        [card(3, "C"), card("A", "C")],
+        [card(4, "C"), card("K", "C")],
+        [card(5, "C"), card(5, "D")],
+        [card(6, "C"), card(6, "D")],
+      ],
+      0,
+    );
+    let s = applyPlay(state, 0, { kind: "play", hand: single(card(3, "C")) });
+    s = applyPlay(s, 1, { kind: "pass" });
+    s = applyPlay(s, 2, { kind: "play", hand: single(card(5, "C")) });
+    s = applyPlay(s, 3, { kind: "pass" });
+    expect(s.turn).toBe(0);
+    s = applyPlay(s, 0, { kind: "play", hand: single(card("A", "C")) });
+    expect(s.trick.top).toEqual(single(card("A", "C")));
+    expect(s.turn).toBe(2);
+    const blocked = applyPlay(s, 1, { kind: "play", hand: single(card("K", "C")) });
+    expect(blocked).toBe(s);
+  });
+
+  it("a player who has passed is skipped on subsequent turn advances", () => {
+    const state = customGame(
+      [
+        [card(3, "C"), card("A", "C")],
+        [card(4, "C"), card("K", "C")],
+        [card(5, "C"), card("Q", "C")],
+        [card(6, "C"), card("J", "C")],
+      ],
+      0,
+    );
+    let s = applyPlay(state, 0, { kind: "play", hand: single(card(3, "C")) });
+    s = applyPlay(s, 1, { kind: "pass" });
+    expect(s.turn).toBe(2);
+    s = applyPlay(s, 2, { kind: "play", hand: single(card(5, "C")) });
+    expect(s.turn).toBe(3);
+    s = applyPlay(s, 3, { kind: "play", hand: single(card(6, "C")) });
+    expect(s.turn).toBe(0);
   });
 
   it("closes the trick when three opponents have passed in a row; lead returns to last player", () => {
@@ -633,7 +825,7 @@ describe("applyPlay — pass", () => {
     s = applyPlay(s, 3, { kind: "pass" });
     expect(s.trick.top).toBeNull();
     expect(s.trick.lastPlayer).toBeNull();
-    expect(s.trick.consecutivePasses).toBe(0);
+    expect(s.trick.passedThisTrick).toEqual(new Set());
     expect(s.turn).toBe(0);
   });
 });
@@ -659,7 +851,7 @@ describe("applyPlay — going out mid-trick", () => {
     expect(afterB.turn).toBe(2);
   });
 
-  it("drops the pass threshold to (active count − 1) after a player goes out", () => {
+  it("closes the trick when every remaining active player has passed after a player goes out", () => {
     const state = customGame(
       [
         [card(3, "C")],
@@ -673,8 +865,9 @@ describe("applyPlay — going out mid-trick", () => {
     expect(s.finishingOrder).toEqual([0]);
     s = applyPlay(s, 1, { kind: "pass" });
     s = applyPlay(s, 2, { kind: "pass" });
+    s = applyPlay(s, 3, { kind: "pass" });
     expect(s.trick.top).toBeNull();
-    expect(s.trick.consecutivePasses).toBe(0);
+    expect(s.trick.passedThisTrick).toEqual(new Set());
   });
 
   it("transfers the lead clockwise when the last player to play is now out", () => {
@@ -690,6 +883,7 @@ describe("applyPlay — going out mid-trick", () => {
     let s = applyPlay(state, 0, { kind: "play", hand: single(card(3, "C")) });
     s = applyPlay(s, 1, { kind: "pass" });
     s = applyPlay(s, 2, { kind: "pass" });
+    s = applyPlay(s, 3, { kind: "pass" });
     expect(s.turn).toBe(1);
   });
 
