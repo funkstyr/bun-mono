@@ -1,0 +1,47 @@
+{
+  "name": "@bun-mono/tic-tac-toe",
+  "version": "0.0.0",
+  "private": true,
+  "files": [
+    "src",
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    "./engine": {
+      "types": "./dist/engine.d.ts",
+      "import": "./dist/engine.js"
+    },
+    "./use-game": {
+      "types": "./dist/use-game.d.ts",
+      "import": "./dist/use-game.js"
+    },
+    "./tic-tac-toe-app": {
+      "types": "./dist/tic-tac-toe-app.d.ts",
+      "import": "./dist/tic-tac-toe-app.js"
+    }
+  },
+  "scripts": {
+    "dev": "tsdown --watch",
+    "build": "tsdown",
+    "check-types": "tsgo --build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@bun-mono/core-ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@bun-mono/config": "workspace:*",
+    "@types/react": "catalog:",
+    "@types/react-dom": "19.2.3",
+    "@typescript/native-preview": "catalog:",
+    "jsdom": "catalog:",
+    "tsdown": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "catalog:",
+    "react-dom": "^19.2.6",
+    "tailwindcss": "^4.2.4"
+  }
+}

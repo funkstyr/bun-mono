@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TimerRouteImport } from './routes/timer'
+import { Route as TicTacToeRouteImport } from './routes/tic-tac-toe'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AiRouteImport } from './routes/ai'
@@ -19,6 +20,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const TimerRoute = TimerRouteImport.update({
   id: '/timer',
   path: '/timer',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TicTacToeRoute = TicTacToeRouteImport.update({
+  id: '/tic-tac-toe',
+  path: '/tic-tac-toe',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -53,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/ai': typeof AiRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/tic-tac-toe': typeof TicTacToeRoute
   '/timer': typeof TimerRoute
 }
 export interface FileRoutesByTo {
@@ -61,6 +68,7 @@ export interface FileRoutesByTo {
   '/ai': typeof AiRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/tic-tac-toe': typeof TicTacToeRoute
   '/timer': typeof TimerRoute
 }
 export interface FileRoutesById {
@@ -70,14 +78,37 @@ export interface FileRoutesById {
   '/ai': typeof AiRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/tic-tac-toe': typeof TicTacToeRoute
   '/timer': typeof TimerRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/account' | '/ai' | '/dashboard' | '/login' | '/timer'
+  fullPaths:
+    | '/'
+    | '/account'
+    | '/ai'
+    | '/dashboard'
+    | '/login'
+    | '/tic-tac-toe'
+    | '/timer'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/account' | '/ai' | '/dashboard' | '/login' | '/timer'
-  id: '__root__' | '/' | '/account' | '/ai' | '/dashboard' | '/login' | '/timer'
+  to:
+    | '/'
+    | '/account'
+    | '/ai'
+    | '/dashboard'
+    | '/login'
+    | '/tic-tac-toe'
+    | '/timer'
+  id:
+    | '__root__'
+    | '/'
+    | '/account'
+    | '/ai'
+    | '/dashboard'
+    | '/login'
+    | '/tic-tac-toe'
+    | '/timer'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -86,6 +117,7 @@ export interface RootRouteChildren {
   AiRoute: typeof AiRoute
   DashboardRoute: typeof DashboardRoute
   LoginRoute: typeof LoginRoute
+  TicTacToeRoute: typeof TicTacToeRoute
   TimerRoute: typeof TimerRoute
 }
 
@@ -96,6 +128,13 @@ declare module '@tanstack/react-router' {
       path: '/timer'
       fullPath: '/timer'
       preLoaderRoute: typeof TimerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tic-tac-toe': {
+      id: '/tic-tac-toe'
+      path: '/tic-tac-toe'
+      fullPath: '/tic-tac-toe'
+      preLoaderRoute: typeof TicTacToeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -142,6 +181,7 @@ const rootRouteChildren: RootRouteChildren = {
   AiRoute: AiRoute,
   DashboardRoute: DashboardRoute,
   LoginRoute: LoginRoute,
+  TicTacToeRoute: TicTacToeRoute,
   TimerRoute: TimerRoute,
 }
 export const routeTree = rootRouteImport
