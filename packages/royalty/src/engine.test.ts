@@ -38,6 +38,10 @@ function bomb(a: Card, b: Card, c: Card, d: Card): Hand {
   return { type: "bomb", cards: [a, b, c, d].toSorted(compareCards) };
 }
 
+function straight(...cards: Card[]): Hand {
+  return { type: "straight", cards: cards.toSorted(compareCards) };
+}
+
 function seatedGame(hand: Card[]): GameState {
   const base = dealGame(7, 0);
   const players = base.players.slice() as [PlayerState, PlayerState, PlayerState, PlayerState];
@@ -148,9 +152,75 @@ describe("classifyHand", () => {
     expect(classifyHand([card(8, "C"), card(8, "S"), card(8, "D"), card(9, "H")])).toBeNull();
   });
 
-  it("returns null for straights (slice 3 territory)", () => {
+  it("classifies a 5-card straight", () => {
+    const result = classifyHand([
+      card(3, "C"),
+      card(4, "D"),
+      card(5, "S"),
+      card(6, "H"),
+      card(7, "C"),
+    ]);
+    expect(result?.type).toBe("straight");
+    expect(result?.cards).toEqual([
+      card(3, "C"),
+      card(4, "D"),
+      card(5, "S"),
+      card(6, "H"),
+      card(7, "C"),
+    ]);
+  });
+
+  it("classifies a 5-card straight ending at Ace", () => {
+    const result = classifyHand([
+      card(10, "C"),
+      card("J", "D"),
+      card("Q", "S"),
+      card("K", "H"),
+      card("A", "C"),
+    ]);
+    expect(result?.type).toBe("straight");
+    expect(result?.cards[result.cards.length - 1]).toEqual(card("A", "C"));
+  });
+
+  it("classifies a 7-card straight", () => {
+    const result = classifyHand([
+      card(3, "C"),
+      card(4, "D"),
+      card(5, "S"),
+      card(6, "H"),
+      card(7, "C"),
+      card(8, "D"),
+      card(9, "S"),
+    ]);
+    expect(result?.type).toBe("straight");
+    expect(result?.cards).toHaveLength(7);
+  });
+
+  it("returns null for a straight that wraps through 2 (J-Q-K-A-2)", () => {
     expect(
-      classifyHand([card(3, "C"), card(4, "C"), card(5, "C"), card(6, "C"), card(7, "C")]),
+      classifyHand([
+        card("J", "C"),
+        card("Q", "D"),
+        card("K", "S"),
+        card("A", "H"),
+        card("2", "C"),
+      ]),
+    ).toBeNull();
+  });
+
+  it("returns null for a 4-card run (too short)", () => {
+    expect(classifyHand([card(3, "C"), card(4, "D"), card(5, "S"), card(6, "H")])).toBeNull();
+  });
+
+  it("returns null for a 5-card sequence with a duplicate rank", () => {
+    expect(
+      classifyHand([card(3, "C"), card(3, "D"), card(4, "S"), card(5, "H"), card(6, "C")]),
+    ).toBeNull();
+  });
+
+  it("returns null for a 5-card sequence with a gap", () => {
+    expect(
+      classifyHand([card(3, "C"), card(5, "D"), card(6, "S"), card(7, "H"), card(8, "C")]),
     ).toBeNull();
   });
 });
@@ -227,6 +297,59 @@ describe("beats — pairs, triples, bombs", () => {
   });
 });
 
+describe("beats — straights", () => {
+  it("a same-length straight with a higher top-card rank wins", () => {
+    const lower = straight(card(3, "C"), card(4, "C"), card(5, "C"), card(6, "C"), card(7, "C"));
+    const higher = straight(card(4, "S"), card(5, "S"), card(6, "S"), card(7, "S"), card(8, "S"));
+    expect(beats(higher, lower)).toBe(true);
+    expect(beats(lower, higher)).toBe(false);
+  });
+
+  it("same top-card rank: the straight with the higher-suit top wins", () => {
+    const heartsTop = straight(
+      card(4, "C"),
+      card(5, "C"),
+      card(6, "C"),
+      card(7, "C"),
+      card(8, "H"),
+    );
+    const clubsTop = straight(card(4, "S"), card(5, "S"), card(6, "S"), card(7, "S"), card(8, "C"));
+    expect(beats(heartsTop, clubsTop)).toBe(true);
+    expect(beats(clubsTop, heartsTop)).toBe(false);
+  });
+
+  it("different-length straights never beat one another", () => {
+    const five = straight(card(3, "C"), card(4, "C"), card(5, "C"), card(6, "C"), card(7, "C"));
+    const six = straight(
+      card(3, "S"),
+      card(4, "S"),
+      card(5, "S"),
+      card(6, "S"),
+      card(7, "S"),
+      card(8, "S"),
+    );
+    expect(beats(six, five)).toBe(false);
+    expect(beats(five, six)).toBe(false);
+  });
+
+  it("a bomb beats any straight regardless of length", () => {
+    const five = straight(card(3, "C"), card(4, "C"), card(5, "C"), card(6, "C"), card(7, "C"));
+    const aBomb = bomb(card(4, "C"), card(4, "S"), card(4, "D"), card(4, "H"));
+    expect(beats(aBomb, five)).toBe(true);
+  });
+
+  it("a straight does not beat a bomb", () => {
+    const five = straight(card(3, "C"), card(4, "C"), card(5, "C"), card(6, "C"), card(7, "C"));
+    const aBomb = bomb(card(4, "C"), card(4, "S"), card(4, "D"), card(4, "H"));
+    expect(beats(five, aBomb)).toBe(false);
+  });
+
+  it("a straight does not beat a non-straight non-bomb of a different type", () => {
+    const five = straight(card(3, "C"), card(4, "C"), card(5, "C"), card(6, "C"), card(7, "C"));
+    expect(beats(five, single(card("2", "H")))).toBe(false);
+  });
+});
+
 describe("enumerateLegalPlays", () => {
   it("when leading, enumerates singles, pairs, triples, and bombs in the holding", () => {
     const holding = [
@@ -262,6 +385,80 @@ describe("enumerateLegalPlays", () => {
     const top = single(card("2", "H"));
     const plays = enumerateLegalPlays(holding, top);
     expect(plays.some((h) => h.type === "bomb")).toBe(true);
+  });
+
+  it("when leading, enumerates a 5-card straight discoverable in holding", () => {
+    const holding = [
+      card(3, "C"),
+      card(4, "C"),
+      card(5, "C"),
+      card(6, "C"),
+      card(7, "C"),
+      card("J", "H"),
+    ];
+    const plays = enumerateLegalPlays(holding, null);
+    const straights = plays.filter((p) => p.type === "straight");
+    expect(straights).toHaveLength(1);
+    expect(straights[0]!.cards).toEqual([
+      card(3, "C"),
+      card(4, "C"),
+      card(5, "C"),
+      card(6, "C"),
+      card(7, "C"),
+    ]);
+  });
+
+  it("when leading, enumerates straights of multiple lengths from a long run", () => {
+    const holding = [
+      card(3, "C"),
+      card(4, "C"),
+      card(5, "C"),
+      card(6, "C"),
+      card(7, "C"),
+      card(8, "C"),
+      card(9, "C"),
+    ];
+    const straights = enumerateLegalPlays(holding, null).filter((p) => p.type === "straight");
+    const byLength = new Map<number, number>();
+    for (const s of straights) {
+      byLength.set(s.cards.length, (byLength.get(s.cards.length) ?? 0) + 1);
+    }
+    expect(byLength.get(5)).toBe(3);
+    expect(byLength.get(6)).toBe(2);
+    expect(byLength.get(7)).toBe(1);
+  });
+
+  it("never enumerates a straight that includes a 2", () => {
+    const holding = [
+      card(10, "C"),
+      card("J", "C"),
+      card("Q", "C"),
+      card("K", "C"),
+      card("A", "C"),
+      card("2", "C"),
+    ];
+    const straights = enumerateLegalPlays(holding, null).filter((p) => p.type === "straight");
+    expect(straights).toHaveLength(1);
+    expect(straights[0]!.cards[straights[0]!.cards.length - 1]).toEqual(card("A", "C"));
+  });
+
+  it("when top is a straight, enumerates only same-length beating straights", () => {
+    const holding = [
+      card(4, "C"),
+      card(5, "C"),
+      card(6, "C"),
+      card(7, "C"),
+      card(8, "C"),
+      card(9, "C"),
+    ];
+    const top = straight(card(3, "S"), card(4, "S"), card(5, "S"), card(6, "S"), card(7, "S"));
+    const plays = enumerateLegalPlays(holding, top);
+    const straights = plays.filter((p) => p.type === "straight");
+    expect(straights).toHaveLength(2);
+    const tops = straights.map((s) => s.cards[s.cards.length - 1]);
+    expect(tops).toContainEqual(card(8, "C"));
+    expect(tops).toContainEqual(card(9, "C"));
+    for (const s of straights) expect(s.cards).toHaveLength(5);
   });
 });
 

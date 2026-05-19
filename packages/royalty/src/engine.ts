@@ -110,18 +110,27 @@ export function classifyHand(cards: readonly Card[]): Hand | null {
   if (cards.length === 1) {
     return { type: "single", cards: [cards[0]!] };
   }
-  if (cards.length > 4) return null;
 
-  const rank = cards[0]!.rank;
-  if (!cards.every((c) => c.rank === rank)) return null;
+  if (cards.length <= 4) {
+    const rank = cards[0]!.rank;
+    if (!cards.every((c) => c.rank === rank)) return null;
 
-  const suits = new Set(cards.map((c) => c.suit));
-  if (suits.size !== cards.length) return null;
+    const suits = new Set(cards.map((c) => c.suit));
+    if (suits.size !== cards.length) return null;
 
+    const sorted = cards.toSorted(compareCards);
+    if (cards.length === 2) return { type: "pair", cards: sorted };
+    if (cards.length === 3) return { type: "triple", cards: sorted };
+    return { type: "bomb", cards: sorted };
+  }
+
+  if (cards.some((c) => c.rank === "2")) return null;
   const sorted = cards.toSorted(compareCards);
-  if (cards.length === 2) return { type: "pair", cards: sorted };
-  if (cards.length === 3) return { type: "triple", cards: sorted };
-  return { type: "bomb", cards: sorted };
+  const startIdx = rankIndex(sorted[0]!.rank);
+  for (let i = 1; i < sorted.length; i++) {
+    if (rankIndex(sorted[i]!.rank) !== startIdx + i) return null;
+  }
+  return { type: "straight", cards: sorted };
 }
 
 function topCard(hand: Hand): Card {
@@ -144,8 +153,10 @@ export function beats(challenger: Hand, top: Hand): boolean {
     case "triple":
     case "bomb":
       return rankIndex(challenger.cards[0]!.rank) - rankIndex(top.cards[0]!.rank) > 0;
-    case "straight":
-      return false;
+    case "straight": {
+      if (challenger.cards.length !== top.cards.length) return false;
+      return compareCards(topCard(challenger), topCard(top)) > 0;
+    }
   }
 }
 
@@ -192,6 +203,41 @@ export function enumerateLegalPlays(holding: readonly Card[], top: Hand | null):
     }
   }
 
+  const byRankIdx: Card[][] = Array.from({ length: 12 }, () => []);
+  for (const c of holding) {
+    const idx = rankIndex(c.rank);
+    if (idx < 12) byRankIdx[idx]!.push(c);
+  }
+  for (const group of byRankIdx) group.sort(compareCards);
+
+  for (let start = 0; start <= 7; start++) {
+    let maxLen = 0;
+    for (let i = start; i < 12; i++) {
+      if (byRankIdx[i]!.length === 0) break;
+      maxLen++;
+    }
+    if (maxLen < 5) continue;
+    for (let len = 5; len <= maxLen; len++) {
+      const groups = byRankIdx.slice(start, start + len);
+      for (const combo of enumerateStraightCombinations(groups)) {
+        consider({ type: "straight", cards: combo });
+      }
+    }
+  }
+
+  return out;
+}
+
+function enumerateStraightCombinations(rankGroups: readonly Card[][]): Card[][] {
+  if (rankGroups.length === 0) return [[]];
+  const first = rankGroups[0]!;
+  const subs = enumerateStraightCombinations(rankGroups.slice(1));
+  const out: Card[][] = [];
+  for (const c of first) {
+    for (const sub of subs) {
+      out.push([c, ...sub]);
+    }
+  }
   return out;
 }
 
