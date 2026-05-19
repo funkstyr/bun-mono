@@ -32,6 +32,7 @@
   },
   "devDependencies": {
     "@bun-mono/config": "workspace:*",
+    "@testing-library/react": "^16.3.2",
     "@types/react": "catalog:",
     "@types/react-dom": "19.2.3",
     "@typescript/native-preview": "catalog:",

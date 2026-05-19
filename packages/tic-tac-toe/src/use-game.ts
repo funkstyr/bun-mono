@@ -13,9 +13,22 @@ import {
 
 const AI_DELAY_MS = 350;
 
+export const SIDE_STORAGE_KEY = "tic-tac-toe:side";
+
+export function readLastUsedSide(): Side {
+  if (typeof window === "undefined") return "X";
+  const stored = window.localStorage.getItem(SIDE_STORAGE_KEY);
+  return stored === "O" ? "O" : "X";
+}
+
+function persistSide(side: Side): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(SIDE_STORAGE_KEY, side);
+}
+
 export type UseTicTacToeGameOptions = {
   difficulty: Difficulty;
-  playerSide?: Side;
+  playerSide: Side;
 };
 
 export type UseTicTacToeGameResult = {
@@ -28,7 +41,7 @@ export type UseTicTacToeGameResult = {
 
 export function useTicTacToeGame({
   difficulty,
-  playerSide = "X",
+  playerSide,
 }: UseTicTacToeGameOptions): UseTicTacToeGameResult {
   const [board, setBoard] = useState<Board>(() => emptyBoard());
   const aiSide: Side = playerSide === "X" ? "O" : "X";
@@ -65,13 +78,12 @@ export function useTicTacToeGame({
   const onCellClick = useCallback(
     (index: number) => {
       if (isAiTurn) return;
-      setBoard((current) => {
-        const s = status(current);
-        if (s.kind !== "playing" || s.turn !== playerSide) return current;
-        return applyMove(current, index, playerSide);
-      });
+      if (gameStatus.kind !== "playing" || gameStatus.turn !== playerSide) return;
+      if (board[index] !== null) return;
+      setBoard((current) => applyMove(current, index, playerSide));
+      persistSide(playerSide);
     },
-    [isAiTurn, playerSide],
+    [board, gameStatus, isAiTurn, playerSide],
   );
 
   const restart = useCallback(() => {
