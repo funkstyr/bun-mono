@@ -50,7 +50,6 @@ tmp
 temp
 *.db
 
-# Claude Code (local junction to .agents/skills)
-.claude/
+# Claude Code
 .scratch/
 CONTEXT.md

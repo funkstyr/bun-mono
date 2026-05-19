@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bun --filter *)",
+      "Bash(bun build *)",
+      "Bash(bun check)",
+      "Bash(bun check-types *)",
+      "Bash(bun install *)",
+      "Bash(bun format *)",
+      "Bash(bun format:fix *)",
+      "Bash(bun lint *)",
+      "Bash(bun test *)",
+      "Bash(bun turbo *)",
+      "Bash(bun run *)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/stop-fix-and-check.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
