@@ -15,6 +15,7 @@ import {
   type Suit,
   type Title,
 } from "./engine";
+import type { SessionSummary } from "./storage";
 import { useRoyaltyGame, type PassEvent, type TributeView } from "./use-game";
 
 const SEATS: readonly Seat[] = [0, 1, 2, 3];
@@ -76,19 +77,41 @@ function usePassIndicator(event: PassEvent | null): Seat | null {
 
 export function RoyaltyApp() {
   const {
+    session,
     game,
     finishedTitles,
     humanSeat,
     lastPassEvent,
     tribute,
+    sessionSummary,
     onPlay,
     onPass,
     onAsk,
     onReturn,
+    onEndSession,
+    dismissSessionSummary,
+    startSession,
     restart,
   } = useRoyaltyGame({ mode: "play" });
   const isOver = finishedTitles !== null;
   const passingSeat = usePassIndicator(lastPassEvent);
+
+  if (session === null || game === null || humanSeat === null) {
+    return (
+      <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-6 px-4 py-8">
+        <header className="flex w-full items-center justify-between">
+          <h1 className="text-2xl font-semibold">Royalty</h1>
+        </header>
+        <div className="flex w-full flex-col items-center gap-4 py-12">
+          <p className="text-muted-foreground text-sm">No active session.</p>
+          <Button onClick={startSession}>Start a session</Button>
+        </div>
+        {sessionSummary ? (
+          <SessionSummaryModal summary={sessionSummary} onClose={dismissSessionSummary} />
+        ) : null}
+      </div>
+    );
+  }
 
   const opponentSeats = SEATS.filter((s) => s !== humanSeat);
 
@@ -96,9 +119,15 @@ export function RoyaltyApp() {
     <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-6 px-4 py-8">
       <header className="flex w-full items-center justify-between">
         <h1 className="text-2xl font-semibold">Royalty</h1>
-        <Button onClick={restart} size="sm" variant="outline">
-          Restart
-        </Button>
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground text-xs">Game {session.gameCount}</span>
+          <Button onClick={restart} size="sm" variant="outline">
+            Restart
+          </Button>
+          <Button onClick={onEndSession} size="sm" variant="outline">
+            End session
+          </Button>
+        </div>
       </header>
 
       <div className="grid w-full grid-cols-3 gap-3">
@@ -137,6 +166,50 @@ export function RoyaltyApp() {
       {finishedTitles && !tribute ? (
         <EndGameOverlay titles={finishedTitles} humanSeat={humanSeat} onRestart={restart} />
       ) : null}
+
+      {sessionSummary ? (
+        <SessionSummaryModal summary={sessionSummary} onClose={dismissSessionSummary} />
+      ) : null}
+    </div>
+  );
+}
+
+type SessionSummaryModalProps = {
+  summary: SessionSummary;
+  onClose: () => void;
+};
+
+function SessionSummaryModal({ summary, onClose }: SessionSummaryModalProps) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="bg-background flex w-full max-w-md flex-col gap-4 rounded-lg p-6 shadow-lg">
+        <h2 className="text-xl font-semibold">Session summary</h2>
+        <ul className="flex flex-col gap-1 text-sm">
+          <li className="flex items-center justify-between">
+            <span>Games played</span>
+            <span className="font-semibold tabular-nums">{summary.gamesPlayed}</span>
+          </li>
+          <li className="flex items-center justify-between">
+            <span>King</span>
+            <span className="font-semibold tabular-nums">{summary.roleCounts.king}</span>
+          </li>
+          <li className="flex items-center justify-between">
+            <span>Queen</span>
+            <span className="font-semibold tabular-nums">{summary.roleCounts.queen}</span>
+          </li>
+          <li className="flex items-center justify-between">
+            <span>3rd</span>
+            <span className="font-semibold tabular-nums">{summary.roleCounts.third}</span>
+          </li>
+          <li className="flex items-center justify-between">
+            <span>Joker</span>
+            <span className="font-semibold tabular-nums">{summary.roleCounts.joker}</span>
+          </li>
+        </ul>
+        <Button onClick={onClose} className="self-end">
+          Close
+        </Button>
+      </div>
     </div>
   );
 }
