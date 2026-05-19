@@ -43,12 +43,7 @@ These files clearly mix components + hooks + utils + constants and exceed the 40
 
 ## Barrel `index.ts` files
 
-Most package `index.ts` files in this repo are real composition roots (exporting composed values like `db`, `auth`, `appRouter`) — those stay.
-
-Pure re-export barrels to remove:
-
-- `packages/db/src/schema/index.ts` (`export * from "./auth"`) — replace with subpath export in `package.json`, or import `./schema/auth` directly.
-- `apps/server/src/emails/index.ts` (1 line) — check; if it's `export *`, inline imports.
+Most package `index.ts` files in this repo are real composition roots (exporting composed values like `db`, `auth`, `appRouter`) — those stay. The pure re-export barrels (`db/src/schema/index.ts`, `server/src/emails/index.ts`) have been deleted. Audit again after any package refactor pass.
 
 ## Recommended order
 

@@ -11,10 +11,10 @@ import {
   Text,
 } from "@react-email/components";
 
-interface WelcomeEmailProps {
+type WelcomeEmailProps = {
   username?: string;
   loginUrl?: string;
-}
+};
 
 export function WelcomeEmail({
   username = "there",

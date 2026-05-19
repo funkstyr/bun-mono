@@ -3,7 +3,7 @@ import { drizzle } from "drizzle-orm/libsql";
 
 import { env } from "@bun-mono/env/server";
 
-import * as schema from "./schema/index";
+import * as schema from "./schema/auth";
 
 const client = createClient({
   url: env.DATABASE_URL,
