@@ -180,35 +180,32 @@ type EndGameBannerProps = {
 function EndGameBanner({ status, playerSide }: EndGameBannerProps) {
   if (status.kind === "draw") {
     return (
-      <div
-        role="status"
+      <output
         aria-live="polite"
         className="border-border flex flex-col items-center gap-1 rounded-md border-2 border-dashed px-6 py-3"
       >
         <span className="text-lg font-semibold">Draw</span>
         <span className="text-muted-foreground text-xs">No three in a row</span>
-      </div>
+      </output>
     );
   }
   if (status.winner === playerSide) {
     return (
-      <div
-        role="status"
+      <output
         aria-live="polite"
         className="bg-primary text-primary-foreground flex flex-col items-center gap-1 rounded-md px-6 py-3"
       >
         <span className="text-lg font-semibold">You won!</span>
-      </div>
+      </output>
     );
   }
   return (
-    <div
-      role="status"
+    <output
       aria-live="polite"
       className="border-border text-muted-foreground flex flex-col items-center gap-1 rounded-md border px-6 py-3"
     >
       <span className="text-base font-medium">AI wins</span>
-    </div>
+    </output>
   );
 }
 

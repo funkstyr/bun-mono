@@ -81,6 +81,20 @@ describe("useTicTacToeGame", () => {
   });
 });
 
+function playSequence(
+  result: { current: ReturnType<typeof useTicTacToeGame> },
+  moves: readonly number[],
+): void {
+  for (const move of moves) {
+    act(() => {
+      result.current.onCellClick(move);
+    });
+    act(() => {
+      vi.advanceTimersByTime(350);
+    });
+  }
+}
+
 describe("useTicTacToeGame stats", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -91,20 +105,6 @@ describe("useTicTacToeGame stats", () => {
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
-
-  function playSequence(
-    result: { current: ReturnType<typeof useTicTacToeGame> },
-    moves: readonly number[],
-  ): void {
-    for (const move of moves) {
-      act(() => {
-        result.current.onCellClick(move);
-      });
-      act(() => {
-        vi.advanceTimersByTime(350);
-      });
-    }
-  }
 
   it("returns score=0 for every difficulty on fresh render and does not write storage", () => {
     const { result } = renderHook(() =>
