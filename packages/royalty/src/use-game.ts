@@ -1,6 +1,16 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
-import { applyPlay, classifyHand, dealGame, type Card, type GameState, type Seat } from "./engine";
+import {
+  applyPlay,
+  classifyHand,
+  dealGame,
+  finalTitles,
+  gameIsOver,
+  type Card,
+  type GameState,
+  type Seat,
+  type Title,
+} from "./engine";
 
 function makeSeed(): number {
   return Math.floor(Math.random() * 0x7fffffff);
@@ -12,7 +22,9 @@ function newGame(): GameState {
 
 export type UseRoyaltyGameResult = {
   game: GameState;
+  finishedTitles: Record<Seat, Title> | null;
   onPlay: (seat: Seat, cards: readonly Card[]) => void;
+  onPass: (seat: Seat) => void;
   restart: () => void;
 };
 
@@ -21,6 +33,7 @@ export function useRoyaltyGame(): UseRoyaltyGameResult {
 
   const onPlay = useCallback((seat: Seat, cards: readonly Card[]) => {
     setGame((current) => {
+      if (gameIsOver(current)) return current;
       if (seat !== current.turn) return current;
       const hand = classifyHand(cards);
       if (hand === null) return current;
@@ -28,9 +41,19 @@ export function useRoyaltyGame(): UseRoyaltyGameResult {
     });
   }, []);
 
+  const onPass = useCallback((seat: Seat) => {
+    setGame((current) => {
+      if (gameIsOver(current)) return current;
+      if (seat !== current.turn) return current;
+      return applyPlay(current, seat, { kind: "pass" });
+    });
+  }, []);
+
   const restart = useCallback(() => {
     setGame(newGame());
   }, []);
 
-  return { game, onPlay, restart };
+  const finishedTitles = useMemo(() => finalTitles(game), [game]);
+
+  return { game, finishedTitles, onPlay, onPass, restart };
 }

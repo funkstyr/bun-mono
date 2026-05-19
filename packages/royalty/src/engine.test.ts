@@ -7,7 +7,9 @@ import {
   compareCards,
   dealGame,
   enumerateLegalPlays,
+  finalTitles,
   freshDeck,
+  gameIsOver,
   shuffle,
   type Card,
   type GameState,
@@ -567,5 +569,218 @@ describe("applyPlay — multi-card hands", () => {
     });
     expect(after.trick.top?.type).toBe("bomb");
     expect(after.players[1].hand).toEqual([card(5, "C")]);
+  });
+});
+
+function customGame(hands: readonly [Card[], Card[], Card[], Card[]], turn: Seat = 0): GameState {
+  return {
+    players: [
+      { hand: hands[0], finishedAt: null },
+      { hand: hands[1], finishedAt: null },
+      { hand: hands[2], finishedAt: null },
+      { hand: hands[3], finishedAt: null },
+    ],
+    turn,
+    trick: { top: null, lastPlayer: null, consecutivePasses: 0 },
+    finishingOrder: [],
+  };
+}
+
+describe("applyPlay — pass", () => {
+  it("is a no-op when leading (no top hand to beat)", () => {
+    const state = dealGame(7, 0);
+    const next = applyPlay(state, 0, { kind: "pass" });
+    expect(next).toEqual(state);
+  });
+
+  it("is a no-op when called for a non-active seat", () => {
+    const state = customGame([[card(3, "C")], [card(4, "C")], [card(5, "C")], [card(6, "C")]], 0);
+    const afterLead = applyPlay(state, 0, { kind: "play", hand: single(card(3, "C")) });
+    const blocked = applyPlay(afterLead, 0, { kind: "pass" });
+    expect(blocked).toEqual(afterLead);
+  });
+
+  it("increments consecutivePasses and advances the turn", () => {
+    const state = customGame(
+      [
+        [card(3, "C"), card("A", "C")],
+        [card(4, "C"), card(4, "D")],
+        [card(5, "C"), card(5, "D")],
+        [card(6, "C"), card(6, "D")],
+      ],
+      0,
+    );
+    const afterLead = applyPlay(state, 0, { kind: "play", hand: single(card(3, "C")) });
+    const afterPass = applyPlay(afterLead, 1, { kind: "pass" });
+    expect(afterPass.trick.consecutivePasses).toBe(1);
+    expect(afterPass.turn).toBe(2);
+    expect(afterPass.trick.top).toEqual(single(card(3, "C")));
+  });
+
+  it("closes the trick when three opponents have passed in a row; lead returns to last player", () => {
+    const state = customGame(
+      [
+        [card(3, "C"), card("A", "C")],
+        [card(4, "C"), card(4, "D")],
+        [card(5, "C"), card(5, "D")],
+        [card(6, "C"), card(6, "D")],
+      ],
+      0,
+    );
+    let s = applyPlay(state, 0, { kind: "play", hand: single(card(3, "C")) });
+    s = applyPlay(s, 1, { kind: "pass" });
+    s = applyPlay(s, 2, { kind: "pass" });
+    s = applyPlay(s, 3, { kind: "pass" });
+    expect(s.trick.top).toBeNull();
+    expect(s.trick.lastPlayer).toBeNull();
+    expect(s.trick.consecutivePasses).toBe(0);
+    expect(s.turn).toBe(0);
+  });
+});
+
+describe("applyPlay — going out mid-trick", () => {
+  it("adds the player to finishingOrder and skips them on subsequent turn advances", () => {
+    const state = customGame(
+      [
+        [card(3, "C")],
+        [card(4, "C"), card(4, "D")],
+        [card(5, "C"), card(5, "D")],
+        [card(6, "C"), card(6, "D")],
+      ],
+      0,
+    );
+    const next = applyPlay(state, 0, { kind: "play", hand: single(card(3, "C")) });
+    expect(next.players[0].hand).toEqual([]);
+    expect(next.players[0].finishedAt).toBe(0);
+    expect(next.finishingOrder).toEqual([0]);
+    expect(next.turn).toBe(1);
+
+    const afterB = applyPlay(next, 1, { kind: "play", hand: single(card(4, "D")) });
+    expect(afterB.turn).toBe(2);
+  });
+
+  it("drops the pass threshold to (active count − 1) after a player goes out", () => {
+    const state = customGame(
+      [
+        [card(3, "C")],
+        [card(4, "C"), card(4, "D")],
+        [card(5, "C"), card(5, "D")],
+        [card(6, "C"), card(6, "D")],
+      ],
+      0,
+    );
+    let s = applyPlay(state, 0, { kind: "play", hand: single(card(3, "C")) });
+    expect(s.finishingOrder).toEqual([0]);
+    s = applyPlay(s, 1, { kind: "pass" });
+    s = applyPlay(s, 2, { kind: "pass" });
+    expect(s.trick.top).toBeNull();
+    expect(s.trick.consecutivePasses).toBe(0);
+  });
+
+  it("transfers the lead clockwise when the last player to play is now out", () => {
+    const state = customGame(
+      [
+        [card(3, "C")],
+        [card(4, "C"), card(4, "D")],
+        [card(5, "C"), card(5, "D")],
+        [card(6, "C"), card(6, "D")],
+      ],
+      0,
+    );
+    let s = applyPlay(state, 0, { kind: "play", hand: single(card(3, "C")) });
+    s = applyPlay(s, 1, { kind: "pass" });
+    s = applyPlay(s, 2, { kind: "pass" });
+    expect(s.turn).toBe(1);
+  });
+
+  it("allows a bomb to be the final hand a player goes out on", () => {
+    const state = customGame(
+      [
+        [card(4, "C"), card(4, "S"), card(4, "D"), card(4, "H")],
+        [card("J", "C"), card("J", "D")],
+        [card(5, "C"), card(5, "D")],
+        [card(6, "C"), card(6, "D")],
+      ],
+      0,
+    );
+    const lead = applyPlay(state, 0, { kind: "play", hand: single(card(4, "C")) });
+    const next = applyPlay(lead, 1, {
+      kind: "play",
+      hand: bomb(card(4, "C"), card(4, "S"), card(4, "D"), card(4, "H")),
+    });
+    expect(next).toBe(lead);
+
+    const bombGame = customGame(
+      [
+        [card(4, "C"), card(4, "S"), card(4, "D"), card(4, "H")],
+        [card("J", "C")],
+        [card(5, "C")],
+        [card(6, "C")],
+      ],
+      0,
+    );
+    const afterBomb = applyPlay(bombGame, 0, {
+      kind: "play",
+      hand: bomb(card(4, "C"), card(4, "S"), card(4, "D"), card(4, "H")),
+    });
+    expect(afterBomb.players[0].hand).toEqual([]);
+    expect(afterBomb.finishingOrder).toEqual([0]);
+  });
+});
+
+describe("gameIsOver and finalTitles", () => {
+  it("gameIsOver is false until three players have finished", () => {
+    const state = customGame(
+      [
+        [card(3, "C")],
+        [card(4, "C"), card(4, "D")],
+        [card(5, "C"), card(5, "D")],
+        [card(6, "C"), card(6, "D")],
+      ],
+      0,
+    );
+    expect(gameIsOver(state)).toBe(false);
+    const oneDone = applyPlay(state, 0, { kind: "play", hand: single(card(3, "C")) });
+    expect(gameIsOver(oneDone)).toBe(false);
+  });
+
+  it("gameIsOver is true once finishingOrder.length === 3", () => {
+    const state = customGame(
+      [[card(3, "C")], [card(4, "C")], [card(5, "C")], [card(6, "C"), card(7, "C")]],
+      0,
+    );
+    let s = applyPlay(state, 0, { kind: "play", hand: single(card(3, "C")) });
+    s = applyPlay(s, 1, { kind: "play", hand: single(card(4, "C")) });
+    s = applyPlay(s, 2, { kind: "play", hand: single(card(5, "C")) });
+    expect(s.finishingOrder).toEqual([0, 1, 2]);
+    expect(gameIsOver(s)).toBe(true);
+  });
+
+  it("applyPlay is a no-op once the game is over", () => {
+    const state = customGame(
+      [[card(3, "C")], [card(4, "C")], [card(5, "C")], [card(6, "C"), card(7, "C")]],
+      0,
+    );
+    let s = applyPlay(state, 0, { kind: "play", hand: single(card(3, "C")) });
+    s = applyPlay(s, 1, { kind: "play", hand: single(card(4, "C")) });
+    s = applyPlay(s, 2, { kind: "play", hand: single(card(5, "C")) });
+    const stuck = applyPlay(s, 3, { kind: "play", hand: single(card(6, "C")) });
+    expect(stuck).toBe(s);
+  });
+
+  it("finalTitles assigns King/Queen/3rd/Joker by finishing order", () => {
+    const state = customGame(
+      [[card(3, "C")], [card(4, "C")], [card(5, "C")], [card(6, "C"), card(7, "C")]],
+      0,
+    );
+    let s = applyPlay(state, 0, { kind: "play", hand: single(card(3, "C")) });
+    s = applyPlay(s, 1, { kind: "play", hand: single(card(4, "C")) });
+    s = applyPlay(s, 2, { kind: "play", hand: single(card(5, "C")) });
+    expect(finalTitles(s)).toEqual({ 0: "king", 1: "queen", 2: "third", 3: "joker" });
+  });
+
+  it("finalTitles is null while the game is in progress", () => {
+    const state = dealGame(7, 0);
+    expect(finalTitles(state)).toBeNull();
   });
 });

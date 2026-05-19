@@ -2,10 +2,25 @@ import { useCallback, useMemo, useState } from "react";
 
 import { Button } from "@bun-mono/core-ui/button";
 
-import { beats, classifyHand, type Card, type Hand, type Seat, type Suit } from "./engine";
+import {
+  beats,
+  classifyHand,
+  type Card,
+  type Hand,
+  type Seat,
+  type Suit,
+  type Title,
+} from "./engine";
 import { useRoyaltyGame } from "./use-game";
 
 const SEATS: readonly Seat[] = [0, 1, 2, 3];
+
+const TITLE_LABEL: Record<Title, string> = {
+  king: "King",
+  queen: "Queen",
+  third: "3rd",
+  joker: "Joker",
+};
 
 const SUIT_LABEL: Record<Suit, string> = {
   C: "♣",
@@ -27,7 +42,8 @@ function isRedSuit(suit: Suit): boolean {
 }
 
 export function RoyaltyApp() {
-  const { game, onPlay, restart } = useRoyaltyGame();
+  const { game, finishedTitles, onPlay, onPass, restart } = useRoyaltyGame();
+  const isOver = finishedTitles !== null;
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-6 px-4 py-8">
@@ -46,11 +62,41 @@ export function RoyaltyApp() {
             key={seat}
             seat={seat}
             hand={game.players[seat].hand}
-            active={seat === game.turn}
+            active={!isOver && seat === game.turn}
             top={game.trick.top}
+            finished={game.players[seat].finishedAt !== null}
             onPlay={onPlay}
+            onPass={onPass}
           />
         ))}
+      </div>
+
+      {finishedTitles ? <EndGameOverlay titles={finishedTitles} onRestart={restart} /> : null}
+    </div>
+  );
+}
+
+type EndGameOverlayProps = {
+  titles: Record<Seat, Title>;
+  onRestart: () => void;
+};
+
+function EndGameOverlay({ titles, onRestart }: EndGameOverlayProps) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="bg-background flex w-full max-w-md flex-col gap-4 rounded-lg p-6 shadow-lg">
+        <h2 className="text-xl font-semibold">Game over</h2>
+        <ul className="flex flex-col gap-1 text-sm">
+          {SEATS.map((seat) => (
+            <li key={seat} className="flex items-center justify-between">
+              <span>Seat {seat}</span>
+              <span className="font-semibold">{TITLE_LABEL[titles[seat]]}</span>
+            </li>
+          ))}
+        </ul>
+        <Button onClick={onRestart} className="self-end">
+          Restart
+        </Button>
       </div>
     </div>
   );
@@ -87,10 +133,12 @@ type SeatPanelProps = {
   hand: readonly Card[];
   active: boolean;
   top: Hand | null;
+  finished: boolean;
   onPlay: (seat: Seat, cards: readonly Card[]) => void;
+  onPass: (seat: Seat) => void;
 };
 
-function SeatPanel({ seat, hand, active, top, onPlay }: SeatPanelProps) {
+function SeatPanel({ seat, hand, active, top, finished, onPlay, onPass }: SeatPanelProps) {
   const [selectedKeys, setSelectedKeys] = useState<ReadonlySet<string>>(() => new Set());
 
   const selectedCards = useMemo(
@@ -100,6 +148,7 @@ function SeatPanel({ seat, hand, active, top, onPlay }: SeatPanelProps) {
 
   const candidate = useMemo(() => classifyHand(selectedCards), [selectedCards]);
   const canPlay = active && candidate !== null && (top === null || beats(candidate, top));
+  const canPass = active && top !== null;
 
   const toggleCard = useCallback((card: Card) => {
     setSelectedKeys((prev) => {
@@ -117,19 +166,38 @@ function SeatPanel({ seat, hand, active, top, onPlay }: SeatPanelProps) {
     setSelectedKeys(new Set());
   }, [canPlay, onPlay, seat, selectedCards]);
 
+  const submitPass = useCallback(() => {
+    if (!canPass) return;
+    onPass(seat);
+    setSelectedKeys(new Set());
+  }, [canPass, onPass, seat]);
+
   return (
     <section
       className={[
         "flex flex-col gap-2 rounded-md border p-3",
         active ? "border-primary bg-primary/5" : "border-border",
+        finished ? "opacity-60" : "",
       ].join(" ")}
     >
       <header className="flex items-center justify-between">
-        <span className="text-sm font-medium">Seat {seat}</span>
+        <span className="text-sm font-medium">
+          Seat {seat}
+          {finished ? <span className="text-muted-foreground ml-2 text-xs">finished</span> : null}
+        </span>
         <div className="flex items-center gap-2">
           {active ? (
             <span className="text-primary text-xs font-semibold uppercase">Turn</span>
           ) : null}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={!canPass}
+            onClick={submitPass}
+          >
+            Pass
+          </Button>
           <Button
             type="button"
             size="sm"

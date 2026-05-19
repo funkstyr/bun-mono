@@ -19,6 +19,9 @@ export type GameState = {
   finishingOrder: readonly Seat[];
 };
 
+export type Title = "king" | "queen" | "third" | "joker";
+export const ALL_SEATS: readonly Seat[] = [0, 1, 2, 3];
+
 export const RANK_ORDER: readonly Rank[] = [3, 4, 5, 6, 7, 8, 9, 10, "J", "Q", "K", "A", "2"];
 export const SUIT_ORDER: readonly Suit[] = ["C", "S", "D", "H"];
 
@@ -249,11 +252,69 @@ function nextSeat(seat: Seat): Seat {
   return ((seat + 1) % 4) as Seat;
 }
 
-export type PlayAction = { kind: "play"; hand: Hand };
+function activeCount(state: GameState): number {
+  return 4 - state.finishingOrder.length;
+}
 
-export function applyPlay(state: GameState, seat: Seat, action: PlayAction): GameState {
+function nextActiveSeat(state: GameState, from: Seat): Seat {
+  let s = from;
+  for (let i = 0; i < 4; i++) {
+    s = nextSeat(s);
+    if (state.players[s].finishedAt === null) return s;
+  }
+  return from;
+}
+
+export function gameIsOver(state: GameState): boolean {
+  return state.finishingOrder.length >= 3;
+}
+
+export function finalTitles(state: GameState): Record<Seat, Title> | null {
+  if (!gameIsOver(state)) return null;
+  const titles = {} as Record<Seat, Title>;
+  titles[state.finishingOrder[0]!] = "king";
+  titles[state.finishingOrder[1]!] = "queen";
+  titles[state.finishingOrder[2]!] = "third";
+  for (const seat of ALL_SEATS) {
+    if (titles[seat] === undefined) titles[seat] = "joker";
+  }
+  return titles;
+}
+
+export type PlayAction = { kind: "play"; hand: Hand };
+export type PassAction = { kind: "pass" };
+export type Action = PlayAction | PassAction;
+
+export function applyPlay(state: GameState, seat: Seat, action: Action): GameState {
+  if (gameIsOver(state)) return state;
   if (seat !== state.turn) return state;
-  if (action.kind !== "play") return state;
+  if (state.players[seat].finishedAt !== null) return state;
+
+  if (action.kind === "pass") {
+    if (state.trick.top === null) return state;
+
+    const nextConsec = state.trick.consecutivePasses + 1;
+    const threshold = activeCount(state) - 1;
+
+    if (nextConsec >= threshold) {
+      const lastPlayer = state.trick.lastPlayer;
+      const lead =
+        lastPlayer !== null && state.players[lastPlayer].finishedAt === null
+          ? lastPlayer
+          : nextActiveSeat(state, lastPlayer ?? seat);
+      return {
+        ...state,
+        turn: lead,
+        trick: { top: null, lastPlayer: null, consecutivePasses: 0 },
+      };
+    }
+
+    return {
+      ...state,
+      turn: nextActiveSeat(state, seat),
+      trick: { ...state.trick, consecutivePasses: nextConsec },
+    };
+  }
 
   const player = state.players[seat];
   const playedCards = action.hand.cards;
@@ -267,18 +328,29 @@ export function applyPlay(state: GameState, seat: Seat, action: PlayAction): Gam
   }
 
   const remaining = player.hand.filter((c) => !playedCards.some((p) => sameCard(p, c)));
+  const wentOut = remaining.length === 0;
 
   const players = state.players.slice() as [PlayerState, PlayerState, PlayerState, PlayerState];
-  players[seat] = { ...player, hand: remaining };
+  players[seat] = {
+    hand: remaining,
+    finishedAt: wentOut ? state.finishingOrder.length : player.finishedAt,
+  };
 
-  return {
+  const finishingOrder = wentOut ? [...state.finishingOrder, seat] : state.finishingOrder;
+
+  const afterPlay: GameState = {
     players,
-    turn: nextSeat(seat),
+    turn: seat,
     trick: {
       top: action.hand,
       lastPlayer: seat,
       consecutivePasses: 0,
     },
-    finishingOrder: state.finishingOrder,
+    finishingOrder,
+  };
+
+  return {
+    ...afterPlay,
+    turn: nextActiveSeat(afterPlay, seat),
   };
 }
