@@ -83,6 +83,7 @@
         "@bun-mono/auth": "workspace:*",
         "@bun-mono/core-ui": "workspace:*",
         "@bun-mono/env": "workspace:*",
+        "@bun-mono/royalty": "workspace:*",
         "@bun-mono/tic-tac-toe": "workspace:*",
         "@bun-mono/workout-timer": "workspace:*",
         "@effect/platform": "catalog:",
@@ -252,6 +253,28 @@
         "@types/bun": "catalog:",
         "@typescript/native-preview": "catalog:",
         "tsdown": "catalog:",
+      },
+    },
+    "packages/royalty": {
+      "name": "@bun-mono/royalty",
+      "version": "0.0.0",
+      "dependencies": {
+        "@bun-mono/core-ui": "workspace:*",
+      },
+      "devDependencies": {
+        "@bun-mono/config": "workspace:*",
+        "@testing-library/react": "^16.3.2",
+        "@types/react": "catalog:",
+        "@types/react-dom": "19.2.3",
+        "@typescript/native-preview": "catalog:",
+        "jsdom": "catalog:",
+        "tsdown": "catalog:",
+        "vitest": "catalog:",
+      },
+      "peerDependencies": {
+        "react": "catalog:",
+        "react-dom": "^19.2.6",
+        "tailwindcss": "^4.2.4",
       },
     },
     "packages/tic-tac-toe": {
@@ -442,6 +465,8 @@
     "@bun-mono/db": ["@bun-mono/db@workspace:packages/db"],
 
     "@bun-mono/env": ["@bun-mono/env@workspace:packages/env"],
+
+    "@bun-mono/royalty": ["@bun-mono/royalty@workspace:packages/royalty"],
 
     "@bun-mono/tic-tac-toe": ["@bun-mono/tic-tac-toe@workspace:packages/tic-tac-toe"],
 
