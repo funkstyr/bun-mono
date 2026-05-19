@@ -24,6 +24,10 @@
       "types": "./dist/royalty-app.d.ts",
       "import": "./dist/royalty-app.js"
     },
+    "./royalty-watch": {
+      "types": "./dist/royalty-watch.d.ts",
+      "import": "./dist/royalty-watch.js"
+    },
     "./styles.css": "./src/styles.css"
   },
   "scripts": {

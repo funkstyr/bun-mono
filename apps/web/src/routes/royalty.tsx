@@ -1,11 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-
-import { RoyaltyApp } from "@bun-mono/royalty/royalty-app";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/royalty")({
   component: RouteComponent,
 });
 
 function RouteComponent() {
-  return <RoyaltyApp />;
+  return <Outlet />;
 }

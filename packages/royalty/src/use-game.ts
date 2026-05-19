@@ -70,7 +70,7 @@ export type TributeBundle = {
 };
 
 export type UseRoyaltyGameOptions = {
-  mode: "play";
+  mode: "play" | "watch";
 };
 
 export type TributeView = {
@@ -83,7 +83,7 @@ export type TributeView = {
 };
 
 export type ActiveSession = {
-  humanSeat: Seat;
+  humanSeat: Seat | null;
   gameCount: number;
   sessionRoleCounts: RoleCounts;
 };
@@ -112,10 +112,23 @@ type RoyaltyState = {
   lifetime: LifetimeBlob;
 };
 
-function newSession(): SessionBlob {
+function newPlaySession(): SessionBlob {
   const seed = makeSeed();
   return {
     humanSeat: pickHumanSeat(),
+    seed,
+    game: dealGame(seed, "three-of-clubs-holder"),
+    tribute: null,
+    titlesFromLastGame: null,
+    gameCount: 1,
+    sessionRoleCounts: emptyRoleCounts(),
+  };
+}
+
+function newWatchSession(): SessionBlob {
+  const seed = makeSeed();
+  return {
+    humanSeat: null,
     seed,
     game: dealGame(seed, "three-of-clubs-holder"),
     tribute: null,
@@ -141,25 +154,30 @@ function withTributeUpdated(
   return role === "king" ? { ...bundle, king: next } : { ...bundle, queen: next };
 }
 
-function loadInitial(): RoyaltyState {
+function loadInitial(mode: "play" | "watch"): RoyaltyState {
+  if (mode === "watch") {
+    return { session: newWatchSession(), lifetime: emptyLifetime() };
+  }
   const stored = load();
   return {
-    session: stored.currentSession ?? newSession(),
+    session: stored.currentSession ?? newPlaySession(),
     lifetime: stored.lifetime,
   };
 }
 
 export function useRoyaltyGame(
-  _options: UseRoyaltyGameOptions = { mode: "play" },
+  options: UseRoyaltyGameOptions = { mode: "play" },
 ): UseRoyaltyGameResult {
-  const [state, setState] = useState<RoyaltyState>(loadInitial);
+  const { mode } = options;
+  const [state, setState] = useState<RoyaltyState>(() => loadInitial(mode));
   const [sessionSummary, setSessionSummary] = useState<SessionSummary | null>(null);
   const [lastPassEvent, setLastPassEvent] = useState<PassEvent | null>(null);
   const passKeyRef = useRef(0);
 
   useEffect(() => {
+    if (mode === "watch") return;
     save({ schemaVersion: 1, currentSession: state.session, lifetime: state.lifetime });
-  }, [state]);
+  }, [mode, state]);
 
   const recordPass = useCallback((seat: Seat) => {
     passKeyRef.current += 1;
@@ -398,9 +416,12 @@ export function useRoyaltyGame(
     passKeyRef.current = 0;
     setSessionSummary(null);
     setState((s) => {
+      if (mode === "watch") {
+        return { ...s, session: newWatchSession() };
+      }
       const seed = makeSeed();
       if (s.session === null) {
-        return { ...s, session: newSession() };
+        return { ...s, session: newPlaySession() };
       }
       return {
         ...s,
@@ -413,14 +434,17 @@ export function useRoyaltyGame(
         },
       };
     });
-  }, []);
+  }, [mode]);
 
   const startSession = useCallback(() => {
     setLastPassEvent(null);
     passKeyRef.current = 0;
     setSessionSummary(null);
-    setState((s) => ({ ...s, session: newSession() }));
-  }, []);
+    setState((s) => ({
+      ...s,
+      session: mode === "watch" ? newWatchSession() : newPlaySession(),
+    }));
+  }, [mode]);
 
   const onEndSession = useCallback(() => {
     setLastPassEvent(null);
@@ -477,7 +501,6 @@ export function useRoyaltyGame(
 
   const activeSession = useMemo<ActiveSession | null>(() => {
     if (session === null) return null;
-    if (session.humanSeat === null) return null;
     return {
       humanSeat: session.humanSeat,
       gameCount: session.gameCount,

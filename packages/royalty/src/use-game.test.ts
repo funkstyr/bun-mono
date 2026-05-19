@@ -5,6 +5,8 @@ import { BOT_PLAY_MS } from "./engine";
 import { emptyLifetime, save, STORAGE_KEY } from "./storage";
 import { useRoyaltyGame } from "./use-game";
 
+const MAX_WATCH_TICK_MS = 60_000;
+
 describe("useRoyaltyGame", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -165,5 +167,96 @@ describe("useRoyaltyGame", () => {
     expect(result.current.lifetime.gamesPlayed).toBe(7);
     expect(result.current.lifetime.kings).toBe(3);
     expect(result.current.lifetime.longestKingStreak).toBe(2);
+  });
+
+  describe("watch mode", () => {
+    it("starts with no human seat and a dealt game", () => {
+      const { result } = renderHook(() => useRoyaltyGame({ mode: "watch" }));
+      expect(result.current.humanSeat).toBeNull();
+      expect(result.current.session).not.toBeNull();
+      expect(result.current.game).not.toBeNull();
+      expect(result.current.session!.gameCount).toBe(1);
+    });
+
+    it("does not write to localStorage while watching", () => {
+      window.localStorage.clear();
+      vi.spyOn(Math, "random").mockReturnValue(0);
+      const { result } = renderHook(() => useRoyaltyGame({ mode: "watch" }));
+      expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
+
+      act(() => {
+        vi.advanceTimersByTime(BOT_PLAY_MS * 4);
+      });
+      expect(result.current.game!.trick.top).not.toBeNull();
+      expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
+    });
+
+    it("does not load an existing play-mode session blob", () => {
+      vi.spyOn(Math, "random").mockReturnValue(0);
+      const play = renderHook(() => useRoyaltyGame({ mode: "play" }));
+      expect(window.localStorage.getItem(STORAGE_KEY)).not.toBeNull();
+      const playHumanSeat = play.result.current.humanSeat;
+      play.unmount();
+
+      const watch = renderHook(() => useRoyaltyGame({ mode: "watch" }));
+      expect(watch.result.current.humanSeat).toBeNull();
+      expect(watch.result.current.humanSeat).not.toBe(playHumanSeat);
+    });
+
+    it("loops through end-of-game into tribute and the next game", () => {
+      vi.spyOn(Math, "random").mockReturnValue(0);
+      const { result } = renderHook(() => useRoyaltyGame({ mode: "watch" }));
+
+      const startGameCount = result.current.session!.gameCount;
+      let sawTribute = false;
+      let sawGameOver = false;
+      // Each act() advances one bot-action's worth of fake time, then lets
+      // React flush state + re-arm the next setTimeout via useEffect.
+      for (let step = 0; step < 2000; step++) {
+        if (result.current.tribute !== null) sawTribute = true;
+        if (result.current.finishedTitles !== null) sawGameOver = true;
+        if (result.current.session!.gameCount > startGameCount) break;
+        act(() => {
+          vi.advanceTimersByTime(MAX_WATCH_TICK_MS);
+        });
+      }
+
+      expect(sawGameOver).toBe(true);
+      expect(sawTribute).toBe(true);
+      expect(result.current.session!.gameCount).toBeGreaterThan(startGameCount);
+      expect(result.current.tribute).toBeNull();
+      expect(result.current.humanSeat).toBeNull();
+      expect(result.current.lifetime.gamesPlayed).toBe(0);
+    });
+
+    it("onPlay/onPass are inert in watch mode", () => {
+      vi.spyOn(Math, "random").mockReturnValue(0);
+      const { result } = renderHook(() => useRoyaltyGame({ mode: "watch" }));
+      const before = result.current.game!;
+      const card = before.players[before.turn].hand[0]!;
+      act(() => {
+        result.current.onPlay([card]);
+        result.current.onPass();
+      });
+      expect(result.current.game).toBe(before);
+    });
+
+    it("restart reshuffles into a fresh watch session", () => {
+      vi.spyOn(Math, "random").mockReturnValue(0);
+      const { result } = renderHook(() => useRoyaltyGame({ mode: "watch" }));
+      act(() => {
+        vi.advanceTimersByTime(BOT_PLAY_MS * 3);
+      });
+      const midGame = result.current.game!;
+      expect(midGame.log.length).toBeGreaterThan(0);
+
+      act(() => {
+        result.current.restart();
+      });
+      expect(result.current.humanSeat).toBeNull();
+      expect(result.current.session!.gameCount).toBe(1);
+      expect(result.current.game!.log.length).toBe(0);
+      expect(result.current.game!.trick.top).toBeNull();
+    });
   });
 });
