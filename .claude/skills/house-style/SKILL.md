@@ -67,9 +67,87 @@ export function compareCards(a: Card, b: Card): number {
 }
 ```
 
-Inside functions, group statements with blank lines when the next line begins a new "phase" (build → validate → return; setup → loop → output). Don't blank-line every other line — that's noise.
-
 Import grouping is handled by oxfmt (`.oxfmtrc.json`): side-effects → react → external → workspace → internal → relative. Don't hand-edit import order.
+
+### Inside function bodies
+
+Each blank-separated chunk is one "phase" — a small group of statements that together extract / compute / guard one concept. Phase boundaries get a blank line; statements that together resolve one concept stay packed.
+
+Rules:
+
+- **A `const` and the guard that immediately validates it stay together** (no blank between them).
+- **Consecutive guard returns of the same flavor stay packed** (multiple precondition checks on the same scope read as one group).
+- **A new `const`/`let` that begins a different computation gets a blank line above it.**
+- **Blank line before the function's final `return`** when meaningful setup precedes it; trivial one- or two-line bodies don't need it.
+- **`try { } catch { }` blocks get a blank line above and below** when surrounding code exists.
+- **Inside React components: state declarations, then memoised derivations, then each `useCallback` action** — group similar-role hooks, blank line between role groups; a single complex `useCallback` gets its own group.
+
+Example (`onPlay` reducer body) — phases: initial guard → seat extract + preconditions → hand classification → state transition → emit:
+
+```ts
+setState((s) => {
+  if (s.session === null) return s;
+
+  const seat = s.session.humanSeat;
+  if (seat === null) return s;
+  if (s.session.tribute !== null) return s;
+  if (gameIsOver(s.session.game)) return s;
+  if (s.session.game.turn !== seat) return s;
+
+  const hand = classifyHand(cards);
+  if (hand === null) return s;
+
+  const next = applyPlay(s.session.game, seat, { kind: "play", hand });
+  if (next === s.session.game) return s;
+
+  return { ...s, session: { ...s.session, game: next } };
+});
+```
+
+Example (`recordGameOver`) — phases: extract title → compute session counts → compute streaks → return:
+
+```ts
+const title = titles[humanSeat];
+
+const nextSessionCounts: RoleCounts = {
+  /* ... */
+};
+
+const nextKingStreak = title === "king" ? lifetime.currentKingStreak + 1 : 0;
+const nextJokerStreak = title === "joker" ? lifetime.currentJokerStreak + 1 : 0;
+
+return {
+  /* ... */
+};
+```
+
+`nextKingStreak` and `nextJokerStreak` are parallel facts about the same thing — no blank between them. But `nextSessionCounts` is a different concern, so it gets its own group.
+
+### Inside JSX
+
+A blank line goes between **sibling elements that represent semantically distinct sections of UI** (a header vs the body it precedes; two list items that each carry their own concept; an action button separated from the label it follows). Tightly-related children — label + value pairs, icon + text, repeated identical siblings inside a `.map()` — stay together.
+
+```tsx
+<header className="flex items-center justify-between">
+  <span className="text-sm font-medium">
+    Pick {returnsRemaining} card{returnsRemaining === 1 ? "" : "s"} to return
+  </span>
+
+  <Button type="button" size="sm" disabled={!canSubmit} onClick={submit}>
+    Return ({selected.length}/{returnsRemaining})
+  </Button>
+</header>
+
+<div className="flex flex-wrap gap-1">
+  {hand.map((c) => (
+    <CardButton key={cardKey(c)} card={c} selected={...} onClick={toggleCard} />
+  ))}
+</div>
+```
+
+The two `<header>` children are a label and an action — distinct concerns, blank between them. `<CardButton>` siblings produced by `.map()` are repeated identical elements — packed.
+
+When a `.map()` callback computes locals before returning JSX, put a blank line before the `return`, and a blank line between major JSX sub-sections inside the returned element (same rule as function bodies; JSX siblings are statements with markup).
 
 ## TypeScript
 

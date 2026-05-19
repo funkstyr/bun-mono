@@ -9,65 +9,42 @@ import {
   BOT_PASS_MS,
   BOT_PLAY_MS,
   BOT_RETURN_MS,
+  type Card,
   classifyHand,
   dealGame,
-  finalTitles,
   finalizeTribute,
+  finalTitles,
   freshDealFor,
+  type GameState,
   gameIsOver,
   returnCards,
+  type Seat,
   startKingTribute,
   startQueenTribute,
-  tributeComplete,
-  type Card,
-  type GameState,
-  type Seat,
   type Title,
   type TributeState,
 } from "./engine";
+import { recordGameOver, summarizeSession } from "./scoring";
 import {
   emptyLifetime,
-  emptyRoleCounts,
-  load,
-  recordGameOver,
-  save,
-  summarizeSession,
   type LifetimeBlob,
   type RoleCounts,
-  type SessionBlob,
   type SessionSummary,
+  save,
 } from "./storage";
-
-function makeSeed(): number {
-  return Math.floor(Math.random() * 0x7fffffff);
-}
-
-function pickHumanSeat(): Seat {
-  return Math.floor(Math.random() * 4) as Seat;
-}
-
-function cardKey(c: Card): string {
-  return `${c.rank}${c.suit}`;
-}
-
-function effectiveTargetHand(fresh: GameState, t: TributeState): readonly Card[] {
-  const receivedKeys = new Set(t.received.map(cardKey));
-  return fresh.players[t.target].hand.filter((c) => !receivedKeys.has(cardKey(c)));
-}
-
-function effectiveAskerHand(fresh: GameState, t: TributeState): readonly Card[] {
-  const returnedKeys = new Set(t.returned.map(cardKey));
-  return fresh.players[t.asker].hand.filter((c) => !returnedKeys.has(cardKey(c)));
-}
+import {
+  currentRoleAndTribute,
+  effectiveAskerHand,
+  effectiveTargetHand,
+  loadInitial,
+  makeSeed,
+  newPlaySession,
+  newWatchSession,
+  type RoyaltyState,
+  withTributeUpdated,
+} from "./use-game-helpers";
 
 export type PassEvent = { seat: Seat; key: number };
-
-export type TributeBundle = {
-  king: TributeState;
-  queen: TributeState;
-  fresh: GameState;
-  freshSeed: number;
-};
 
 export type UseRoyaltyGameOptions = {
   mode: "play" | "watch";
@@ -107,64 +84,6 @@ export type UseRoyaltyGameResult = {
   restart: () => void;
 };
 
-type RoyaltyState = {
-  session: SessionBlob | null;
-  lifetime: LifetimeBlob;
-};
-
-function newPlaySession(): SessionBlob {
-  const seed = makeSeed();
-  return {
-    humanSeat: pickHumanSeat(),
-    seed,
-    game: dealGame(seed, "three-of-clubs-holder"),
-    tribute: null,
-    titlesFromLastGame: null,
-    gameCount: 1,
-    sessionRoleCounts: emptyRoleCounts(),
-  };
-}
-
-function newWatchSession(): SessionBlob {
-  const seed = makeSeed();
-  return {
-    humanSeat: null,
-    seed,
-    game: dealGame(seed, "three-of-clubs-holder"),
-    tribute: null,
-    titlesFromLastGame: null,
-    gameCount: 1,
-    sessionRoleCounts: emptyRoleCounts(),
-  };
-}
-
-function currentRoleAndTribute(
-  bundle: TributeBundle,
-): { role: "king" | "queen"; tribute: TributeState } | null {
-  if (!tributeComplete(bundle.king)) return { role: "king", tribute: bundle.king };
-  if (!tributeComplete(bundle.queen)) return { role: "queen", tribute: bundle.queen };
-  return null;
-}
-
-function withTributeUpdated(
-  bundle: TributeBundle,
-  role: "king" | "queen",
-  next: TributeState,
-): TributeBundle {
-  return role === "king" ? { ...bundle, king: next } : { ...bundle, queen: next };
-}
-
-function loadInitial(mode: "play" | "watch"): RoyaltyState {
-  if (mode === "watch") {
-    return { session: newWatchSession(), lifetime: emptyLifetime() };
-  }
-  const stored = load();
-  return {
-    session: stored.currentSession ?? newPlaySession(),
-    lifetime: stored.lifetime,
-  };
-}
-
 export function useRoyaltyGame(
   options: UseRoyaltyGameOptions = { mode: "play" },
 ): UseRoyaltyGameResult {
@@ -192,15 +111,19 @@ export function useRoyaltyGame(
   const onPlay = useCallback((cards: readonly Card[]) => {
     setState((s) => {
       if (s.session === null) return s;
+
       const seat = s.session.humanSeat;
       if (seat === null) return s;
       if (s.session.tribute !== null) return s;
       if (gameIsOver(s.session.game)) return s;
       if (s.session.game.turn !== seat) return s;
+
       const hand = classifyHand(cards);
       if (hand === null) return s;
+
       const next = applyPlay(s.session.game, seat, { kind: "play", hand });
       if (next === s.session.game) return s;
+
       return { ...s, session: { ...s.session, game: next } };
     });
   }, []);
@@ -208,14 +131,18 @@ export function useRoyaltyGame(
   const onPass = useCallback(() => {
     setState((s) => {
       if (s.session === null) return s;
+
       const seat = s.session.humanSeat;
       if (seat === null) return s;
       if (s.session.tribute !== null) return s;
       if (gameIsOver(s.session.game)) return s;
       if (s.session.game.turn !== seat) return s;
+
       const next = applyPlay(s.session.game, seat, { kind: "pass" });
       if (next === s.session.game) return s;
+
       recordPass(seat);
+
       return { ...s, session: { ...s.session, game: next } };
     });
   }, [recordPass]);
@@ -223,17 +150,22 @@ export function useRoyaltyGame(
   const onAsk = useCallback((card: Card) => {
     setState((s) => {
       if (s.session === null) return s;
+
       const t = s.session.tribute;
       if (t === null) return s;
+
       const seat = s.session.humanSeat;
       if (seat === null) return s;
+
       const active = currentRoleAndTribute(t);
       if (active === null) return s;
       if (active.tribute.phase !== "ask") return s;
       if (active.tribute.asker !== seat) return s;
+
       const targetHand = effectiveTargetHand(t.fresh, active.tribute);
       const { state: next } = askCard(active.tribute, card, targetHand);
       if (next === active.tribute) return s;
+
       return {
         ...s,
         session: {
@@ -247,16 +179,21 @@ export function useRoyaltyGame(
   const onReturn = useCallback((cards: readonly Card[]) => {
     setState((s) => {
       if (s.session === null) return s;
+
       const t = s.session.tribute;
       if (t === null) return s;
+
       const seat = s.session.humanSeat;
       if (seat === null) return s;
+
       const active = currentRoleAndTribute(t);
       if (active === null) return s;
       if (active.tribute.phase !== "return") return s;
       if (active.tribute.asker !== seat) return s;
+
       const next = returnCards(active.tribute, cards);
       if (next === active.tribute) return s;
+
       return {
         ...s,
         session: {
@@ -276,9 +213,12 @@ export function useRoyaltyGame(
     if (currentTribute === null && !gameIsOver(currentGame) && currentGame.turn !== seat) {
       const botSeat = currentGame.turn;
       const action = decide({ phase: "play", state: currentGame, seat: botSeat });
+
       if (action.kind !== "play" && action.kind !== "pass") return undefined;
+
       const playAction = action;
       const delay = playAction.kind === "pass" ? BOT_PASS_MS : BOT_PLAY_MS;
+
       const id = setTimeout(() => {
         setState((s) => {
           if (s.session === null) return s;
@@ -291,19 +231,24 @@ export function useRoyaltyGame(
           return { ...s, session: { ...s.session, game: next } };
         });
       }, delay);
+
       return () => clearTimeout(id);
     }
 
     if (currentTribute === null && gameIsOver(currentGame)) {
       const freshSeed = makeSeed();
+
       const id = setTimeout(() => {
         setState((s) => {
           if (s.session === null) return s;
           if (s.session.tribute !== null) return s;
           if (!gameIsOver(s.session.game)) return s;
+
           const titles = finalTitles(s.session.game);
           if (titles === null) return s;
+
           const humanSeatForScoring = s.session.humanSeat;
+
           const { lifetime: nextLifetime, sessionRoleCounts: nextCounts } =
             humanSeatForScoring === null
               ? { lifetime: s.lifetime, sessionRoleCounts: s.session.sessionRoleCounts }
@@ -313,6 +258,7 @@ export function useRoyaltyGame(
                   humanSeatForScoring,
                   titles,
                 );
+
           return {
             lifetime: nextLifetime,
             session: {
@@ -339,10 +285,13 @@ export function useRoyaltyGame(
         const id = setTimeout(() => {
           setState((s) => {
             if (s.session === null) return s;
+
             const t = s.session.tribute;
             if (t === null) return s;
             if (currentRoleAndTribute(t) !== null) return s;
+
             const next = finalizeTribute(s.session.game, t.king, t.queen, t.freshSeed);
+
             return {
               ...s,
               session: {
@@ -364,17 +313,21 @@ export function useRoyaltyGame(
       if (current.phase === "ask") {
         const askerHand = effectiveAskerHand(currentTribute.fresh, current);
         const action = decide({ phase: "tribute-ask", state: current, askerHand });
+
         if (action.kind !== "ask") return undefined;
         const id = setTimeout(() => {
           setState((s) => {
             if (s.session === null) return s;
             const t = s.session.tribute;
             if (t === null) return s;
+
             const a = currentRoleAndTribute(t);
             if (a === null || a.role !== role) return s;
+
             const targetHand = effectiveTargetHand(t.fresh, a.tribute);
             const { state: next } = askCard(a.tribute, action.card, targetHand);
             if (next === a.tribute) return s;
+
             return {
               ...s,
               session: { ...s.session, tribute: withTributeUpdated(t, role, next) },
@@ -393,12 +346,16 @@ export function useRoyaltyGame(
       const id = setTimeout(() => {
         setState((s) => {
           if (s.session === null) return s;
+
           const t = s.session.tribute;
           if (t === null) return s;
+
           const a = currentRoleAndTribute(t);
           if (a === null || a.role !== role) return s;
+
           const next = returnCards(a.tribute, action.cards);
           if (next === a.tribute) return s;
+
           return {
             ...s,
             session: { ...s.session, tribute: withTributeUpdated(t, role, next) },
@@ -440,6 +397,7 @@ export function useRoyaltyGame(
     setLastPassEvent(null);
     passKeyRef.current = 0;
     setSessionSummary(null);
+
     setState((s) => ({
       ...s,
       session: mode === "watch" ? newWatchSession() : newPlaySession(),
@@ -449,6 +407,7 @@ export function useRoyaltyGame(
   const onEndSession = useCallback(() => {
     setLastPassEvent(null);
     passKeyRef.current = 0;
+
     setState((s) => {
       if (s.session === null) return s;
       let finalLifetime = s.lifetime;
@@ -459,6 +418,7 @@ export function useRoyaltyGame(
         gameIsOver(finalSession.game)
       ) {
         const titles = finalTitles(finalSession.game);
+
         if (titles !== null && finalSession.humanSeat !== null) {
           const result = recordGameOver(
             finalLifetime,
@@ -466,6 +426,7 @@ export function useRoyaltyGame(
             finalSession.humanSeat,
             titles,
           );
+
           finalLifetime = result.lifetime;
           finalSession = {
             ...finalSession,
@@ -474,6 +435,7 @@ export function useRoyaltyGame(
           };
         }
       }
+
       setSessionSummary(summarizeSession(finalSession));
       return { lifetime: finalLifetime, session: null };
     });
@@ -487,8 +449,10 @@ export function useRoyaltyGame(
 
   const tributeView = useMemo<TributeView | null>(() => {
     if (tribute === null) return null;
+
     const active = currentRoleAndTribute(tribute);
     if (active === null) return null;
+
     return {
       king: tribute.king,
       queen: tribute.queen,

@@ -1,11 +1,4 @@
-import {
-  type Card,
-  type GameState,
-  type Seat,
-  type Title,
-  type TrickState,
-  type TributeState,
-} from "./engine";
+import type { GameState, Seat, Title, TrickState, TributeState } from "./engine";
 
 export const STORAGE_KEY = "royalty:v1";
 export const SCHEMA_VERSION = 1;
@@ -142,14 +135,17 @@ function deserializeSession(session: SerializedSession): SessionBlob {
 export function load(): RoyaltyStorage {
   if (typeof window === "undefined") return emptyStorage();
   let raw: string | null;
+
   try {
     raw = window.localStorage.getItem(STORAGE_KEY);
   } catch {
     return emptyStorage();
   }
+
   if (raw === null) return emptyStorage();
 
   let parsed: unknown;
+
   try {
     parsed = JSON.parse(raw);
   } catch {
@@ -161,6 +157,7 @@ export function load(): RoyaltyStorage {
   if (version !== SCHEMA_VERSION) return emptyStorage();
 
   const stored = parsed as SerializedStorage;
+
   return {
     schemaVersion: SCHEMA_VERSION,
     currentSession:
@@ -173,11 +170,13 @@ export function load(): RoyaltyStorage {
 
 export function save(state: RoyaltyStorage): void {
   if (typeof window === "undefined") return;
+
   const serialized: SerializedStorage = {
     schemaVersion: SCHEMA_VERSION,
     currentSession: state.currentSession === null ? null : serializeSession(state.currentSession),
     lifetime: state.lifetime,
   };
+
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(serialized));
   } catch {
@@ -188,43 +187,3 @@ export function save(state: RoyaltyStorage): void {
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
-
-export function recordGameOver(
-  lifetime: LifetimeBlob,
-  sessionRoleCounts: RoleCounts,
-  humanSeat: Seat,
-  titles: Record<Seat, Title>,
-): { lifetime: LifetimeBlob; sessionRoleCounts: RoleCounts } {
-  const title = titles[humanSeat];
-  const nextSessionCounts: RoleCounts = {
-    king: sessionRoleCounts.king + (title === "king" ? 1 : 0),
-    queen: sessionRoleCounts.queen + (title === "queen" ? 1 : 0),
-    third: sessionRoleCounts.third + (title === "third" ? 1 : 0),
-    joker: sessionRoleCounts.joker + (title === "joker" ? 1 : 0),
-  };
-  const nextKingStreak = title === "king" ? lifetime.currentKingStreak + 1 : 0;
-  const nextJokerStreak = title === "joker" ? lifetime.currentJokerStreak + 1 : 0;
-  return {
-    sessionRoleCounts: nextSessionCounts,
-    lifetime: {
-      gamesPlayed: lifetime.gamesPlayed + 1,
-      kings: lifetime.kings + (title === "king" ? 1 : 0),
-      queens: lifetime.queens + (title === "queen" ? 1 : 0),
-      thirds: lifetime.thirds + (title === "third" ? 1 : 0),
-      jokers: lifetime.jokers + (title === "joker" ? 1 : 0),
-      currentKingStreak: nextKingStreak,
-      currentJokerStreak: nextJokerStreak,
-      longestKingStreak: Math.max(lifetime.longestKingStreak, nextKingStreak),
-      longestJokerStreak: Math.max(lifetime.longestJokerStreak, nextJokerStreak),
-    },
-  };
-}
-
-export function summarizeSession(session: SessionBlob): SessionSummary {
-  return {
-    gamesPlayed: session.gameCount,
-    roleCounts: session.sessionRoleCounts,
-  };
-}
-
-export type { Card };
