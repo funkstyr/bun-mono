@@ -14,7 +14,14 @@
       "Bash(bun run *)",
       "Skill(house-style)",
       "Bash(bunx vitest *)",
-      "Bash(bun pm *)"
+      "Bash(bun pm *)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "mcp__cclsp__find_definition",
+      "mcp__cclsp__find_references",
+      "mcp__cclsp__get_diagnostics",
+      "Bash(gh auth *)",
+      "Bash(gh repo *)"
     ],
     "deny": [
       "Read(**/node_modules/**)",
