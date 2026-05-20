@@ -31,6 +31,7 @@ function TextField({
     (e: React.ChangeEvent<HTMLInputElement>) => field.handleChange(e.target.value),
     [field],
   );
+
   return (
     <div className="space-y-2">
       <Label htmlFor={field.name}>{label}</Label>
@@ -42,6 +43,7 @@ function TextField({
         onBlur={field.handleBlur}
         onChange={onChange}
       />
+
       {field.state.meta.errors.map((error) => (
         <p key={error?.message} className="text-red-500">
           {error?.message}
@@ -55,6 +57,7 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
   const navigate = useNavigate({
     from: "/",
   });
+
   const { isPending } = authClient.useSession();
 
   const form = useForm({

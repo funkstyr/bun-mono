@@ -18,6 +18,7 @@ const triggerButton = <Button variant="outline" />;
 
 export default function UserMenu() {
   const navigate = useNavigate();
+
   const { data: session, isPending } = authClient.useSession();
 
   const goAccount = useCallback(() => {
@@ -51,6 +52,7 @@ export default function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger render={trigger}>{session.user.name}</DropdownMenuTrigger>
+
       <DropdownMenuContent className="bg-card">
         <DropdownMenuGroup>
           <DropdownMenuLabel>My Account</DropdownMenuLabel>

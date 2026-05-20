@@ -23,12 +23,15 @@ function ProfileTextField({ field, label }: { field: StringField; label: string 
     (e: React.ChangeEvent<HTMLInputElement>) => field.handleChange(e.target.value),
     [field],
   );
+
   return (
     <FormField field={field}>
       <FormLabel>{label}</FormLabel>
+
       <FormControl>
         <Input value={field.state.value} onBlur={field.handleBlur} onChange={onChange} />
       </FormControl>
+
       <FormMessage />
     </FormField>
   );
@@ -114,8 +117,10 @@ export function ProfileSection({ user }: { user: ProfileUser }) {
     <Card>
       <CardHeader>
         <CardTitle>Profile</CardTitle>
+
         <CardDescription>Update your display name and username.</CardDescription>
       </CardHeader>
+
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <form.Field name="name" validators={nameValidators}>

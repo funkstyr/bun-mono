@@ -83,9 +83,11 @@ export function DeleteAccountDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger render={triggerRender} />
+
       <DialogContent showClose={!isPending}>
         <DialogHeader>
           <DialogTitle>Delete your account?</DialogTitle>
+
           <DialogDescription>
             This is permanent. Your account, sessions, and data will be removed and cannot be
             recovered.
@@ -107,6 +109,7 @@ export function DeleteAccountDialog({
 
         <DialogFooter>
           <DialogClose render={cancelRender} />
+
           <Button
             variant="destructive"
             size="sm"

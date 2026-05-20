@@ -15,5 +15,6 @@ export const appRouter = {
   }),
   account: accountRouter,
 };
+
 export type AppRouter = typeof appRouter;
 export type AppRouterClient = RouterClient<typeof appRouter>;

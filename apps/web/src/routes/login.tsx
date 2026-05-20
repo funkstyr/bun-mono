@@ -12,6 +12,7 @@ function RouteComponent() {
   const [showSignIn, setShowSignIn] = useState(true);
 
   const switchToSignUp = useCallback(() => setShowSignIn(false), []);
+
   const switchToSignIn = useCallback(() => setShowSignIn(true), []);
 
   return showSignIn ? (

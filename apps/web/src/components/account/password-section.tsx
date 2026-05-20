@@ -30,9 +30,11 @@ function PasswordField({
     (e: React.ChangeEvent<HTMLInputElement>) => field.handleChange(e.target.value),
     [field],
   );
+
   return (
     <FormField field={field}>
       <FormLabel>{label}</FormLabel>
+
       <FormControl>
         <Input
           type="password"
@@ -42,6 +44,7 @@ function PasswordField({
           onChange={onChange}
         />
       </FormControl>
+
       <FormMessage />
     </FormField>
   );
@@ -128,10 +131,12 @@ export function PasswordSection() {
     <Card>
       <CardHeader>
         <CardTitle>Password</CardTitle>
+
         <CardDescription>
           Change your password. All other devices will be signed out.
         </CardDescription>
       </CardHeader>
+
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <form.Field name="currentPassword" validators={currentPasswordValidators}>

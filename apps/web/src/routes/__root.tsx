@@ -9,10 +9,11 @@ import type { orpc } from "@/utils/orpc";
 
 import appCss from "../index.css?url";
 import Header from "../components/header";
-export interface RouterAppContext {
+
+export type RouterAppContext = {
   orpc: typeof orpc;
   queryClient: QueryClient;
-}
+};
 
 export const Route = createRootRouteWithContext<RouterAppContext>()({
   head: () => ({

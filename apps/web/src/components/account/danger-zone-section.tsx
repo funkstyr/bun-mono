@@ -15,8 +15,10 @@ export function DangerZoneSection({ user }: { user: DangerZoneUser }) {
     <Card className="ring-destructive/40">
       <CardHeader>
         <CardTitle className="text-destructive">Danger zone</CardTitle>
+
         <CardDescription>Permanently delete your account.</CardDescription>
       </CardHeader>
+
       <CardContent>
         {username ? (
           <DeleteAccountDialog username={username} displayUsername={displayUsername} />

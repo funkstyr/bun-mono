@@ -42,7 +42,9 @@ function pickDefaultKind(workoutsLen: number, setsLen: number): TimerKind {
 function RouteComponent() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/timer" });
+
   const [mounted, setMounted] = useState(false);
+
   const sets = useTimers();
   const workouts = useWorkouts();
 

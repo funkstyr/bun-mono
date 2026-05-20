@@ -23,17 +23,23 @@ export function WelcomeEmail({
   return (
     <Html>
       <Head />
+
       <Preview>Welcome to bun-mono!</Preview>
+
       <Body style={main}>
         <Container style={container}>
           <Heading style={h1}>Welcome to bun-mono!</Heading>
+
           <Text style={text}>Hi {username},</Text>
+
           <Text style={text}>Thanks for signing up! We're excited to have you on board.</Text>
+
           <Section style={buttonContainer}>
             <Button style={button} href={loginUrl}>
               Get Started
             </Button>
           </Section>
+
           <Text style={footer}>
             If you didn't create an account, you can safely ignore this email.
           </Text>

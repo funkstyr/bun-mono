@@ -15,6 +15,7 @@ export const Route = createFileRoute("/ai")({
 
 function RouteComponent() {
   const [input, setInput] = useState("");
+
   const { messages, sendMessage, status } = useChat({
     transport: new DefaultChatTransport({
       api: `${env.VITE_SERVER_URL}/ai`,
@@ -61,6 +62,7 @@ function RouteComponent() {
               <p className="mb-1 text-sm font-semibold">
                 {message.role === "user" ? "You" : "AI Assistant"}
               </p>
+
               {message.parts?.map((part) => {
                 if (part.type === "text") {
                   return (
@@ -77,6 +79,7 @@ function RouteComponent() {
             </div>
           ))
         )}
+
         <div ref={messagesEndRef} />
       </div>
 
@@ -89,6 +92,7 @@ function RouteComponent() {
           className="flex-1"
           autoComplete="off"
         />
+
         <Button type="submit" size="icon">
           <Send size={18} />
         </Button>

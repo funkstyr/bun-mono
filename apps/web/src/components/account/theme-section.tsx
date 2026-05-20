@@ -13,7 +13,9 @@ const OPTIONS = [
 
 export function ThemeSection() {
   const { theme, setTheme } = useTheme();
+
   const [mounted, setMounted] = useState(false);
+
   const groupId = useId();
 
   useEffect(() => {
@@ -26,8 +28,10 @@ export function ThemeSection() {
     <Card>
       <CardHeader>
         <CardTitle>Theme</CardTitle>
+
         <CardDescription>Choose how the app looks on this device.</CardDescription>
       </CardHeader>
+
       <CardContent>
         <RadioGroup
           value={mounted ? (theme ?? "system") : "system"}
