@@ -1,4 +1,4 @@
-@source "./*.tsx";
+@source "./**/*.tsx";
 
 :root {
   --timer-prep: oklch(0.65 0.18 145);

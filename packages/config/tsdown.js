@@ -1,5 +1,8 @@
-import { defineConfig, mergeConfig, type UserConfig } from "tsdown";
+import { defineConfig, mergeConfig } from "tsdown";
 
+/** @typedef {import("tsdown").UserConfig} UserConfig */
+
+/** @type {UserConfig} */
 const base = {
   format: "esm",
   target: "es2022",
@@ -8,9 +11,13 @@ const base = {
   splitting: false,
   minify: false,
   clean: false,
-} satisfies UserConfig;
+};
 
-export function nodePreset(overrides: UserConfig = {}): UserConfig {
+/**
+ * @param {UserConfig} [overrides]
+ * @returns {UserConfig}
+ */
+export function nodePreset(overrides = {}) {
   return defineConfig(
     mergeConfig(
       {
@@ -23,7 +30,11 @@ export function nodePreset(overrides: UserConfig = {}): UserConfig {
   );
 }
 
-export function browserPreset(overrides: UserConfig = {}): UserConfig {
+/**
+ * @param {UserConfig} [overrides]
+ * @returns {UserConfig}
+ */
+export function browserPreset(overrides = {}) {
   return defineConfig(
     mergeConfig(
       {

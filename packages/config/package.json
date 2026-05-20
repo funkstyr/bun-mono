@@ -5,7 +5,7 @@
   "type": "module",
   "exports": {
     "./tsconfig.base.json": "./tsconfig.base.json",
-    "./tsdown": "./tsdown.ts",
+    "./tsdown": "./tsdown.js",
     "./vitest": "./vitest.ts",
     "./vitest-setup-browser": "./vitest-setup-browser.ts"
   },
