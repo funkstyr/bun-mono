@@ -72,18 +72,11 @@ export default function generator(plop: PlopTypes.NodePlopAPI): void {
         },
       ];
       if (flavor === "ui") {
-        actions.push(
-          {
-            type: "add",
-            path: `${base}/vitest.setup.ts`,
-            templateFile: "templates/ui/vitest.setup.ts.hbs",
-          },
-          {
-            type: "add",
-            path: `${base}/src/styles.css`,
-            templateFile: "templates/ui/styles.css.hbs",
-          },
-        );
+        actions.push({
+          type: "add",
+          path: `${base}/src/styles.css`,
+          templateFile: "templates/ui/styles.css.hbs",
+        });
       }
       actions.push({
         type: "add",

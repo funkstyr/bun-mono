@@ -1,8 +1,3 @@
-import { defineConfig } from "vitest/config";
+import { browserPreset } from "@bun-mono/config/vitest";
 
-export default defineConfig({
-  test: {
-    environment: "jsdom",
-    setupFiles: ["./vitest.setup.ts"],
-  },
-});
+export default browserPreset();

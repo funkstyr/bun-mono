@@ -288,7 +288,7 @@ bun turbo gen package
 
 Prompts: kebab-case name, flavor (`lib` or `ui`), and (for `ui`) whether to depend on `@bun-mono/core-ui`. Non-interactive: `bun turbo gen package --args my-pkg ui true`.
 
-The generator scaffolds `packages/<name>/` with `package.json`, `tsconfig.json` (already `isolatedDeclarations: true`), `tsdown.config.ts`, `vitest.config.ts`, a starter duck source + test file, and (for `ui`) `vitest.setup.ts` + `styles.css`. Run `bun install` after.
+The generator scaffolds `packages/<name>/` with `package.json`, `tsconfig.json` (already `isolatedDeclarations: true`), `tsdown.config.ts` and `vitest.config.ts` (both two-line files that delegate to a preset from `@bun-mono/config`), a starter duck source + test file, and (for `ui`) `styles.css`. The `ui` flavor's jsdom + localStorage shim is wired in by the shared vitest preset, not a per-package `vitest.setup.ts`. Run `bun install` after.
 
 **Flavors:**
 

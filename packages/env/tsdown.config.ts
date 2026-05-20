@@ -1,13 +1,5 @@
-import { defineConfig } from "tsdown";
+import { nodePreset } from "@bun-mono/config/tsdown";
 
-export default defineConfig({
+export default nodePreset({
   entry: ["src/server.ts", "src/web.ts", "src/native.ts"],
-  format: "esm",
-  target: "es2022",
-  platform: "neutral",
-  dts: false,
-  sourcemap: true,
-  splitting: false,
-  minify: false,
-  clean: false,
 });

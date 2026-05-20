@@ -1,13 +1,3 @@
-import { defineConfig } from "tsdown";
+import { browserPreset } from "@bun-mono/config/tsdown";
 
-export default defineConfig({
-  entry: ["src/*.ts", "src/*.tsx", "!src/*.test.ts"],
-  format: "esm",
-  target: "es2022",
-  platform: "browser",
-  dts: false,
-  sourcemap: true,
-  splitting: false,
-  minify: false,
-  clean: false,
-});
+export default browserPreset();

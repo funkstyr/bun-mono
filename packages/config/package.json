@@ -1,5 +1,16 @@
 {
   "name": "@bun-mono/config",
   "version": "0.0.0",
-  "private": true
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./tsconfig.base.json": "./tsconfig.base.json",
+    "./tsdown": "./tsdown.ts",
+    "./vitest": "./vitest.ts",
+    "./vitest-setup-browser": "./vitest-setup-browser.ts"
+  },
+  "devDependencies": {
+    "tsdown": "catalog:",
+    "vitest": "catalog:"
+  }
 }

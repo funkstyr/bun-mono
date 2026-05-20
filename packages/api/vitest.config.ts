@@ -1,7 +1,3 @@
-import { defineConfig } from "vitest/config";
+import { nodePreset } from "@bun-mono/config/vitest";
 
-export default defineConfig({
-  test: {
-    environment: "node",
-  },
-});
+export default nodePreset();
