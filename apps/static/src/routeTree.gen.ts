@@ -11,7 +11,10 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TimerRouteImport } from './routes/timer'
 import { Route as TicTacToeRouteImport } from './routes/tic-tac-toe'
+import { Route as RoyaltyRouteImport } from './routes/royalty'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as RoyaltyIndexRouteImport } from './routes/royalty.index'
+import { Route as RoyaltyWatchRouteImport } from './routes/royalty.watch'
 
 const TimerRoute = TimerRouteImport.update({
   id: '/timer',
@@ -23,38 +26,75 @@ const TicTacToeRoute = TicTacToeRouteImport.update({
   path: '/tic-tac-toe',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RoyaltyRoute = RoyaltyRouteImport.update({
+  id: '/royalty',
+  path: '/royalty',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RoyaltyIndexRoute = RoyaltyIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => RoyaltyRoute,
+} as any)
+const RoyaltyWatchRoute = RoyaltyWatchRouteImport.update({
+  id: '/watch',
+  path: '/watch',
+  getParentRoute: () => RoyaltyRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/royalty': typeof RoyaltyRouteWithChildren
   '/tic-tac-toe': typeof TicTacToeRoute
   '/timer': typeof TimerRoute
+  '/royalty/watch': typeof RoyaltyWatchRoute
+  '/royalty/': typeof RoyaltyIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/tic-tac-toe': typeof TicTacToeRoute
   '/timer': typeof TimerRoute
+  '/royalty/watch': typeof RoyaltyWatchRoute
+  '/royalty': typeof RoyaltyIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/royalty': typeof RoyaltyRouteWithChildren
   '/tic-tac-toe': typeof TicTacToeRoute
   '/timer': typeof TimerRoute
+  '/royalty/watch': typeof RoyaltyWatchRoute
+  '/royalty/': typeof RoyaltyIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/tic-tac-toe' | '/timer'
+  fullPaths:
+    | '/'
+    | '/royalty'
+    | '/tic-tac-toe'
+    | '/timer'
+    | '/royalty/watch'
+    | '/royalty/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/tic-tac-toe' | '/timer'
-  id: '__root__' | '/' | '/tic-tac-toe' | '/timer'
+  to: '/' | '/tic-tac-toe' | '/timer' | '/royalty/watch' | '/royalty'
+  id:
+    | '__root__'
+    | '/'
+    | '/royalty'
+    | '/tic-tac-toe'
+    | '/timer'
+    | '/royalty/watch'
+    | '/royalty/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  RoyaltyRoute: typeof RoyaltyRouteWithChildren
   TicTacToeRoute: typeof TicTacToeRoute
   TimerRoute: typeof TimerRoute
 }
@@ -75,6 +115,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TicTacToeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/royalty': {
+      id: '/royalty'
+      path: '/royalty'
+      fullPath: '/royalty'
+      preLoaderRoute: typeof RoyaltyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -82,11 +129,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/royalty/': {
+      id: '/royalty/'
+      path: '/'
+      fullPath: '/royalty/'
+      preLoaderRoute: typeof RoyaltyIndexRouteImport
+      parentRoute: typeof RoyaltyRoute
+    }
+    '/royalty/watch': {
+      id: '/royalty/watch'
+      path: '/watch'
+      fullPath: '/royalty/watch'
+      preLoaderRoute: typeof RoyaltyWatchRouteImport
+      parentRoute: typeof RoyaltyRoute
+    }
   }
 }
 
+interface RoyaltyRouteChildren {
+  RoyaltyWatchRoute: typeof RoyaltyWatchRoute
+  RoyaltyIndexRoute: typeof RoyaltyIndexRoute
+}
+
+const RoyaltyRouteChildren: RoyaltyRouteChildren = {
+  RoyaltyWatchRoute: RoyaltyWatchRoute,
+  RoyaltyIndexRoute: RoyaltyIndexRoute,
+}
+
+const RoyaltyRouteWithChildren =
+  RoyaltyRoute._addFileChildren(RoyaltyRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  RoyaltyRoute: RoyaltyRouteWithChildren,
   TicTacToeRoute: TicTacToeRoute,
   TimerRoute: TimerRoute,
 }

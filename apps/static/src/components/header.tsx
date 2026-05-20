@@ -5,6 +5,7 @@ export default function Header() {
     { to: "/", label: "Home" },
     { to: "/tic-tac-toe", label: "Tic-tac-toe" },
     { to: "/timer", label: "Workouts" },
+    { to: "/royalty", label: "Royalty" },
   ] as const;
 
   return (
