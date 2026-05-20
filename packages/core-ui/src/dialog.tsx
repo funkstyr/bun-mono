@@ -42,6 +42,7 @@ function DialogContent({
   return (
     <DialogPortal>
       <DialogBackdrop />
+
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
@@ -51,6 +52,7 @@ function DialogContent({
         {...props}
       >
         {children}
+
         {showClose ? (
           <DialogPrimitive.Close
             data-slot="dialog-close-button"

@@ -86,6 +86,7 @@ export function Confetti() {
       canvas.height = Math.floor(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
+
     resize();
     window.addEventListener("resize", resize);
 
@@ -112,6 +113,7 @@ export function Confetti() {
       let alive = 0;
       for (const p of particles) {
         if (p.age >= p.lifetime) continue;
+
         p.age += dt;
         p.vy += GRAVITY_PX_PER_SEC2 * dt;
         p.vx *= Math.pow(1 - HORIZONTAL_DRAG_PER_SEC, dt);
