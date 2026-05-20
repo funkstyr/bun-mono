@@ -19,6 +19,11 @@
       "dependsOn": ["^build"],
       "outputs": ["coverage/**"]
     },
+    "test:e2e": {
+      "dependsOn": ["static#build"],
+      "cache": false,
+      "outputs": ["playwright-report/**", "test-results/**"]
+    },
     "dev": {
       "cache": false,
       "persistent": true

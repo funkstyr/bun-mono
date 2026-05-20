@@ -46,6 +46,7 @@
     "build:packages": "turbo build --filter=\"./packages/*\"",
     "check-types": "turbo check-types",
     "test": "turbo test",
+    "e2e": "turbo test:e2e --filter=e2e",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "format": "oxfmt --check",

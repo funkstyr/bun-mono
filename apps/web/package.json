@@ -54,7 +54,6 @@
   "devDependencies": {
     "@bun-mono/config": "workspace:*",
     "@effect/vitest": "catalog:",
-    "@playwright/test": "catalog:",
     "@tanstack/react-query-devtools": "^5.100.11",
     "@tanstack/react-router-devtools": "^1.167.0",
     "@testing-library/dom": "^10.4.1",
@@ -68,7 +67,6 @@
     "@vitest/coverage-v8": "catalog:",
     "@vitest/ui": "catalog:",
     "jsdom": "catalog:",
-    "playwright": "catalog:",
     "vite": "^8.0.13",
     "vitest": "catalog:",
     "web-vitals": "^5.2.0"

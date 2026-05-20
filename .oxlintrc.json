@@ -26,6 +26,12 @@
       "rules": {
         "no-console": "off"
       }
+    },
+    {
+      "files": ["apps/e2e/**"],
+      "rules": {
+        "no-await-in-loop": "off"
+      }
     }
   ],
   "ignorePatterns": [
