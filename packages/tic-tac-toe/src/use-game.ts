@@ -10,77 +10,9 @@ import {
   type GameStatus,
   type Side,
 } from "./engine";
+import { persistSide, readStats, writeStats, type Score, type StatsBlob } from "./storage";
 
 const AI_DELAY_MS = 350;
-
-export const SIDE_STORAGE_KEY = "tic-tac-toe:side";
-export const STATS_STORAGE_KEY = "tic-tac-toe:stats";
-
-export type Score = { wins: number; losses: number; draws: number };
-export type StatsBlob = Record<Difficulty, Score>;
-
-const DIFFICULTIES: readonly Difficulty[] = ["easy", "medium", "hard"];
-
-function emptyScore(): Score {
-  return { wins: 0, losses: 0, draws: 0 };
-}
-
-function emptyStats(): StatsBlob {
-  return { easy: emptyScore(), medium: emptyScore(), hard: emptyScore() };
-}
-
-function isFiniteNonNegativeInt(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0;
-}
-
-function isScore(value: unknown): value is Score {
-  if (!value || typeof value !== "object") return false;
-  const s = value as Partial<Score>;
-  return (
-    isFiniteNonNegativeInt(s.wins) &&
-    isFiniteNonNegativeInt(s.losses) &&
-    isFiniteNonNegativeInt(s.draws)
-  );
-}
-
-function parseStats(raw: string | null): StatsBlob {
-  if (raw === null) return emptyStats();
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return emptyStats();
-  }
-  if (!parsed || typeof parsed !== "object") return emptyStats();
-  const blob = parsed as Partial<Record<Difficulty, unknown>>;
-  const result = emptyStats();
-  for (const d of DIFFICULTIES) {
-    const candidate = blob[d];
-    if (isScore(candidate)) result[d] = { ...candidate };
-  }
-  return result;
-}
-
-export function readStats(): StatsBlob {
-  if (typeof window === "undefined") return emptyStats();
-  return parseStats(window.localStorage.getItem(STATS_STORAGE_KEY));
-}
-
-function writeStats(stats: StatsBlob): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(stats));
-}
-
-export function readLastUsedSide(): Side {
-  if (typeof window === "undefined") return "X";
-  const stored = window.localStorage.getItem(SIDE_STORAGE_KEY);
-  return stored === "O" ? "O" : "X";
-}
-
-function persistSide(side: Side): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(SIDE_STORAGE_KEY, side);
-}
 
 export type UseTicTacToeGameOptions = {
   difficulty: Difficulty;
@@ -117,6 +49,7 @@ export function useTicTacToeGame({
 
   useEffect(() => {
     if (!isAiTurn) return;
+
     cancelTimer();
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
@@ -129,6 +62,7 @@ export function useTicTacToeGame({
         return applyMove(current, move, aiSide);
       });
     }, AI_DELAY_MS);
+
     return cancelTimer;
   }, [board, isAiTurn, aiSide, difficulty, cancelTimer]);
 
@@ -140,6 +74,7 @@ export function useTicTacToeGame({
       return;
     }
     if (recordedRef.current) return;
+
     recordedRef.current = true;
     setStats((prev) => {
       const current = prev[difficulty];
@@ -149,6 +84,7 @@ export function useTicTacToeGame({
           : gameStatus.winner === playerSide
             ? { ...current, wins: current.wins + 1 }
             : { ...current, losses: current.losses + 1 };
+
       const next: StatsBlob = { ...prev, [difficulty]: nextForDifficulty };
       writeStats(next);
       return next;
@@ -160,6 +96,7 @@ export function useTicTacToeGame({
       if (isAiTurn) return;
       if (gameStatus.kind !== "playing" || gameStatus.turn !== playerSide) return;
       if (board[index] !== null) return;
+
       setBoard((current) => applyMove(current, index, playerSide));
       persistSide(playerSide);
     },

@@ -6,9 +6,9 @@ import {
   readStats,
   SIDE_STORAGE_KEY,
   STATS_STORAGE_KEY,
-  useTicTacToeGame,
   type StatsBlob,
-} from "./use-game";
+} from "./storage";
+import { useTicTacToeGame } from "./use-game";
 
 describe("useTicTacToeGame", () => {
   beforeEach(() => {
