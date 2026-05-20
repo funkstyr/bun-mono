@@ -1,5 +1,7 @@
 import { Link } from "@tanstack/react-router";
 
+import { ThemeToggle } from "@bun-mono/core-ui/theme-toggle";
+
 export default function Header() {
   const links = [
     { to: "/", label: "Home" },
@@ -18,6 +20,8 @@ export default function Header() {
             </Link>
           ))}
         </nav>
+
+        <ThemeToggle />
       </div>
       <hr />
     </div>

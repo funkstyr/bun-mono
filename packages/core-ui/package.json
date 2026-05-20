@@ -64,6 +64,10 @@
       "types": "./dist/theme-provider.d.ts",
       "import": "./dist/theme-provider.js"
     },
+    "./theme-toggle": {
+      "types": "./dist/theme-toggle.d.ts",
+      "import": "./dist/theme-toggle.js"
+    },
     "./utils": {
       "types": "./dist/utils.d.ts",
       "import": "./dist/utils.js"
