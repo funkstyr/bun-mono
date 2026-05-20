@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { decide } from "./bot";
 import {
   applyPlay,
   dealGame,
@@ -13,7 +12,8 @@ import {
   type PlayerState,
   type Seat,
   type TributeState,
-} from "./engine";
+} from "../engine";
+import { decidePlay, decideTributeAsk, decideTributeReturn } from "./easy";
 
 function handsEqual(a: Hand, b: Hand): boolean {
   if (a.type !== b.type) return false;
@@ -29,11 +29,11 @@ function withTop(state: GameState, top: Hand): GameState {
   return { ...state, trick: { ...state.trick, top, lastPlayer: 1 } };
 }
 
-describe("decide (play phase)", () => {
+describe("easy.decidePlay", () => {
   it("returns a play with a single low card when leading", () => {
     const state = dealGame(42, "three-of-clubs-holder");
     const seat = state.turn;
-    const action = decide({ phase: "play", state, seat });
+    const action = decidePlay(state, seat);
     expect(action.kind).toBe("play");
     if (action.kind !== "play") return;
     expect(action.hand.type).toBe("single");
@@ -42,7 +42,7 @@ describe("decide (play phase)", () => {
   it("returned play is always in enumerateLegalPlays for the seat", () => {
     const state = dealGame(101, "three-of-clubs-holder");
     const seat = state.turn;
-    const action = decide({ phase: "play", state, seat });
+    const action = decidePlay(state, seat);
     if (action.kind !== "play") return;
     const legal = enumerateLegalPlays(state.players[seat].hand, state.trick.top);
     expect(legal.some((h) => handsEqual(h, action.hand))).toBe(true);
@@ -66,7 +66,7 @@ describe("decide (play phase)", () => {
       turn: seat,
       trick: { top, lastPlayer: 1, passedThisTrick: new Set() },
     };
-    const action = decide({ phase: "play", state, seat });
+    const action = decidePlay(state, seat);
     expect(action.kind).toBe("pass");
   });
 
@@ -89,7 +89,7 @@ describe("decide (play phase)", () => {
       turn: seat,
       trick: { top, lastPlayer: 1, passedThisTrick: new Set() },
     };
-    const action = decide({ phase: "play", state, seat });
+    const action = decidePlay(state, seat);
     expect(action.kind).toBe("play");
     if (action.kind !== "play") return;
     expect(action.hand.cards[0]!.rank).toBe(7);
@@ -102,12 +102,22 @@ describe("decide (play phase)", () => {
         const seat = state.turn;
         if (state.players[seat].finishedAt !== null) break;
         if (state.finishingOrder.length >= 3) break;
-        const action = decide({ phase: "play", state, seat });
+        const action = decidePlay(state, seat);
         expect(action.kind === "play" || action.kind === "pass").toBe(true);
         if (action.kind !== "play" && action.kind !== "pass") break;
         state = applyPlay(state, seat, action);
       }
     }
+  });
+
+  it("returns pass when top exists and hand is empty (defensive)", () => {
+    const base = dealGame(7, "three-of-clubs-holder");
+    const players = base.players.slice() as [PlayerState, PlayerState, PlayerState, PlayerState];
+    players[0] = { hand: [], finishedAt: 0 };
+    const top: Hand = { type: "single", cards: [{ rank: 3, suit: "C" }] };
+    const state: GameState = { ...base, players, turn: 0, trick: withTop(base, top).trick };
+    const action = decidePlay(state, 0);
+    expect(action.kind).toBe("pass");
   });
 });
 
@@ -139,14 +149,14 @@ function freshQueenTribute(): TributeState {
   };
 }
 
-describe("decide (tribute-ask phase)", () => {
+describe("easy.decideTributeAsk", () => {
   it("returns an ask for a card the asker does not already hold or know is missed", () => {
     const state = freshKingTribute();
     const askerHand: Card[] = [
       { rank: "2", suit: "H" },
       { rank: "2", suit: "D" },
     ];
-    const action = decide({ phase: "tribute-ask", state, askerHand });
+    const action = decideTributeAsk(state, askerHand);
     expect(action.kind).toBe("ask");
     if (action.kind !== "ask") return;
     const inHand = askerHand.some(
@@ -162,7 +172,7 @@ describe("decide (tribute-ask phase)", () => {
       missed: [{ rank: "2", suit: "H" }],
       capRemaining: KING_ASK_CAP - 1,
     };
-    const action = decide({ phase: "tribute-ask", state, askerHand });
+    const action = decideTributeAsk(state, askerHand);
     if (action.kind !== "ask") {
       throw new Error("expected ask");
     }
@@ -172,13 +182,13 @@ describe("decide (tribute-ask phase)", () => {
   it("targets the highest unseen rank first", () => {
     const askerHand: Card[] = [];
     const state = freshKingTribute();
-    const action = decide({ phase: "tribute-ask", state, askerHand });
+    const action = decideTributeAsk(state, askerHand);
     if (action.kind !== "ask") throw new Error("expected ask");
     expect(action.card.rank).toBe("2");
   });
 });
 
-describe("decide (tribute-return phase)", () => {
+describe("easy.decideTributeReturn", () => {
   it("returns 2 lowest cards for a King tribute", () => {
     const state = { ...freshKingTribute(), phase: "return" as const };
     const giverHand: Card[] = [
@@ -187,7 +197,7 @@ describe("decide (tribute-return phase)", () => {
       { rank: 5, suit: "D" },
       { rank: "A", suit: "H" },
     ];
-    const action = decide({ phase: "tribute-return", state, giverHand });
+    const action = decideTributeReturn(state, giverHand);
     expect(action.kind).toBe("return");
     if (action.kind !== "return") return;
     expect(action.cards).toHaveLength(2);
@@ -207,21 +217,9 @@ describe("decide (tribute-return phase)", () => {
       { rank: 7, suit: "C" },
       { rank: 5, suit: "D" },
     ];
-    const action = decide({ phase: "tribute-return", state, giverHand });
+    const action = decideTributeReturn(state, giverHand);
     if (action.kind !== "return") throw new Error("expected return");
     expect(action.cards).toHaveLength(1);
     expect(action.cards[0]!.rank).toBe(5);
-  });
-});
-
-describe("decide (play phase additional smoke)", () => {
-  it("returns pass when top exists and hand is empty (defensive)", () => {
-    const base = dealGame(7, "three-of-clubs-holder");
-    const players = base.players.slice() as [PlayerState, PlayerState, PlayerState, PlayerState];
-    players[0] = { hand: [], finishedAt: 0 };
-    const top: Hand = { type: "single", cards: [{ rank: 3, suit: "C" }] };
-    const state: GameState = { ...base, players, turn: 0, trick: withTop(base, top).trick };
-    const action = decide({ phase: "play", state, seat: 0 });
-    expect(action.kind).toBe("pass");
   });
 });

@@ -26,6 +26,7 @@ function freshSession(): RoyaltyStorage["currentSession"] {
     titlesFromLastGame: null,
     gameCount: 3,
     sessionRoleCounts: { king: 1, queen: 0, third: 1, joker: 1 },
+    strategies: { 0: "easy", 1: "easy", 2: null, 3: "easy" },
   };
 }
 
@@ -75,11 +76,59 @@ describe("storage load/save", () => {
       titlesFromLastGame: null,
       gameCount: 1,
       sessionRoleCounts: { king: 0, queen: 0, third: 0, joker: 0 },
+      strategies: {
+        0: "easy" as const,
+        1: "easy" as const,
+        2: "easy" as const,
+        3: "easy" as const,
+      },
     };
     save({ schemaVersion: 1, currentSession: session, lifetime: emptyLifetime() });
 
     const loaded = load();
     expect(loaded.currentSession?.game.log).toEqual(afterPlay.log);
+  });
+
+  it("drops a pre-feature session (no strategies field) and preserves lifetime", () => {
+    const seed = 12345;
+    const game = dealGame(seed, "three-of-clubs-holder");
+    const preFeatureSession = {
+      humanSeat: 2,
+      seed,
+      game: {
+        ...game,
+        trick: {
+          top: game.trick.top,
+          lastPlayer: game.trick.lastPlayer,
+          passedThisTrick: Array.from(game.trick.passedThisTrick),
+        },
+      },
+      tribute: null,
+      titlesFromLastGame: null,
+      gameCount: 3,
+      sessionRoleCounts: { king: 1, queen: 0, third: 1, joker: 1 },
+    };
+    const lifetime = {
+      ...emptyLifetime(),
+      gamesPlayed: 9,
+      kings: 4,
+      longestKingStreak: 3,
+    };
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        schemaVersion: 1,
+        currentSession: preFeatureSession,
+        lifetime,
+      }),
+    );
+
+    const loaded = load();
+
+    expect(loaded.currentSession).toBeNull();
+    expect(loaded.lifetime.gamesPlayed).toBe(9);
+    expect(loaded.lifetime.kings).toBe(4);
+    expect(loaded.lifetime.longestKingStreak).toBe(3);
   });
 
   it("round-trips a session with non-empty passedThisTrick set", () => {

@@ -32,6 +32,7 @@ import {
   type SessionSummary,
   save,
 } from "./storage";
+import type { StrategyName } from "./strategy";
 import {
   currentRoleAndTribute,
   effectiveAskerHand,
@@ -80,7 +81,7 @@ export type UseRoyaltyGameResult = {
   onReturn: (cards: readonly Card[]) => void;
   onEndSession: () => void;
   dismissSessionSummary: () => void;
-  startSession: () => void;
+  startSession: (tier?: StrategyName) => void;
   restart: () => void;
 };
 
@@ -212,7 +213,9 @@ export function useRoyaltyGame(
 
     if (currentTribute === null && !gameIsOver(currentGame) && currentGame.turn !== seat) {
       const botSeat = currentGame.turn;
-      const action = decide({ phase: "play", state: currentGame, seat: botSeat });
+      const strategy = session.strategies[botSeat];
+      if (strategy === null) return undefined;
+      const action = decide({ phase: "play", strategy, state: currentGame, seat: botSeat });
 
       if (action.kind !== "play" && action.kind !== "pass") return undefined;
 
@@ -312,7 +315,9 @@ export function useRoyaltyGame(
 
       if (current.phase === "ask") {
         const askerHand = effectiveAskerHand(currentTribute.fresh, current);
-        const action = decide({ phase: "tribute-ask", state: current, askerHand });
+        const strategy = session.strategies[current.asker];
+        if (strategy === null) return undefined;
+        const action = decide({ phase: "tribute-ask", strategy, state: current, askerHand });
 
         if (action.kind !== "ask") return undefined;
         const id = setTimeout(() => {
@@ -340,7 +345,9 @@ export function useRoyaltyGame(
       if (current.returnsRemaining === 0) return undefined;
 
       const giverHand = effectiveAskerHand(currentTribute.fresh, current);
-      const action = decide({ phase: "tribute-return", state: current, giverHand });
+      const strategy = session.strategies[current.asker];
+      if (strategy === null) return undefined;
+      const action = decide({ phase: "tribute-return", strategy, state: current, giverHand });
       if (action.kind !== "return") return undefined;
       const delay = BOT_RETURN_MS * Math.max(action.cards.length, 1);
       const id = setTimeout(() => {
@@ -393,16 +400,19 @@ export function useRoyaltyGame(
     });
   }, [mode]);
 
-  const startSession = useCallback(() => {
-    setLastPassEvent(null);
-    passKeyRef.current = 0;
-    setSessionSummary(null);
+  const startSession = useCallback(
+    (tier: StrategyName = "easy") => {
+      setLastPassEvent(null);
+      passKeyRef.current = 0;
+      setSessionSummary(null);
 
-    setState((s) => ({
-      ...s,
-      session: mode === "watch" ? newWatchSession() : newPlaySession(),
-    }));
-  }, [mode]);
+      setState((s) => ({
+        ...s,
+        session: mode === "watch" ? newWatchSession() : newPlaySession(tier),
+      }));
+    },
+    [mode],
+  );
 
   const onEndSession = useCallback(() => {
     setLastPassEvent(null);

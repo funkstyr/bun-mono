@@ -14,6 +14,7 @@ import {
   type LifetimeBlob,
   type SessionBlob,
 } from "./storage";
+import type { StrategyName } from "./strategy";
 
 export type TributeBundle = {
   king: TributeState;
@@ -45,16 +46,18 @@ export function effectiveAskerHand(fresh: GameState, t: TributeState): readonly 
   return fresh.players[t.asker].hand.filter((c) => !returnedKeys.has(cardKey(c)));
 }
 
-export function newPlaySession(): SessionBlob {
+export function newPlaySession(tier: StrategyName = "easy"): SessionBlob {
   const seed = makeSeed();
+  const humanSeat = pickHumanSeat();
   return {
-    humanSeat: pickHumanSeat(),
+    humanSeat,
     seed,
     game: dealGame(seed, "three-of-clubs-holder"),
     tribute: null,
     titlesFromLastGame: null,
     gameCount: 1,
     sessionRoleCounts: emptyRoleCounts(),
+    strategies: strategiesForPlay(humanSeat, tier),
   };
 }
 
@@ -68,7 +71,14 @@ export function newWatchSession(): SessionBlob {
     titlesFromLastGame: null,
     gameCount: 1,
     sessionRoleCounts: emptyRoleCounts(),
+    strategies: { 0: "hard", 1: "hard", 2: "hard", 3: "hard" },
   };
+}
+
+function strategiesForPlay(humanSeat: Seat, tier: StrategyName): Record<Seat, StrategyName | null> {
+  const result: Record<Seat, StrategyName | null> = { 0: tier, 1: tier, 2: tier, 3: tier };
+  result[humanSeat] = null;
+  return result;
 }
 
 export function currentRoleAndTribute(

@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import { useCallback, useEffect, useState, type JSX } from "react";
 
 import { Button } from "@bun-mono/core-ui/button";
 
@@ -10,6 +10,7 @@ import { OpponentSeat } from "./seat/opponent-seat";
 import { SEATS } from "./seat/seat-utils";
 import { usePassIndicator } from "./seat/use-pass-indicator";
 import { SessionSummaryModal } from "./session-summary-modal";
+import type { StrategyName } from "./strategy";
 import { TopHand } from "./top-hand";
 import { TributePanel } from "./tribute/tribute-panel";
 import { useRoyaltyGame } from "./use-game";
@@ -32,8 +33,17 @@ export function RoyaltyApp(): JSX.Element {
     startSession,
     restart,
   } = useRoyaltyGame({ mode: "play" });
+  const [tier, setTier] = useState<StrategyName>("easy");
   const isOver = finishedTitles !== null;
   const passingSeat = usePassIndicator(lastPassEvent);
+
+  useEffect(() => {
+    if (session === null) setTier("easy");
+  }, [session]);
+
+  const pickEasy = useCallback(() => setTier("easy"), []);
+  const pickHard = useCallback(() => setTier("hard"), []);
+  const onStart = useCallback(() => startSession(tier), [startSession, tier]);
 
   if (session === null || game === null || humanSeat === null) {
     return (
@@ -45,7 +55,27 @@ export function RoyaltyApp(): JSX.Element {
         </header>
         <div className="flex w-full flex-col items-center gap-4 py-12">
           <p className="text-muted-foreground text-sm">No active session.</p>
-          <Button onClick={startSession}>Start a session</Button>
+          <div className="flex items-center gap-2">
+            <fieldset className="flex items-center" aria-label="Difficulty">
+              <Button
+                aria-pressed={tier === "easy"}
+                onClick={pickEasy}
+                size="sm"
+                variant={tier === "easy" ? "default" : "outline"}
+              >
+                Easy
+              </Button>
+              <Button
+                aria-pressed={tier === "hard"}
+                onClick={pickHard}
+                size="sm"
+                variant={tier === "hard" ? "default" : "outline"}
+              >
+                Hard
+              </Button>
+            </fieldset>
+            <Button onClick={onStart}>Start a session</Button>
+          </div>
         </div>
         {sessionSummary ? (
           <SessionSummaryModal summary={sessionSummary} onClose={dismissSessionSummary} />

@@ -1,4 +1,5 @@
 import type { GameState, Seat, Title, TrickState, TributeState } from "./engine";
+import type { StrategyName } from "./strategy";
 
 export const STORAGE_KEY = "royalty:v1";
 export const SCHEMA_VERSION = 1;
@@ -37,6 +38,7 @@ export type SessionBlob = {
   titlesFromLastGame: Record<Seat, Title> | null;
   gameCount: number;
   sessionRoleCounts: RoleCounts;
+  strategies: Record<Seat, StrategyName | null>;
 };
 
 export type RoyaltyStorage = {
@@ -158,14 +160,29 @@ export function load(): RoyaltyStorage {
 
   const stored = parsed as SerializedStorage;
 
+  const session =
+    stored.currentSession === null || stored.currentSession === undefined
+      ? null
+      : isValidStoredSession(stored.currentSession)
+        ? deserializeSession(stored.currentSession)
+        : null;
+
   return {
     schemaVersion: SCHEMA_VERSION,
-    currentSession:
-      stored.currentSession === null || stored.currentSession === undefined
-        ? null
-        : deserializeSession(stored.currentSession),
+    currentSession: session,
     lifetime: { ...emptyLifetime(), ...stored.lifetime },
   };
+}
+
+function isValidStoredSession(session: SerializedSession): boolean {
+  const strategies = (session as { strategies?: unknown }).strategies;
+  if (!isPlainObject(strategies)) return false;
+  for (const seat of [0, 1, 2, 3] as const) {
+    if (!(seat in strategies)) return false;
+    const value = (strategies as Record<string, unknown>)[seat];
+    if (value !== null && value !== "easy" && value !== "hard") return false;
+  }
+  return true;
 }
 
 export function save(state: RoyaltyStorage): void {
