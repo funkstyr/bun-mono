@@ -13,7 +13,22 @@
       "Bash(bun turbo *)",
       "Bash(bun run *)",
       "Skill(house-style)",
-      "Bash(bunx vitest *)"
+      "Bash(bunx vitest *)",
+      "Bash(bun pm *)"
+    ],
+    "deny": [
+      "Read(**/node_modules/**)",
+      "Read(**/dist/**)",
+      "Read(**/.turbo/**)",
+      "Read(**/coverage/**)",
+      "Read(**/playwright-report/**)",
+      "Read(**/test-results/**)",
+      "Read(**/.next/**)",
+      "Read(**/.vite/**)",
+      "Read(**/.tanstack/**)",
+      "Read(**/.scratch/**)",
+      "Read(**/bun.lock)",
+      "Read(**/*.tsbuildinfo)"
     ]
   },
   "hooks": {
