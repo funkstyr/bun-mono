@@ -11,7 +11,9 @@
       "Bash(bun lint *)",
       "Bash(bun test *)",
       "Bash(bun turbo *)",
-      "Bash(bun run *)"
+      "Bash(bun run *)",
+      "Skill(house-style)",
+      "Bash(bunx vitest *)"
     ]
   },
   "hooks": {
