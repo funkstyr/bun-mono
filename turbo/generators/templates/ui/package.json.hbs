@@ -1,0 +1,44 @@
+{
+  "name": "@bun-mono/{{name}}",
+  "version": "0.0.0",
+  "private": true,
+  "files": [
+    "src",
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "exports": {
+    "./styles.css": "./src/styles.css",
+    "./{{name}}": {
+      "types": "./dist/{{name}}.d.ts",
+      "import": "./dist/{{name}}.js"
+    }
+  },
+  "scripts": {
+    "dev": "tsdown --watch",
+    "build": "tsdown",
+    "check-types": "tsgo --build",
+    "test": "vitest run"
+  },
+  "dependencies": {{#if useCoreUi}}{
+    "@bun-mono/core-ui": "workspace:*"
+  }{{else}}{}{{/if}},
+  "devDependencies": {
+    "@bun-mono/config": "workspace:*",
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "catalog:",
+    "@types/react-dom": "19.2.3",
+    "@typescript/native-preview": "catalog:",
+    "jsdom": "catalog:",
+    "tsdown": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "catalog:",
+    "react-dom": "^19.2.6",
+    "tailwindcss": "^4.2.4"
+  }
+}

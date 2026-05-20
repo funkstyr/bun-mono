@@ -1,0 +1,29 @@
+{
+  "name": "@bun-mono/{{name}}",
+  "version": "0.0.0",
+  "private": true,
+  "files": [
+    "src",
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    "./{{name}}": {
+      "types": "./dist/{{name}}.d.ts",
+      "import": "./dist/{{name}}.js"
+    }
+  },
+  "scripts": {
+    "dev": "tsdown --watch",
+    "build": "tsdown",
+    "check-types": "tsgo --build",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@bun-mono/config": "workspace:*",
+    "@types/bun": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "tsdown": "catalog:",
+    "vitest": "catalog:"
+  }
+}

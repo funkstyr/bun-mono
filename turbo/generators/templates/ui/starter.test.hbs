@@ -1,0 +1,8 @@
+import { render } from "@testing-library/react";
+import { expect, test } from "vitest";
+import { {{pascalCase name}} } from "./{{name}}";
+
+test("renders", () => {
+  const { container } = render(<{{pascalCase name}} />);
+  expect(container.textContent).toContain("{{name}}");
+});

@@ -213,7 +213,7 @@ Base config is `packages/config/tsconfig.base.json`. All strict flags are on:
 
 Apps (`web`, `server`) `noEmit` and can't use the flag. Don't try.
 
-Adoption recipe (see `packages/royalty/tsconfig.json` for the working example):
+New packages get the flag automatically from `turbo gen package`. The recipe below is for **retrofitting** an existing package (see `packages/royalty/tsconfig.json` for the working example):
 
 1. In the package `tsconfig.json`, add `"isolatedDeclarations": true` and extend the exclude list to skip test files:
    ```jsonc
@@ -278,6 +278,37 @@ Forcing it anyway means duplicating the schema in a type annotation — defeats 
 
 See `packages/royalty/src/engine.test.ts` for the target shape: data in, behavior out, no fixtures, no setup.
 
+## Creating a new package
+
+**Use the generator. Don't hand-write boilerplate.**
+
+```sh
+bun turbo gen package
+```
+
+Prompts: kebab-case name, flavor (`lib` or `ui`), and (for `ui`) whether to depend on `@bun-mono/core-ui`. Non-interactive: `bun turbo gen package --args my-pkg ui true`.
+
+The generator scaffolds `packages/<name>/` with `package.json`, `tsconfig.json` (already `isolatedDeclarations: true`), `tsdown.config.ts`, `vitest.config.ts`, a starter duck source + test file, and (for `ui`) `vitest.setup.ts` + `styles.css`. Run `bun install` after.
+
+**Flavors:**
+
+| Flavor | Test env | Includes                                                |
+| ------ | -------- | ------------------------------------------------------- |
+| `lib`  | node     | tsdown for node, no React                               |
+| `ui`   | jsdom    | React + Tailwind peers, `styles.css`, localStorage shim |
+
+### Adding a new duck-file export
+
+Each new file in `src/` (other than tests) needs an entry in `package.json#exports`. Use:
+
+```sh
+bun turbo gen export
+```
+
+Prompts for the package directory (e.g. `royalty`) and the duck filename without extension (e.g. `use-game`). It appends `"./<duck>": { "types": "./dist/<duck>.d.ts", "import": "./dist/<duck>.js" }` to the exports map.
+
+If a package's exports map drifts from `src/`, the build will silently skip the missing entry — there's no whole-repo check yet.
+
 ## Automation
 
 A Stop hook (`.claude/hooks/stop-fix-and-check.sh`, wired in `.claude/settings.local.json`) runs **automatically** when the assistant finishes a turn:
@@ -307,7 +338,7 @@ When refactoring a package to match this style:
 4. **Move, don't rewrite.** Cut symbols to new files in a single commit per split. Don't change behavior in the same commit.
 5. **Delete any `index.ts` you find.** Update imports to point at the concrete file.
 6. **Tighten test scope.** When splitting a file, ask: does the existing test file still match? If a test reaches into newly-private internals, it was testing implementation — rewrite to use the public surface.
-7. **Flip on `isolatedDeclarations`** _if_ the package's public surface is hand-written code (pure functions, types, simple components) — not if it wraps a schema/DSL builder (see the [caveat table](#schema-builders-and-isolateddeclarations)). Follow the [adoption recipe](#enabling-isolateddeclarations-on-a-library-package). Best done after splitting, since smaller files mean smaller diffs.
+7. **Flip on `isolatedDeclarations`** _if_ the package's public surface is hand-written code (pure functions, types, simple components) — not if it wraps a schema/DSL builder (see the [caveat table](#schema-builders-and-isolateddeclarations)). Follow the [retrofit recipe](#enabling-isolateddeclarations-on-a-library-package). Best done after splitting, since smaller files mean smaller diffs. (Packages created with `turbo gen package` already have it on.)
 8. **Run `bun check`** (full suite) before declaring the package done.
 
 For the largest current offenders see [refactor-targets.md](refactor-targets.md).
