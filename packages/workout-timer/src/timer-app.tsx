@@ -1,10 +1,10 @@
 import { useCallback, useMemo } from "react";
 
-import { EditorSheet, type EditorInitialValues } from "./editor-sheet";
-import { ListView } from "./list-view";
-import { RunnerHost, WorkoutRunnerHost } from "./runner-view";
+import { ListView } from "./list/list-view";
+import { RunnerHost, WorkoutRunnerHost } from "./runner/runner-host";
+import { EditorSheet, type EditorInitialValues } from "./set-editor/editor-sheet";
 import { useTimers } from "./use-timers";
-import { WorkoutEditor } from "./workout-editor";
+import { WorkoutEditor } from "./workout/workout-editor";
 
 export type TimerView = "list" | "edit" | "run";
 export type TimerKind = "set" | "workout";
@@ -27,8 +27,10 @@ export function TimerApp({ view, kind, id, onNavigate }: TimerAppProps) {
 
   const initialValues = useMemo<EditorInitialValues | undefined>(() => {
     if (view !== "edit" || kind !== "set" || !id) return undefined;
+
     const found = sets.find((s) => s.id === id);
     if (!found) return undefined;
+
     return { id: found.id, name: found.name, config: found.config };
   }, [view, kind, id, sets]);
 

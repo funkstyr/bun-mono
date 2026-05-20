@@ -12,169 +12,40 @@ import {
 
 import { Button } from "@bun-mono/core-ui/button";
 import { Confetti } from "@bun-mono/core-ui/confetti";
-import { toast } from "@bun-mono/core-ui/sonner";
 
-import { isMuted, playFanfare, playPhaseChange, playTick, setMuted } from "./audio";
-import { CountdownRing } from "./countdown-ring";
-import { buildPhaseSequence, type PhaseDescriptor, type PhaseKind } from "./engine";
-import { formatMmSs } from "./format";
-import type { SavedSet, SavedWorkout } from "./schemas";
-import type { TimerAppNavigate, TimerKind } from "./timer-app";
-import { useTimerEngine } from "./use-timer-engine";
-import { useTimers, useWorkouts } from "./use-timers";
-import { useWakeLock } from "./use-wake-lock";
+import { isMuted, playFanfare, playPhaseChange, playTick, setMuted } from "../audio";
+import { CountdownRing } from "../countdown-ring";
+import { buildPhaseSequence } from "../engine";
+import { formatMmSs } from "../format";
+import type { TimerKind } from "../timer-app";
+import { useTimerEngine } from "../use-timer-engine";
+import { useWakeLock } from "../use-wake-lock";
+import { CompleteView } from "./complete-view";
+import {
+  computePositional,
+  pauseButtonStyle,
+  pausedLabelStyle,
+  pauseIconStyle,
+  phaseColor,
+  phaseLabel,
+  phaseLabelStyle,
+  remainingTimeStyle,
+  rhythmGapStyle,
+  rootStyle,
+  roundIndicatorStyle,
+  type RunnerViewProps,
+  sideButtonStyle,
+  sideIconStyle,
+  subLineStyle,
+  totalLineStyle,
+} from "./phase-helpers";
 
-export type RunnerHostProps = {
-  setId: string;
-  onNavigate: TimerAppNavigate;
-};
-
-export function RunnerHost({ setId, onNavigate }: RunnerHostProps) {
-  const sets = useTimers();
-  const [snapshot] = useState<SavedSet | null>(() => sets.find((s) => s.id === setId) ?? null);
-
-  useEffect(() => {
-    if (!snapshot) onNavigate({ view: "list", kind: "set", id: null });
-  }, [snapshot, onNavigate]);
-
-  if (!snapshot) return null;
-  return <RunnerView kind="set" set={snapshot} onNavigate={onNavigate} />;
-}
-
-export type WorkoutRunnerHostProps = {
-  workoutId: string;
-  onNavigate: TimerAppNavigate;
-};
-
-type WorkoutSnapshot = { workout: SavedWorkout; resolvedSets: SavedSet[] };
-
-export function WorkoutRunnerHost({ workoutId, onNavigate }: WorkoutRunnerHostProps) {
-  const workouts = useWorkouts();
-  const sets = useTimers();
-  const [snapshot] = useState<WorkoutSnapshot | null>(() => {
-    const workout = workouts.find((w) => w.id === workoutId);
-    if (!workout) return null;
-    const resolved: SavedSet[] = [];
-    for (const slot of workout.slots) {
-      const found = sets.find((s) => s.id === slot.setId);
-      if (!found) return null;
-      resolved.push(found);
-    }
-    if (resolved.length === 0) return null;
-    return { workout, resolvedSets: resolved };
-  });
-  const failedRef = useRef(false);
-
-  useEffect(() => {
-    if (snapshot) return;
-    if (failedRef.current) return;
-    failedRef.current = true;
-    toast.error("Couldn't start workout — a referenced set is missing.");
-    onNavigate({ view: "list", kind: "workout", id: null });
-  }, [snapshot, onNavigate]);
-
-  if (!snapshot) return null;
-  return (
-    <RunnerView
-      kind="workout"
-      workout={snapshot.workout}
-      resolvedSets={snapshot.resolvedSets}
-      onNavigate={onNavigate}
-    />
-  );
-}
-
-export type RunnerViewProps =
-  | { kind: "set"; set: SavedSet; onNavigate: TimerAppNavigate }
-  | {
-      kind: "workout";
-      workout: SavedWorkout;
-      resolvedSets: SavedSet[];
-      onNavigate: TimerAppNavigate;
-    };
-
-const phaseLabel = (kind: PhaseKind): string => {
-  switch (kind) {
-    case "prep":
-      return "GET READY";
-    case "active":
-      return "ACTIVE";
-    case "rest":
-      return "REST";
-    case "complete":
-      return "DONE";
-  }
-};
-
-const phaseColor = (kind: PhaseKind): string => {
-  switch (kind) {
-    case "prep":
-      return "var(--timer-prep)";
-    case "active":
-      return "var(--timer-active)";
-    case "rest":
-      return "var(--timer-rest)";
-    default:
-      return "var(--foreground)";
-  }
-};
-
-const rootStyle = {
-  "--ring-size": "min(clamp(240px, 70dvmin, 1200px), 50dvh)",
-  "--rhythm-gap": "clamp(12px, calc(var(--ring-size) * 0.06), 80px)",
-  "--btn-size": "max(44px, calc(var(--ring-size) * 0.18))",
-  "--btn-pause-size": "max(48px, calc(var(--ring-size) * 0.22))",
-} as React.CSSProperties;
-
-const rhythmGapStyle = { gap: "var(--rhythm-gap)" } as const;
-
-const phaseLabelStyle = {
-  fontSize: "calc(var(--ring-size) * 0.13)",
-  lineHeight: 1.1,
-} as const;
-
-const remainingTimeStyle = {
-  fontSize: "calc(var(--ring-size) * 0.28)",
-  lineHeight: 1,
-} as const;
-
-const pausedLabelStyle = {
-  fontSize: "max(11px, calc(var(--ring-size) * 0.045))",
-  lineHeight: 1.2,
-} as const;
-
-const roundIndicatorStyle = {
-  fontSize: "calc(var(--ring-size) * 0.075)",
-  lineHeight: 1.2,
-  minHeight: "1.5em",
-} as const;
-
-const subLineStyle = {
-  fontSize: "calc(var(--ring-size) * 0.055)",
-  lineHeight: 1.2,
-} as const;
-
-const sideButtonStyle = { width: "var(--btn-size)", height: "var(--btn-size)" } as const;
-const sideIconStyle = {
-  width: "calc(var(--btn-size) * 0.4)",
-  height: "calc(var(--btn-size) * 0.4)",
-} as const;
-const pauseButtonStyle = {
-  width: "var(--btn-pause-size)",
-  height: "var(--btn-pause-size)",
-} as const;
-const pauseIconStyle = {
-  width: "calc(var(--btn-pause-size) * 0.4)",
-  height: "calc(var(--btn-pause-size) * 0.4)",
-} as const;
-const totalLineStyle = {
-  fontSize: "max(12px, calc(var(--ring-size) * 0.05))",
-  lineHeight: 1.4,
-} as const;
+export type { RunnerViewProps } from "./phase-helpers";
 
 export function RunnerView(props: RunnerViewProps) {
   const { kind, onNavigate } = props;
   const sourceKind: TimerKind = kind;
+
   const sequence = useMemo(
     () =>
       props.kind === "set"
@@ -283,6 +154,7 @@ export function RunnerView(props: RunnerViewProps) {
             >
               <XIcon />
             </Button>
+
             <Button
               type="button"
               variant="ghost"
@@ -362,6 +234,7 @@ export function RunnerView(props: RunnerViewProps) {
               >
                 <RotateCcwIcon style={sideIconStyle} />
               </Button>
+
               <Button
                 type="button"
                 size="lg"
@@ -376,6 +249,7 @@ export function RunnerView(props: RunnerViewProps) {
                   <PauseIcon style={pauseIconStyle} />
                 )}
               </Button>
+
               <Button
                 type="button"
                 variant="outline"
@@ -396,82 +270,4 @@ export function RunnerView(props: RunnerViewProps) {
       )}
     </div>
   );
-}
-
-type CompleteViewProps = {
-  elapsedMs: number;
-  heading: string;
-  onRepeat: () => void;
-  onDone: () => void;
-};
-
-function CompleteView({ elapsedMs, heading, onRepeat, onDone }: CompleteViewProps) {
-  const elapsedSeconds = Math.round(elapsedMs / 1000);
-  return (
-    <div className="absolute inset-0 flex flex-col">
-      <div className="flex flex-1 flex-col items-center justify-center gap-8 px-4 text-center">
-        <div className="text-5xl font-bold tracking-wide">DONE</div>
-        <div className="flex flex-col items-center gap-3">
-          <div className="text-xl font-semibold">{heading}</div>
-          <div className="flex flex-col items-center">
-            <div className="text-4xl font-semibold tabular-nums">{formatMmSs(elapsedSeconds)}</div>
-            <div className="text-muted-foreground text-xs tracking-widest uppercase">
-              Total time
-            </div>
-          </div>
-        </div>
-        <div className="flex flex-col items-stretch gap-3 self-stretch sm:flex-row sm:justify-center">
-          <Button type="button" size="lg" onClick={onRepeat} className="sm:min-w-40">
-            Repeat
-          </Button>
-          <Button
-            type="button"
-            size="lg"
-            variant="outline"
-            onClick={onDone}
-            className="sm:min-w-40"
-          >
-            Done
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function computePositional(
-  props: RunnerViewProps,
-  d: PhaseDescriptor,
-): { upper: string; lower: string } {
-  if (props.kind === "set") {
-    if (d.kind === "active" || d.kind === "rest") {
-      return { upper: `Round ${d.round} of ${props.set.config.rounds}`, lower: "" };
-    }
-    return { upper: "", lower: "" };
-  }
-  const { workout } = props;
-  const M = workout.slots.length;
-  const R = workout.repeats;
-  if (d.kind === "active" || d.kind === "rest") {
-    const setIdx = d.setIdx ?? 0;
-    const repeatIdx = d.repeatIdx ?? 0;
-    const set = props.resolvedSets[setIdx];
-    const totalRounds = set?.config.rounds ?? 0;
-    return {
-      upper: `${d.setName ?? ""} · Round ${d.round} of ${totalRounds}`,
-      lower: `Set ${setIdx + 1} of ${M} · Pass ${repeatIdx + 1} of ${R}`,
-    };
-  }
-  if (d.kind === "prep") {
-    const setIdx = d.setIdx ?? 0;
-    const repeatIdx = d.repeatIdx ?? 0;
-    const isWorkoutStart = setIdx === 0 && repeatIdx === 0;
-    return {
-      upper: `Up next: ${d.upNextSetName ?? ""}`,
-      lower: isWorkoutStart
-        ? `Pass 1 of ${R}`
-        : `Set ${setIdx + 1} of ${M} · Pass ${repeatIdx + 1} of ${R}`,
-    };
-  }
-  return { upper: "", lower: "" };
 }

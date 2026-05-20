@@ -45,7 +45,7 @@ export function TributePanel({
             {current.target === humanSeat ? " (you)" : ""}
           </span>
         </div>
-        
+
         <span className="text-xs font-medium">{phaseLabel}</span>
       </header>
 

@@ -73,14 +73,18 @@ Import grouping is handled by oxfmt (`.oxfmtrc.json`): side-effects → react �
 
 Each blank-separated chunk is one "phase" — a small group of statements that together extract / compute / guard one concept. Phase boundaries get a blank line; statements that together resolve one concept stay packed.
 
+**Default to a blank line between top-level statements; pack only the explicit exceptions below.** When in doubt, add the blank — the formatter / reviewers will push you that direction, so writing it that way first saves a round-trip.
+
 Rules:
 
 - **A `const` and the guard that immediately validates it stay together** (no blank between them).
 - **Consecutive guard returns of the same flavor stay packed** (multiple precondition checks on the same scope read as one group).
-- **A new `const`/`let` that begins a different computation gets a blank line above it.**
+- **Parallel facts of the same shape stay packed** — two `next*Streak` lines that compute the same kind of value for sibling cases, or a destructure + a one-line derivation off it. If you can't honestly call them "the same fact restated for a sibling case," put a blank above the second one.
+- **A new `const`/`let` that begins a different computation gets a blank line above it.** This applies to **every `useState` / `useMemo` / `useCallback` call too** — each hook is its own statement and starts its own phase. Don't bundle three `useCallback`s together because they're "all action handlers"; give each its own blank above.
+- **After a multi-line statement** (object/array literal `const x = { ... };`, multi-line function call, block-bodied `if`/`for`/`try`), **insert a blank line before the next statement** unless that next statement is a closing `return` of the immediate result.
 - **Blank line before the function's final `return`** when meaningful setup precedes it; trivial one- or two-line bodies don't need it.
 - **`try { } catch { }` blocks get a blank line above and below** when surrounding code exists.
-- **Inside React components: state declarations, then memoised derivations, then each `useCallback` action** — group similar-role hooks, blank line between role groups; a single complex `useCallback` gets its own group.
+- **Inside `for` / `while` bodies**: a guard + the `const` it validates stay packed; a side effect on the accumulator (`array.push`, `map.set`) on the following line gets a blank above it.
 
 Example (`onPlay` reducer body) — phases: initial guard → seat extract + preconditions → hand classification → state transition → emit:
 
@@ -125,7 +129,14 @@ return {
 
 ### Inside JSX
 
-A blank line goes between **sibling elements that represent semantically distinct sections of UI** (a header vs the body it precedes; two list items that each carry their own concept; an action button separated from the label it follows). Tightly-related children — label + value pairs, icon + text, repeated identical siblings inside a `.map()` — stay together.
+**Default: distinct JSX siblings get a blank line between them — including a pair of buttons, a pair of tabs, two compound-component slots like `<DropdownMenuTrigger>` + `<DropdownMenuContent>`, or two semantically different `<div>` sections of a layout.** Treat siblings as statements: each is its own "phase" of the UI.
+
+Pack siblings only when one of these explicit exceptions applies:
+
+- **Repeated identical siblings produced by `.map()`** — they're an algorithmic list, not hand-curated UI.
+- **List-shaped same-tag siblings** of a collection container (e.g. consecutive `<DropdownMenuItem>` rows inside `<DropdownMenuContent>`, or a small hand-written cluster of `<option>` rows). The container's role is "render N items"; they read as data, not as distinct sections.
+- **Label + value / icon + text** that visually compose one line (`<PlusIcon /> Add set`, `<Label>` immediately followed by its `<Input>`).
+- A **single trailing child** of an element — there's no sibling to separate from.
 
 ```tsx
 <header className="flex items-center justify-between">
@@ -146,6 +157,32 @@ A blank line goes between **sibling elements that represent semantically distinc
 ```
 
 The two `<header>` children are a label and an action — distinct concerns, blank between them. `<CardButton>` siblings produced by `.map()` are repeated identical elements — packed.
+
+Two tabs are still distinct siblings, even though they share a component type:
+
+```tsx
+<div role="tablist" className="flex border-b">
+  <TabButton selected={kind === "workout"} onClick={goWorkouts}>
+    Workouts
+  </TabButton>
+
+  <TabButton selected={kind === "set"} onClick={goSets}>
+    Sets
+  </TabButton>
+</div>
+```
+
+But consecutive `<DropdownMenuItem>` rows inside a menu are list-shaped same-tag siblings and stay packed:
+
+```tsx
+<DropdownMenuContent align="end">
+  <DropdownMenuItem onClick={handleEdit}>Edit</DropdownMenuItem>
+  <DropdownMenuItem onClick={handleDuplicate}>Duplicate</DropdownMenuItem>
+  <DropdownMenuItem variant="destructive" onClick={handleDelete}>
+    Delete
+  </DropdownMenuItem>
+</DropdownMenuContent>
+```
 
 When a `.map()` callback computes locals before returning JSX, put a blank line before the `return`, and a blank line between major JSX sub-sections inside the returned element (same rule as function bodies; JSX siblings are statements with markup).
 
@@ -255,6 +292,8 @@ The hook **does not** run the full `bun check` (which also runs tests and builds
 ```sh
 bun check
 ```
+
+**Fix pre-existing issues you surface, don't just dodge them.** If `bun check` (or any other check you run) turns up a format, lint, or type problem that you didn't introduce, fix it in the same branch — typically as a small `chore:` commit alongside your work. The bar is "the branch leaves the tree clean," not "no worse than I found it." Exceptions: deep refactors of unrelated code, or a real bug rather than a hygiene issue — flag those to the user instead of silently rewriting them.
 
 `lefthook` separately runs `oxlint --fix` and `oxfmt --write` on staged files at pre-commit, so commits are always formatted.
 

@@ -24,10 +24,6 @@
       "types": "./dist/countdown-ring.d.ts",
       "import": "./dist/countdown-ring.js"
     },
-    "./editor-sheet": {
-      "types": "./dist/editor-sheet.d.ts",
-      "import": "./dist/editor-sheet.js"
-    },
     "./engine": {
       "types": "./dist/engine.d.ts",
       "import": "./dist/engine.js"
@@ -35,14 +31,6 @@
     "./format": {
       "types": "./dist/format.d.ts",
       "import": "./dist/format.js"
-    },
-    "./list-view": {
-      "types": "./dist/list-view.d.ts",
-      "import": "./dist/list-view.js"
-    },
-    "./runner-view": {
-      "types": "./dist/runner-view.d.ts",
-      "import": "./dist/runner-view.js"
     },
     "./schemas": {
       "types": "./dist/schemas.d.ts",
@@ -67,10 +55,6 @@
     "./use-wake-lock": {
       "types": "./dist/use-wake-lock.d.ts",
       "import": "./dist/use-wake-lock.js"
-    },
-    "./workout-editor": {
-      "types": "./dist/workout-editor.d.ts",
-      "import": "./dist/workout-editor.js"
     }
   },
   "scripts": {
