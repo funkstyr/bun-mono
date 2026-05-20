@@ -13,15 +13,22 @@ function ThemeToggle(): JSX.Element {
     setMounted(true);
   }, []);
 
-  const isDark = mounted && resolvedTheme === "dark";
+  const isDark = resolvedTheme === "dark";
 
   const toggle = useCallback(() => {
     setTheme(isDark ? "light" : "dark");
   }, [isDark, setTheme]);
 
   return (
-    <Button variant="ghost" size="icon" aria-label="Toggle theme" onClick={toggle}>
-      {mounted ? isDark ? <SunIcon /> : <MoonIcon /> : null}
+    <Button
+      variant="ghost"
+      size="icon"
+      aria-label="Toggle dark mode"
+      aria-pressed={mounted ? isDark : undefined}
+      onClick={toggle}
+    >
+      <SunIcon aria-hidden="true" className="hidden dark:block" />
+      <MoonIcon aria-hidden="true" className="block dark:hidden" />
     </Button>
   );
 }

@@ -15,6 +15,8 @@ export type RouterAppContext = {
   queryClient: QueryClient;
 };
 
+const themeInitScript = `(function(){try{var t=localStorage.getItem('theme');if(!t||t==='system'){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.classList.add(t);document.documentElement.style.colorScheme=t;}catch(e){}})();`;
+
 export const Route = createRootRouteWithContext<RouterAppContext>()({
   head: () => ({
     meta: [
@@ -35,6 +37,11 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
         href: appCss,
       },
     ],
+    scripts: [
+      {
+        children: themeInitScript,
+      },
+    ],
   }),
 
   component: RootDocument,
@@ -42,7 +49,7 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 
 function RootDocument() {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
@@ -50,7 +57,9 @@ function RootDocument() {
         <ThemeProvider>
           <div className="grid h-svh grid-rows-[auto_1fr]">
             <Header />
-            <Outlet />
+            <main id="main-content" tabIndex={-1} className="outline-none">
+              <Outlet />
+            </main>
           </div>
           <Toaster richColors />
 

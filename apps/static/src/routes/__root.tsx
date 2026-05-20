@@ -15,7 +15,9 @@ function RootComponent() {
     <ThemeProvider>
       <div className="grid h-svh grid-rows-[auto_1fr]">
         <Header />
-        <Outlet />
+        <main id="main-content" tabIndex={-1} className="outline-none">
+          <Outlet />
+        </main>
       </div>
       <Toaster richColors />
       <PwaUpdate />

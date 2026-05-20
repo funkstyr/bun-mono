@@ -9,6 +9,19 @@
     <link rel="apple-touch-icon" href="./pwa-icon.svg" />
     <link rel="mask-icon" href="./pwa-icon.svg" color="#0a0a0a" />
     <script>
+      // Apply the saved theme before paint to prevent a flash of the wrong color scheme.
+      (function () {
+        try {
+          var t = localStorage.getItem("theme");
+          if (!t || t === "system") {
+            t = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          }
+          document.documentElement.classList.add(t);
+          document.documentElement.style.colorScheme = t;
+        } catch (e) {}
+      })();
+    </script>
+    <script>
       // Single Page Apps for GitHub Pages — https://github.com/rafgraph/spa-github-pages — MIT
       // Decodes the redirect path written by 404.html back into the browser URL.
       (function (l) {
