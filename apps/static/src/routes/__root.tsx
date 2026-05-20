@@ -4,6 +4,7 @@ import { Toaster } from "@bun-mono/core-ui/sonner";
 import { ThemeProvider } from "@bun-mono/core-ui/theme-provider";
 
 import Header from "../components/header";
+import PwaUpdate from "../components/pwa-update";
 
 export const Route = createRootRoute({
   component: RootComponent,
@@ -17,6 +18,7 @@ function RootComponent() {
         <Outlet />
       </div>
       <Toaster richColors />
+      <PwaUpdate />
     </ThemeProvider>
   );
 }
