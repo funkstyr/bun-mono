@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import { useEffect, useState, type JSX } from "react";
 
 import { Button } from "@bun-mono/core-ui/button";
 
@@ -6,11 +6,22 @@ import { PlayLog } from "./play-log";
 import { OpponentSeat } from "./seat/opponent-seat";
 import { SEATS } from "./seat/seat-utils";
 import { usePassIndicator } from "./seat/use-pass-indicator";
+import { SimPanel } from "./sim/sim-panel";
 import { TopHand } from "./top-hand";
 import { TributeReadout } from "./tribute/tribute-readout";
 import { useRoyaltyGame } from "./use-game";
 
 export function RoyaltyWatch(): JSX.Element {
+  const [simEnabled, setSimEnabled] = useState(false);
+  useEffect(() => {
+    setSimEnabled(readSimFromUrl());
+  }, []);
+  if (simEnabled) return <SimPanel />;
+
+  return <VisualViewer />;
+}
+
+function VisualViewer(): JSX.Element {
   const { session, game, finishedTitles, lastPassEvent, tribute, restart } = useRoyaltyGame({
     mode: "watch",
   });
@@ -71,4 +82,10 @@ export function RoyaltyWatch(): JSX.Element {
       </div>
     </div>
   );
+}
+
+function readSimFromUrl(): boolean {
+  if (typeof window === "undefined") return false;
+  const sim = new URLSearchParams(window.location.search).get("sim");
+  return sim !== null && sim !== "";
 }
