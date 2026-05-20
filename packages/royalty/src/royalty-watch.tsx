@@ -43,10 +43,6 @@ export function RoyaltyWatch(): JSX.Element {
       </header>
 
       <div className="flex w-full flex-col gap-4 lg:flex-row lg:items-start">
-        <aside className="w-full lg:sticky lg:top-4 lg:w-72 lg:shrink-0">
-          <PlayLog log={game.log} humanSeat={null} />
-        </aside>
-
         <div className="flex min-w-0 flex-1 flex-col items-center gap-6">
           <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-4">
             {SEATS.map((seat) => (
@@ -68,6 +64,10 @@ export function RoyaltyWatch(): JSX.Element {
             <TopHand top={game.trick.top} lastPlayer={game.trick.lastPlayer} />
           )}
         </div>
+
+        <aside className="w-full lg:sticky lg:top-4 lg:w-72 lg:shrink-0">
+          <PlayLog log={game.log} humanSeat={null} />
+        </aside>
       </div>
     </div>
   );

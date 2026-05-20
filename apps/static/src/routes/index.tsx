@@ -24,22 +24,6 @@ function RouteComponent() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle>Workout Timer</CardTitle>
-
-            <CardDescription>
-              Interval and workout timers that run entirely in your browser.
-            </CardDescription>
-          </CardHeader>
-
-          <CardFooter>
-            <Button render={timerLink} variant="outline" size="sm">
-              Open Workout Timer
-            </Button>
-          </CardFooter>
-        </Card>
-
-        <Card>
-          <CardHeader>
             <CardTitle>Tic-Tac-Toe</CardTitle>
 
             <CardDescription>
@@ -70,6 +54,22 @@ function RouteComponent() {
           <CardFooter>
             <Button render={royaltyLink} variant="outline" size="sm">
               Open Royalty
+            </Button>
+          </CardFooter>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Workout Timer</CardTitle>
+
+            <CardDescription>
+              Interval and workout timers that run entirely in your browser.
+            </CardDescription>
+          </CardHeader>
+
+          <CardFooter>
+            <Button render={timerLink} variant="outline" size="sm">
+              Open Workout Timer
             </Button>
           </CardFooter>
         </Card>
