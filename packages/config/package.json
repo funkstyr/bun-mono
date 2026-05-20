@@ -6,7 +6,7 @@
   "exports": {
     "./tsconfig.base.json": "./tsconfig.base.json",
     "./tsdown": "./tsdown.js",
-    "./vitest": "./vitest.ts",
+    "./vitest": "./vitest.js",
     "./vitest-setup-browser": "./vitest-setup-browser.ts"
   },
   "devDependencies": {

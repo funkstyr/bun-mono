@@ -80,12 +80,14 @@ export function HumanSeat({
 
   const submitPlay = useCallback(() => {
     if (!canPlay) return;
+
     onPlay(selectedCards);
     setSelectedKeys(new Set());
   }, [canPlay, onPlay, selectedCards]);
 
   const submitPass = useCallback(() => {
     if (!canPass) return;
+
     onPass();
     setSelectedKeys(new Set());
   }, [canPass, onPass]);
@@ -145,6 +147,7 @@ export function HumanSeat({
             />
           );
         })}
+
         {hand.length === 0 ? (
           <span className="text-muted-foreground text-xs">Empty hand</span>
         ) : null}
@@ -153,6 +156,7 @@ export function HumanSeat({
       {active && quickPlays.length > 0 ? (
         <QuickPlayStrip plays={quickPlays} onPick={pickQuickPlay} />
       ) : null}
+
       {passing ? (
         <span className="bg-foreground text-background absolute -top-2 right-3 rounded px-2 py-0.5 text-[10px] font-semibold uppercase shadow">
           Pass
@@ -269,7 +273,7 @@ function lowestRankIndex(play: Hand): number {
     const idx = rankIndex(c.rank);
     if (idx < min) min = idx;
   }
-  
+
   return min;
 }
 
