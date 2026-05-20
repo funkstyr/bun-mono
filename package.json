@@ -60,7 +60,8 @@
     "db:local": "turbo -F @bun-mono/db db:local",
     "postinstall": "lefthook install",
     "up-deps": "bunx taze -r -w minor",
-    "up-deps:major": "bunx taze -r -w major"
+    "up-deps:major": "bunx taze -r -w major",
+    "scratch:sync": "bun scripts/sync-scratch.ts"
   },
   "dependencies": {
     "@bun-mono/env": "workspace:*",

@@ -21,7 +21,10 @@
       "mcp__cclsp__find_references",
       "mcp__cclsp__get_diagnostics",
       "Bash(gh auth *)",
-      "Bash(gh repo *)"
+      "Bash(gh repo *)",
+      "Bash(gh label *)",
+      "Bash(gh issue *)",
+      "Bash(gh project *)"
     ],
     "deny": [
       "Read(**/node_modules/**)",
@@ -33,7 +36,6 @@
       "Read(**/.next/**)",
       "Read(**/.vite/**)",
       "Read(**/.tanstack/**)",
-      "Read(**/.scratch/**)",
       "Read(**/bun.lock)",
       "Read(**/*.tsbuildinfo)"
     ]

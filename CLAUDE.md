@@ -68,7 +68,7 @@ Shared dep versions live in `package.json` → `workspaces.catalog`. Individual 
 - **House style** (`house-style` skill): duck/feature layout, file-size limits, blank-line groups, strict TS, fast tests. Loaded automatically when relevant; consult it before non-trivial code changes.
 - **Domain language**: see `CONTEXT-MAP.md` at the repo root, which points to per-context `CONTEXT.md` files (currently `packages/royalty/` and the forward-looking `apps/server/`).
 - **Architectural decisions**: see `docs/adr/`.
-- **Issues**: filed as markdown under `.scratch/<feature>/` (see `docs/agents/issue-tracker.md`).
+- **Issues**: tracked on GitHub Issues via the `gh` CLI (see `docs/agents/issue-tracker.md`). PRDs carry the `prd` label; their child slice issues link back via `Parent: #N`.
 - **Triage labels**: canonical roles `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix` (see `docs/agents/triage-labels.md`).
 
 ## When you finish a turn

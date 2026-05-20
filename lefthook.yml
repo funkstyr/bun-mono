@@ -9,3 +9,8 @@ pre-commit:
       glob: "*.{ts,tsx,js,jsx,mjs,cjs,json,jsonc,md,css,html}"
       run: oxfmt --write {staged_files} || true
       stage_fixed: true
+
+pre-push:
+  commands:
+    scratch-sync:
+      run: bun run scratch:sync
