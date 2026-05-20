@@ -4,6 +4,7 @@ import { Button } from "@bun-mono/core-ui/button";
 
 import { EndGameOverlay } from "./end-game-overlay";
 import { PlayLog } from "./play-log";
+import { RulesModal } from "./rules-modal";
 import { HumanSeat } from "./seat/human-seat";
 import { OpponentSeat } from "./seat/opponent-seat";
 import { SEATS } from "./seat/seat-utils";
@@ -39,6 +40,8 @@ export function RoyaltyApp(): JSX.Element {
       <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-6 px-4 py-8">
         <header className="flex w-full items-center justify-between">
           <h1 className="text-2xl font-semibold">Royalty</h1>
+
+          <RulesModal />
         </header>
         <div className="flex w-full flex-col items-center gap-4 py-12">
           <p className="text-muted-foreground text-sm">No active session.</p>
@@ -59,6 +62,7 @@ export function RoyaltyApp(): JSX.Element {
         <h1 className="text-2xl font-semibold">Royalty</h1>
         <div className="flex items-center gap-2">
           <span className="text-muted-foreground text-xs">Game {session.gameCount}</span>
+          <RulesModal />
           <Button onClick={restart} size="sm" variant="outline">
             Restart
           </Button>
