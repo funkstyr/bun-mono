@@ -9,9 +9,15 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TimerRouteImport } from './routes/timer'
 import { Route as TicTacToeRouteImport } from './routes/tic-tac-toe'
 import { Route as IndexRouteImport } from './routes/index'
 
+const TimerRoute = TimerRouteImport.update({
+  id: '/timer',
+  path: '/timer',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TicTacToeRoute = TicTacToeRouteImport.update({
   id: '/tic-tac-toe',
   path: '/tic-tac-toe',
@@ -26,31 +32,42 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/tic-tac-toe': typeof TicTacToeRoute
+  '/timer': typeof TimerRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/tic-tac-toe': typeof TicTacToeRoute
+  '/timer': typeof TimerRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/tic-tac-toe': typeof TicTacToeRoute
+  '/timer': typeof TimerRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/tic-tac-toe'
+  fullPaths: '/' | '/tic-tac-toe' | '/timer'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/tic-tac-toe'
-  id: '__root__' | '/' | '/tic-tac-toe'
+  to: '/' | '/tic-tac-toe' | '/timer'
+  id: '__root__' | '/' | '/tic-tac-toe' | '/timer'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   TicTacToeRoute: typeof TicTacToeRoute
+  TimerRoute: typeof TimerRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/timer': {
+      id: '/timer'
+      path: '/timer'
+      fullPath: '/timer'
+      preLoaderRoute: typeof TimerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tic-tac-toe': {
       id: '/tic-tac-toe'
       path: '/tic-tac-toe'
@@ -71,6 +88,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TicTacToeRoute: TicTacToeRoute,
+  TimerRoute: TimerRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
