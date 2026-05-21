@@ -4,6 +4,7 @@ import {
   makeConnection,
   makeIdCounter,
   makeIntent,
+  makeTypingIntent,
   rejectionPayload,
   setupRoomTest,
 } from "./_room-actor-test-utils";
@@ -178,7 +179,7 @@ describe("RoomActor — chat.send_message rate limit (5 per rolling 10s)", () =>
     // important assertion is *no* `rate_limit_send_message` rejection.)
     for (let i = 0; i < 10; i++) {
       // eslint-disable-next-line no-await-in-loop -- sequential bursts
-      await actor.submit(alice, { kind: "chat.typing_ping", payload: {}, intentId: `t-${i}` });
+      await actor.submit(alice, makeTypingIntent(`t-${i}`));
       clock += 1_600;
     }
 
@@ -186,7 +187,7 @@ describe("RoomActor — chat.send_message rate limit (5 per rolling 10s)", () =>
     const rateLimited = newEvents.filter(
       (e) =>
         e.kind === "room.intent_rejected" &&
-        (e.payload as { reason: string }).reason === "rate_limit_send_message",
+        rejectionPayload(e).reason === "rate_limit_send_message",
     );
     expect(rateLimited).toHaveLength(0);
   });

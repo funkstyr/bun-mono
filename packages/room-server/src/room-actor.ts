@@ -11,6 +11,7 @@ import type {
 } from "@bun-mono/room-protocol/member-events";
 import type { RoomMember, SpectatorReason } from "@bun-mono/room-protocol/system";
 
+import { AuthRevalidationCache } from "./auth-revalidate";
 import type { ChatEvent, ChatIntent, ChatState } from "./chat-reducer";
 import {
   allocateSlot,
@@ -24,6 +25,11 @@ import {
   type MemberInfo,
 } from "./member-presence";
 import { persistAndPruneEvent, rehydrateRoom } from "./room-actor-persistence";
+import {
+  createSendRateLimitState,
+  tryRecordSend,
+  type SendRateLimitState,
+} from "./send-rate-limit";
 import { TTL_MS } from "./ttl";
 import type { AnyLibSQLDatabase, Connection, ReducerContext, RoomReducer, RoomRow } from "./types";
 
@@ -34,20 +40,6 @@ const SNAPSHOT_EVENT_COUNT = 100;
 // is accepted silently — no broadcast, no rejection. The client mirrors this
 // to avoid wasted intents, but the server is authoritative.
 const TYPING_DEBOUNCE_MS = 1500;
-
-// Per-connection cache window for better-auth session lookups. The server
-// re-validates the handshake cookie on every Member intent, but a hot
-// chatter would otherwise hammer the auth layer; one validate every ~60s is
-// good enough to demote a revoked session before the User does any
-// observable damage (their next-but-one send fails).
-const AUTH_REVALIDATE_TTL_MS = 60_000;
-
-// Per-Member-per-Room send-message rate limit. Five sends in any rolling
-// 10s window pass; a sixth in the same window is rejected with
-// `rate_limit_send_message`. The reducer never sees the intent — no
-// `chat.message_sent` is emitted. In-memory only; resets on hibernation.
-const SEND_RATE_LIMIT_WINDOW_MS = 10_000;
-const SEND_RATE_LIMIT_COUNT = 5;
 
 const idAlphabet = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ0123456789";
 const generateEventId = customAlphabet(idAlphabet, 21);
@@ -73,11 +65,10 @@ export class RoomActor {
   private readonly spectators = new Set<string>();
   // Last `chat.typing` broadcast timestamp per Member, for server-side debounce.
   private readonly lastTypingAt = new Map<string, number>();
-  // Last successful auth revalidation per connection, for the 60s TTL cache.
-  private readonly authValidatedAt = new Map<string, number>();
+  private readonly authCache: AuthRevalidationCache;
   // Rolling-window timestamps of `chat.send_message` intents per Member, for
   // the send-rate limit. Pruned in place on each check.
-  private readonly sendRateLimit = new Map<string, number[]>();
+  private readonly sendRateLimit: SendRateLimitState = createSendRateLimitState();
   private admissionChain: Promise<unknown> = Promise.resolve();
   private state: ChatState;
   private recentDurableEvents: EventEnvelope[] = [];
@@ -96,6 +87,7 @@ export class RoomActor {
     this.now = deps.now ?? (() => Date.now());
     this.nextEventId = deps.nextEventId ?? generateEventId;
     this.state = reducer.initialState(room);
+    this.authCache = new AuthRevalidationCache(this.now);
   }
 
   get nextPositionForTests(): number {
@@ -162,7 +154,7 @@ export class RoomActor {
 
   async detach(conn: Connection): Promise<void> {
     this.connections.delete(conn.connectionId);
-    this.authValidatedAt.delete(conn.connectionId);
+    this.authCache.evict(conn.connectionId);
 
     // Spectators have no slot, row, or presence — the count shift is observed on the next snapshot, not broadcast.
     if (this.spectators.delete(conn.connectionId)) return;
@@ -267,7 +259,10 @@ export class RoomActor {
     const fromUserId = await this.resolveSubmittingMember(conn, intent);
     if (fromUserId === null) return;
 
-    if (intent.kind === "chat.send_message" && !this.recordSendForRateLimit(fromUserId)) {
+    if (
+      intent.kind === "chat.send_message" &&
+      !tryRecordSend(this.sendRateLimit, fromUserId, this.now())
+    ) {
       this.sendRejection(conn, intent.intentId, "rate_limit_send_message");
       return;
     }
@@ -327,11 +322,20 @@ export class RoomActor {
     if (this.spectators.has(conn.connectionId)) return true;
     if (conn.userId === null) return true;
 
-    const last = this.authValidatedAt.get(conn.connectionId);
-    if (last !== undefined && this.now() - last < AUTH_REVALIDATE_TTL_MS) return true;
+    if (this.authCache.isFresh(conn.connectionId)) return true;
 
-    const result = await conn.revalidateAuth();
-    this.authValidatedAt.set(conn.connectionId, this.now());
+    let result: { userId: string } | null;
+    try {
+      result = await conn.revalidateAuth();
+    } catch (err) {
+      // Fail-open: a transient auth-DB hiccup shouldn't demote every active
+      // chatter. Skip the cache update so the next intent re-checks; a real
+      // revocation surfaces promptly once the auth layer recovers.
+      console.error("revalidateAuth threw; treating session as still valid", err);
+      return true;
+    }
+
+    this.authCache.markValidated(conn.connectionId);
 
     // Either a revoked/expired session (`null`) or a different user behind
     // the same conn (defensive — shouldn't happen with better-auth tokens).
@@ -358,7 +362,7 @@ export class RoomActor {
     }
     this.spectators.add(conn.connectionId);
     conn.userId = null;
-    this.authValidatedAt.delete(conn.connectionId);
+    this.authCache.evict(conn.connectionId);
 
     // Mirror the `detach` "last conn drops" path: the Member is now
     // effectively offline. Persist `lastSeenAt` so the TTL sweep can free
@@ -374,26 +378,6 @@ export class RoomActor {
       userId,
       slot: info.slot,
     });
-  }
-
-  // Returns true and records the timestamp if the User is under the
-  // per-10s send budget; returns false otherwise. The 6th send in a window
-  // is rejected — the existing timestamps stay so the budget continues to
-  // tick over without the rejected attempt counting against it.
-  private recordSendForRateLimit(userId: string): boolean {
-    const now = this.now();
-    const cutoff = now - SEND_RATE_LIMIT_WINDOW_MS;
-    const existing = this.sendRateLimit.get(userId) ?? [];
-    const fresh = existing.filter((t) => t > cutoff);
-
-    if (fresh.length >= SEND_RATE_LIMIT_COUNT) {
-      this.sendRateLimit.set(userId, fresh);
-      return false;
-    }
-
-    fresh.push(now);
-    this.sendRateLimit.set(userId, fresh);
-    return true;
   }
 
   private ensureAdmitted(userId: string): Promise<MemberInfo | null> {

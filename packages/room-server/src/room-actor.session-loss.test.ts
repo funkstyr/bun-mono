@@ -9,6 +9,8 @@ import {
   makeIntent,
   rejectionPayload,
   setupRoomTest,
+  snapshotPayload,
+  userIdOf,
 } from "./_room-actor-test-utils";
 import type { TestDb } from "./_test-utils";
 import { chatReducer } from "./chat-reducer";
@@ -95,10 +97,7 @@ describe("RoomActor — session-loss demotion on intent", () => {
     await actor.submit(alice, makeIntent("hi", "i-1"));
 
     const bobNew = bob.events.slice(bobBefore);
-    const offline = bobNew.find(
-      (e) =>
-        e.kind === "room.member_offline" && (e.payload as { userId: string }).userId === "alice",
-    );
+    const offline = bobNew.find((e) => e.kind === "room.member_offline" && userIdOf(e) === "alice");
     expect(offline).toBeDefined();
   });
 
@@ -202,22 +201,16 @@ describe("RoomActor — session-loss demotion on intent", () => {
     // Alice's fresh conn lands as a Member (slot intact, room_member row intact).
     const snapshot = aliceNew.events.find((e) => e.kind === "room.snapshot");
     expect(snapshot).toBeDefined();
-    expect((snapshot!.payload as { yourRole: string }).yourRole).toBe("member");
+    expect(snapshotPayload(snapshot!).yourRole).toBe("member");
 
     // No duplicate `member_joined` reaches the other Member — only a
     // `member_online` because Alice was offline-by-demotion.
     const bobNew = bob.events.slice(bobBefore);
     expect(
-      bobNew.filter(
-        (e) =>
-          e.kind === "room.member_joined" && (e.payload as { userId: string }).userId === "alice",
-      ),
+      bobNew.filter((e) => e.kind === "room.member_joined" && userIdOf(e) === "alice"),
     ).toHaveLength(0);
     expect(
-      bobNew.filter(
-        (e) =>
-          e.kind === "room.member_online" && (e.payload as { userId: string }).userId === "alice",
-      ),
+      bobNew.filter((e) => e.kind === "room.member_online" && userIdOf(e) === "alice"),
     ).toHaveLength(1);
   });
 

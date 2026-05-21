@@ -6,6 +6,7 @@ import { toast } from "@bun-mono/core-ui/sonner";
 import { env } from "@bun-mono/env/web";
 import type { IntentEnvelope } from "@bun-mono/room-protocol/envelope";
 import { parseEvent } from "@bun-mono/room-protocol/kinds";
+import { SEND_RATE_LIMIT_COUNT, SEND_RATE_LIMIT_WINDOW_MS } from "@bun-mono/room-protocol/limits";
 
 import {
   isChatTyping,
@@ -102,7 +103,10 @@ export function useRoomSocket(slug: string): UseRoomSocket {
         isIntentRejected(parsed.value) &&
         parsed.value.payload.reason === "rate_limit_send_message"
       ) {
-        toast.error("Slow down a bit — you can send 5 messages per 10s.");
+        const seconds = SEND_RATE_LIMIT_WINDOW_MS / 1000;
+        toast.error(
+          `Slow down a bit — you can send ${SEND_RATE_LIMIT_COUNT} messages per ${seconds}s.`,
+        );
       }
 
       // A fresh typing event from the same User restarts the 3s expiry —
