@@ -4,6 +4,7 @@ import type { EventEnvelope } from "@bun-mono/room-protocol/envelope";
 
 import {
   isChatMessage,
+  isChatTyping,
   isMemberJoined,
   isMemberLeft,
   isMemberOffline,
@@ -25,6 +26,7 @@ export type RoomState = {
   spectatorCount: number;
   members: readonly MemberView[];
   timeline: readonly RoomTimelineEntry[];
+  typingUserIds: readonly string[];
 };
 
 const initial: RoomState = {
@@ -34,6 +36,7 @@ const initial: RoomState = {
   spectatorCount: 0,
   members: [],
   timeline: [],
+  typingUserIds: [],
 };
 
 export type RoomStore = Store<RoomState>;
@@ -60,6 +63,8 @@ export function applyEvent(store: RoomStore, event: EventEnvelope): void {
       spectatorCount: payload.spectatorCount,
       members: sortBySlot(payload.members),
       timeline: payload.recentEvents.filter(isTimelineEntry),
+      // Snapshot doesn't carry typing state — typing is transient by definition.
+      typingUserIds: [],
     }));
     return;
   }
@@ -108,6 +113,22 @@ export function applyEvent(store: RoomStore, event: EventEnvelope): void {
     patchMember(store, event.payload.userId, { online: false, lastSeenAt: event.ts });
     return;
   }
+
+  if (isChatTyping(event)) {
+    const { userId } = event.payload;
+    store.setState((s) => {
+      if (s.typingUserIds.includes(userId)) return s;
+      return { ...s, typingUserIds: [...s.typingUserIds, userId] };
+    });
+    return;
+  }
+}
+
+export function removeTypingUser(store: RoomStore, userId: string): void {
+  store.setState((s) => {
+    if (!s.typingUserIds.includes(userId)) return s;
+    return { ...s, typingUserIds: s.typingUserIds.filter((id) => id !== userId) };
+  });
 }
 
 function patchMember(store: RoomStore, userId: string, patch: Partial<MemberView>): void {

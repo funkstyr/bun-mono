@@ -4,17 +4,22 @@ import { Button } from "@bun-mono/core-ui/button";
 
 type Props = {
   onSend: (text: string) => void;
+  onTyping: () => void;
   disabled: boolean;
 };
 
 const MAX = 2000;
 
-export function MessageInput({ onSend, disabled }: Props): React.ReactElement {
+export function MessageInput({ onSend, onTyping, disabled }: Props): React.ReactElement {
   const [text, setText] = useState("");
 
-  const handleChange = useCallback((e: ChangeEvent<HTMLTextAreaElement>): void => {
-    setText(e.target.value);
-  }, []);
+  const handleChange = useCallback(
+    (e: ChangeEvent<HTMLTextAreaElement>): void => {
+      setText(e.target.value);
+      if (e.target.value.length > 0) onTyping();
+    },
+    [onTyping],
+  );
 
   const handleSubmit = useCallback(
     (e: FormEvent): void => {

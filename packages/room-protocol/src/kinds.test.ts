@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { durable, parseEvent, parseIntent, type EventKind, type ParseResult } from "./kinds";
+import {
+  broadcastToSpectators,
+  durable,
+  parseEvent,
+  parseIntent,
+  type EventKind,
+  type ParseResult,
+} from "./kinds";
 
 function validSendMessageIntent(): unknown {
   return {
@@ -77,6 +84,16 @@ describe("parseIntent — happy path", () => {
     expect(valueOf(result)?.kind).toBe("chat.send_message");
     expect(valueOf(result)?.intentId).toBe("i-1");
   });
+
+  it("accepts a chat.typing_ping intent with an empty payload", () => {
+    const result = parseIntent({
+      kind: "chat.typing_ping",
+      payload: {},
+      intentId: "i-typing",
+    });
+    expect(result.ok).toBe(true);
+    expect(valueOf(result)?.kind).toBe("chat.typing_ping");
+  });
 });
 
 describe("parseIntent — sad paths", () => {
@@ -138,6 +155,20 @@ describe("parseEvent — happy paths for each event kind", () => {
     const result = parseEvent(validMessageSentEvent());
     expect(result.ok).toBe(true);
     expect(valueOf(result)?.kind).toBe("chat.message_sent");
+  });
+
+  it("accepts chat.typing", () => {
+    const result = parseEvent({
+      kind: "chat.typing",
+      payload: { userId: "user-1" },
+      id: "e-typing",
+      ts: 1_700_000_000_010,
+      position: 5,
+      from: "user-1",
+      durable: false,
+    });
+    expect(result.ok).toBe(true);
+    expect(valueOf(result)?.kind).toBe("chat.typing");
   });
 
   it("accepts room.intent_rejected with a replyTo", () => {
@@ -246,6 +277,7 @@ describe("parseEvent — sad paths", () => {
 describe("durable registry", () => {
   const cases: Array<[EventKind, boolean]> = [
     ["chat.message_sent", true],
+    ["chat.typing", false],
     ["room.snapshot", false],
     ["room.intent_rejected", false],
     ["room.member_joined", true],
@@ -260,10 +292,11 @@ describe("durable registry", () => {
     });
   }
 
-  it("contains exactly the event kinds defined across slices 01–02", () => {
+  it("contains exactly the event kinds defined so far", () => {
     expect(Object.keys(durable).toSorted()).toEqual(
       [
         "chat.message_sent",
+        "chat.typing",
         "room.intent_rejected",
         "room.snapshot",
         "room.member_joined",
@@ -272,5 +305,28 @@ describe("durable registry", () => {
         "room.member_offline",
       ].toSorted(),
     );
+  });
+});
+
+describe("broadcastToSpectators registry", () => {
+  const cases: Array<[EventKind, boolean]> = [
+    ["chat.message_sent", true],
+    ["chat.typing", false],
+    ["room.snapshot", true],
+    ["room.intent_rejected", true],
+    ["room.member_joined", true],
+    ["room.member_left", true],
+    ["room.member_online", true],
+    ["room.member_offline", true],
+  ];
+
+  for (const [kind, expected] of cases) {
+    it(`broadcastToSpectators[${kind}] === ${expected}`, () => {
+      expect(broadcastToSpectators[kind]).toBe(expected);
+    });
+  }
+
+  it("has an entry for every event kind in the durable registry", () => {
+    expect(Object.keys(broadcastToSpectators).toSorted()).toEqual(Object.keys(durable).toSorted());
   });
 });

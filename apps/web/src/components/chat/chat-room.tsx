@@ -7,12 +7,23 @@ import { MemberList } from "./member-list";
 import { MessageInput } from "./message-input";
 import { MessageList } from "./message-list";
 import type { MemberView } from "./room-events";
+import { TypingIndicator } from "./typing-indicator";
 import { useRoomSocket } from "./use-room-socket";
 
 type Props = { slug: string };
 
 export function ChatRoom({ slug }: Props): React.ReactElement {
-  const { status, myUserId, myRole, spectatorCount, members, timeline, send } = useRoomSocket(slug);
+  const {
+    status,
+    myUserId,
+    myRole,
+    spectatorCount,
+    members,
+    timeline,
+    typingUserIds,
+    send,
+    sendTypingPing,
+  } = useRoomSocket(slug);
 
   // Spectator UX splits on whether the user has a session: anonymous → sign-in CTA, authenticated full-room → banner.
   const isSpectator = myRole === "spectator";
@@ -35,7 +46,15 @@ export function ChatRoom({ slug }: Props): React.ReactElement {
           {isSpectator ? (
             <SpectatorFooter slug={slug} anonymous={isAnonymous} />
           ) : (
-            <MessageInput onSend={send} disabled={status !== "open"} />
+            <>
+              <TypingIndicator
+                typingUserIds={typingUserIds}
+                members={members}
+                myUserId={myUserId}
+              />
+
+              <MessageInput onSend={send} onTyping={sendTypingPing} disabled={status !== "open"} />
+            </>
           )}
         </div>
 

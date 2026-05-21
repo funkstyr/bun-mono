@@ -1,4 +1,4 @@
-import type { MessageSentPayload } from "@bun-mono/room-protocol/chat";
+import type { MessageSentPayload, TypingPayload } from "@bun-mono/room-protocol/chat";
 import type { EventEnvelope } from "@bun-mono/room-protocol/envelope";
 import type {
   MemberJoinedPayload,
@@ -11,6 +11,11 @@ import type { RoomSnapshotPayload } from "@bun-mono/room-protocol/system";
 export type ChatMessageEvent = EventEnvelope & {
   kind: "chat.message_sent";
   payload: MessageSentPayload;
+};
+
+export type ChatTypingEvent = EventEnvelope & {
+  kind: "chat.typing";
+  payload: TypingPayload;
 };
 
 export type MemberJoinedEvent = EventEnvelope & {
@@ -44,6 +49,10 @@ export type MemberView = RoomSnapshotPayload["members"][number];
 
 export function isChatMessage(ev: EventEnvelope): ev is ChatMessageEvent {
   return ev.kind === "chat.message_sent";
+}
+
+export function isChatTyping(ev: EventEnvelope): ev is ChatTypingEvent {
+  return ev.kind === "chat.typing";
 }
 
 export function isMemberJoined(ev: EventEnvelope): ev is MemberJoinedEvent {

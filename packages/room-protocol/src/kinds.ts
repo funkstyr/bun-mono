@@ -1,6 +1,6 @@
 import { type } from "arktype";
 
-import { sendMessagePayload, messageSentPayload } from "./chat";
+import { sendMessagePayload, messageSentPayload, typingPingPayload, typingPayload } from "./chat";
 import { eventEnvelope, intentEnvelope, type EventEnvelope, type IntentEnvelope } from "./envelope";
 import {
   memberJoinedPayload,
@@ -10,10 +10,11 @@ import {
 } from "./member-events";
 import { intentRejectedPayload, roomSnapshotPayload } from "./system";
 
-export type IntentKind = "chat.send_message";
+export type IntentKind = "chat.send_message" | "chat.typing_ping";
 
 export type EventKind =
   | "chat.message_sent"
+  | "chat.typing"
   | "room.snapshot"
   | "room.intent_rejected"
   | "room.member_joined"
@@ -25,10 +26,12 @@ type PayloadValidator = (input: unknown) => unknown;
 
 const intentRegistry: Record<IntentKind, PayloadValidator> = {
   "chat.send_message": sendMessagePayload as PayloadValidator,
+  "chat.typing_ping": typingPingPayload as PayloadValidator,
 };
 
 const eventRegistry: Record<EventKind, PayloadValidator> = {
   "chat.message_sent": messageSentPayload as PayloadValidator,
+  "chat.typing": typingPayload as PayloadValidator,
   "room.snapshot": roomSnapshotPayload as PayloadValidator,
   "room.intent_rejected": intentRejectedPayload as PayloadValidator,
   "room.member_joined": memberJoinedPayload as PayloadValidator,
@@ -39,12 +42,28 @@ const eventRegistry: Record<EventKind, PayloadValidator> = {
 
 export const durable: Record<EventKind, boolean> = {
   "chat.message_sent": true,
+  "chat.typing": false,
   "room.snapshot": false,
   "room.intent_rejected": false,
   "room.member_joined": true,
   "room.member_left": true,
   "room.member_online": false,
   "room.member_offline": false,
+};
+
+// Per-kind toggle for whether an event reaches Spectator connections. Default
+// is true; transient broadcasts that are only meaningful between active
+// participants (e.g. `chat.typing`) opt out by setting this to false. Checked
+// in the Room actor's broadcast path.
+export const broadcastToSpectators: Record<EventKind, boolean> = {
+  "chat.message_sent": true,
+  "chat.typing": false,
+  "room.snapshot": true,
+  "room.intent_rejected": true,
+  "room.member_joined": true,
+  "room.member_left": true,
+  "room.member_online": true,
+  "room.member_offline": true,
 };
 
 export type ParseResult<T> = { ok: true; value: T } | { ok: false; error: string };
