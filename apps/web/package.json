@@ -6,7 +6,8 @@
     "build": "vite build",
     "check-types": "tsgo --noEmit",
     "dev": "vite dev",
-    "serve": "vite preview"
+    "serve": "vite preview",
+    "test": "vitest run"
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.187",

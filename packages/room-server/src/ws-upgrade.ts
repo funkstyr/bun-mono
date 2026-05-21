@@ -133,15 +133,16 @@ export function onRoomClose(ctx: RoomUpgradeContext, deps: RegistryDeps = {}): v
   connByConnectionId.delete(ctx.connectionId);
 
   // Best-effort detach; the registry holds the actor, so re-resolve lazily.
-  // The `.catch` swallows any registry-lookup failure (e.g., DB error during
-  // close) — the cost is a tiny memory leak in the actor's `connections` map
-  // until the actor is GC'd, not a crash.
+  // `detach` is async (it persists `lastSeenAt` and emits `member_offline`);
+  // we `await` inside the `.then` so the `.catch` covers both registry-lookup
+  // and detach failures. The cost on failure is a tiny memory leak in the
+  // actor's `connections` map until the actor is GC'd, not a crash.
   void getOrCreateActorBySlug(ctx.slug, deps)
-    .then((found) => {
-      if (found) found.actor.detach(entry.conn);
+    .then(async (found) => {
+      if (found) await found.actor.detach(entry.conn);
     })
     .catch((err: unknown) => {
-      console.error("onRoomClose: detach lookup failed:", err);
+      console.error("onRoomClose: detach failed:", err);
     });
 }
 

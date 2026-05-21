@@ -1,7 +1,7 @@
 {
   "extends": "@bun-mono/config/tsconfig.base.json",
   "include": ["src/**/*.ts"],
-  "exclude": ["dist", "node_modules", "**/*.test.ts", "**/_test-utils.ts"],
+  "exclude": ["dist", "node_modules", "**/*.test.ts", "**/_*.ts"],
   "compilerOptions": {
     "composite": true,
     "declaration": true,

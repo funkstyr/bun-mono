@@ -1,6 +1,7 @@
 {
   "extends": "@bun-mono/config/tsconfig.base.json",
   "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["dist", "node_modules", "vitest.config.ts"],
   "compilerOptions": {
     "target": "ES2022",
     "jsx": "react-jsx",

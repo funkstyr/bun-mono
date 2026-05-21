@@ -20,6 +20,10 @@
       "types": "./dist/system.d.ts",
       "import": "./dist/system.js"
     },
+    "./member-events": {
+      "types": "./dist/member-events.d.ts",
+      "import": "./dist/member-events.js"
+    },
     "./kinds": {
       "types": "./dist/kinds.d.ts",
       "import": "./dist/kinds.js"

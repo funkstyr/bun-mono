@@ -1,66 +1,50 @@
 import { useEffect, useRef, useState } from "react";
+import { useSelector } from "@tanstack/react-store";
 import PartySocket from "partysocket";
 
 import { env } from "@bun-mono/env/web";
-import type { EventEnvelope, IntentEnvelope } from "@bun-mono/room-protocol/envelope";
+import type { IntentEnvelope } from "@bun-mono/room-protocol/envelope";
 import { parseEvent } from "@bun-mono/room-protocol/kinds";
 
-type ChatMessageEvent = EventEnvelope & {
-  kind: "chat.message_sent";
-  payload: { text: string };
-};
+import type { MemberView, RoomTimelineEntry } from "./room-events";
+import {
+  applyEvent,
+  createRoomStore,
+  resetStore,
+  setStatus,
+  type ConnectionStatus,
+  type RoomState,
+} from "./room-store";
 
-type RoomSnapshotEvent = EventEnvelope & {
-  kind: "room.snapshot";
-  payload: { recentEvents: EventEnvelope[] };
-};
-
-type RoomIntentRejectedEvent = EventEnvelope & {
-  kind: "room.intent_rejected";
-  payload: { reason: string };
-};
-
-export type ConnectionStatus = "connecting" | "open" | "closed";
+export type { ConnectionStatus };
 
 type UseRoomSocket = {
   status: ConnectionStatus;
-  messages: ChatMessageEvent[];
+  myUserId: string | null;
+  members: readonly MemberView[];
+  timeline: readonly RoomTimelineEntry[];
   send: (text: string) => void;
 };
 
-function isChatMessageSent(ev: EventEnvelope): ev is ChatMessageEvent {
-  return ev.kind === "chat.message_sent";
-}
-
-function isRoomSnapshot(ev: EventEnvelope): ev is RoomSnapshotEvent {
-  return ev.kind === "room.snapshot";
-}
-
-function isIntentRejected(ev: EventEnvelope): ev is RoomIntentRejectedEvent {
-  return ev.kind === "room.intent_rejected";
-}
-
 export function useRoomSocket(slug: string): UseRoomSocket {
-  const [messages, setMessages] = useState<ChatMessageEvent[]>([]);
-  const [status, setStatus] = useState<ConnectionStatus>("connecting");
+  const [store] = useState(() => createRoomStore());
+
   const socketRef = useRef<PartySocket | null>(null);
 
   useEffect(() => {
-    const url = new URL(env.VITE_SERVER_URL);
+    resetStore(store);
 
+    const url = new URL(env.VITE_SERVER_URL);
     const socket = new PartySocket({
       host: url.host,
       room: slug,
       basePath: `ws/room/${slug}`,
       protocol: url.protocol === "https:" ? "wss" : "ws",
     });
-
     socketRef.current = socket;
-    setStatus("connecting");
-    setMessages([]);
 
-    const onOpen = (): void => setStatus("open");
-    const onClose = (): void => setStatus("closed");
+    const onOpen = (): void => setStatus(store, "open");
+    const onClose = (): void => setStatus(store, "closed");
     const onMessage = (ev: MessageEvent): void => {
       let json: unknown;
       try {
@@ -75,18 +59,7 @@ export function useRoomSocket(slug: string): UseRoomSocket {
         return;
       }
 
-      const event = parsed.value;
-      if (isRoomSnapshot(event)) {
-        setMessages(event.payload.recentEvents.filter(isChatMessageSent));
-        return;
-      }
-      if (isChatMessageSent(event)) {
-        setMessages((prev) => [...prev, event]);
-        return;
-      }
-      if (isIntentRejected(event)) {
-        console.warn("intent rejected:", event.payload.reason);
-      }
+      applyEvent(store, parsed.value);
     };
 
     socket.addEventListener("open", onOpen);
@@ -100,7 +73,15 @@ export function useRoomSocket(slug: string): UseRoomSocket {
       socket.close();
       socketRef.current = null;
     };
-  }, [slug]);
+  }, [slug, store]);
+
+  const status = useSelector(store, (s: RoomState) => s.status);
+
+  const myUserId = useSelector(store, (s: RoomState) => s.myUserId);
+
+  const members = useSelector(store, (s: RoomState) => s.members);
+
+  const timeline = useSelector(store, (s: RoomState) => s.timeline);
 
   const send = (text: string): void => {
     const sock = socketRef.current;
@@ -115,5 +96,5 @@ export function useRoomSocket(slug: string): UseRoomSocket {
     sock.send(JSON.stringify(intent));
   };
 
-  return { status, messages, send };
+  return { status, myUserId, members, timeline, send };
 }
