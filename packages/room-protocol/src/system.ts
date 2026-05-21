@@ -19,6 +19,10 @@ export const roomSnapshotPayload = type({
   yourRole: "'member' | 'spectator'",
   yourSlot: "0 | 1 | 2 | 3 | null",
   yourUserId: "string | null",
+  // Optional explanation when `yourRole === "spectator"` was forced rather
+  // than chosen. Currently only emitted on the cap-downgrade path; absent on
+  // anonymous-spectator and full-room-spectator attaches.
+  "reason?": "'membership_cap'",
 });
 
 export type RoomSnapshotPayload = typeof roomSnapshotPayload.infer;

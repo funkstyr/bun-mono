@@ -24,6 +24,10 @@
       "types": "./dist/member-events.d.ts",
       "import": "./dist/member-events.js"
     },
+    "./room-intents": {
+      "types": "./dist/room-intents.d.ts",
+      "import": "./dist/room-intents.js"
+    },
     "./kinds": {
       "types": "./dist/kinds.d.ts",
       "import": "./dist/kinds.js"

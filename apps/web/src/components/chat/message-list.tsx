@@ -8,17 +8,26 @@ import {
   type RoomTimelineEntry,
 } from "./room-events";
 
-type Props = { timeline: readonly RoomTimelineEntry[] };
+type Props = {
+  timeline: readonly RoomTimelineEntry[];
+  displayNamesByUserId: Readonly<Record<string, string>>;
+};
 
-function systemText(e: MemberJoinedEvent | MemberLeftEvent): string {
+function systemText(
+  e: MemberJoinedEvent | MemberLeftEvent,
+  names: Readonly<Record<string, string>>,
+): string {
   if (isMemberJoined(e)) return `${e.payload.displayName} joined`;
+
+  const name = names[e.payload.userId] ?? `slot ${e.payload.slot}`;
+
   if (e.payload.reason === "ttl_expired") {
-    return `slot ${e.payload.slot} reopened after 24h idle`;
+    return `${name}'s slot reopened after 24h idle`;
   }
-  return `slot ${e.payload.slot} left`;
+  return `${name} left the Room`;
 }
 
-export function MessageList({ timeline }: Props): React.ReactElement {
+export function MessageList({ timeline, displayNamesByUserId }: Props): React.ReactElement {
   const ref = useRef<HTMLUListElement | null>(null);
 
   useEffect(() => {
@@ -50,7 +59,7 @@ export function MessageList({ timeline }: Props): React.ReactElement {
           <li key={entry.id} className="text-muted-foreground flex gap-2 text-xs italic">
             <span className="font-mono">{new Date(entry.ts).toLocaleTimeString()}</span>
 
-            <span>— {systemText(entry)}</span>
+            <span>— {systemText(entry, displayNamesByUserId)}</span>
           </li>
         );
       })}

@@ -143,6 +143,25 @@ describe("roomSnapshotPayload", () => {
     const result = roomSnapshotPayload(snap);
     expect(result instanceof type.errors).toBe(true);
   });
+
+  it("accepts an optional reason: 'membership_cap' (cap-downgrade Spectator)", () => {
+    const result = roomSnapshotPayload({
+      ...validSnapshot(),
+      yourRole: "spectator",
+      yourSlot: null,
+      reason: "membership_cap",
+    });
+    expect(result instanceof type.errors).toBe(false);
+  });
+
+  it("rejects an unknown reason literal", () => {
+    const result = roomSnapshotPayload({
+      ...validSnapshot(),
+      yourRole: "spectator",
+      reason: "room_full",
+    });
+    expect(result instanceof type.errors).toBe(true);
+  });
 });
 
 describe("intentRejectedPayload", () => {

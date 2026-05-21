@@ -1,9 +1,16 @@
-import { and, eq, isNotNull, lt } from "drizzle-orm";
+import { and, eq, isNotNull, lt, sql } from "drizzle-orm";
 
 import { user } from "@bun-mono/db/schema/auth";
 import { roomMember } from "@bun-mono/db/schema/room";
 
 import type { AnyLibSQLDatabase } from "./types";
+
+// Per-User soft cap on `room_member` rows. Enforced by `room.create` (orpc
+// typed error) and the WS-attach path (downgrade to Spectator). Not a hard
+// constraint at the DB level — a User who is already a Member of >= 10
+// Rooms when this cap ships is allowed to continue, they just can't join
+// or create more until they leave one.
+export const MEMBERSHIP_CAP = 10;
 
 export type Slot = 0 | 1 | 2 | 3;
 
@@ -94,6 +101,33 @@ export async function setMemberLastSeen(
     .update(roomMember)
     .set({ lastSeenAt: lastSeenAt === null ? null : new Date(lastSeenAt) })
     .where(and(eq(roomMember.roomId, roomId), eq(roomMember.userId, userId)));
+}
+
+// Unconditional delete used by the explicit-leave path. The TTL sweeper
+// uses `deleteStaleMember` instead — its WHERE clause guards against a
+// race with reconnect. Explicit leave has no such race: the User chose to
+// release the slot.
+export async function deleteMemberRow(
+  db: AnyLibSQLDatabase,
+  roomId: string,
+  userId: string,
+): Promise<void> {
+  await db
+    .delete(roomMember)
+    .where(and(eq(roomMember.roomId, roomId), eq(roomMember.userId, userId)));
+}
+
+// Count of Memberships owned by this User across all Rooms — drives the
+// 10-Membership soft cap enforced on `room.create` and WS attach.
+export async function countMembershipsForUser(
+  db: AnyLibSQLDatabase,
+  userId: string,
+): Promise<number> {
+  const rows = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(roomMember)
+    .where(eq(roomMember.userId, userId));
+  return Number(rows[0]?.count ?? 0);
 }
 
 export type StaleMemberRow = { userId: string; slot: Slot };

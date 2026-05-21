@@ -139,8 +139,10 @@ describe("createRoomStore", () => {
       status: "connecting",
       myUserId: null,
       myRole: "unknown",
+      spectatorReason: null,
       spectatorCount: 0,
       members: [],
+      displayNamesByUserId: {},
       timeline: [],
       typingUserIds: [],
     });
@@ -168,8 +170,10 @@ describe("resetStore", () => {
       status: "connecting",
       myUserId: null,
       myRole: "unknown",
+      spectatorReason: null,
       spectatorCount: 0,
       members: [],
+      displayNamesByUserId: {},
       timeline: [],
       typingUserIds: [],
     });

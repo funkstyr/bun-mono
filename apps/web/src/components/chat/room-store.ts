@@ -11,6 +11,7 @@ import {
   isMemberOnline,
   isRoomSnapshot,
   isTimelineEntry,
+  type MemberJoinedEvent,
   type MemberView,
   type RoomTimelineEntry,
 } from "./room-events";
@@ -19,12 +20,20 @@ export type ConnectionStatus = "connecting" | "open" | "closed";
 
 export type MyRole = "unknown" | "member" | "spectator";
 
+export type SpectatorReason = "membership_cap";
+
 export type RoomState = {
   status: ConnectionStatus;
   myUserId: string | null;
   myRole: MyRole;
+  spectatorReason: SpectatorReason | null;
   spectatorCount: number;
   members: readonly MemberView[];
+  // Sticky display-name lookup for users who may no longer be Members —
+  // populated from snapshot.members and `member_joined` events (current
+  // and historical). Entries persist across `member_left` so the message
+  // list can render "Alice left the Room" with the actual name.
+  displayNamesByUserId: Readonly<Record<string, string>>;
   timeline: readonly RoomTimelineEntry[];
   typingUserIds: readonly string[];
 };
@@ -33,8 +42,10 @@ const initial: RoomState = {
   status: "connecting",
   myUserId: null,
   myRole: "unknown",
+  spectatorReason: null,
   spectatorCount: 0,
   members: [],
+  displayNamesByUserId: {},
   timeline: [],
   typingUserIds: [],
 };
@@ -56,13 +67,16 @@ export function setStatus(store: RoomStore, status: ConnectionStatus): void {
 export function applyEvent(store: RoomStore, event: EventEnvelope): void {
   if (isRoomSnapshot(event)) {
     const { payload } = event;
+    const timeline = payload.recentEvents.filter(isTimelineEntry);
     store.setState(() => ({
       status: "open",
       myUserId: payload.yourUserId,
       myRole: payload.yourRole,
+      spectatorReason: payload.reason ?? null,
       spectatorCount: payload.spectatorCount,
       members: sortBySlot(payload.members),
-      timeline: payload.recentEvents.filter(isTimelineEntry),
+      displayNamesByUserId: collectDisplayNames(payload.members, timeline),
+      timeline,
       // Snapshot doesn't carry typing state — typing is transient by definition.
       typingUserIds: [],
     }));
@@ -80,14 +94,18 @@ export function applyEvent(store: RoomStore, event: EventEnvelope): void {
       // Promotion-on-intent: when *I* am the user being joined, this event
       // arrives before any reply to my pending chat intent — flip my role
       // so the input unlocks immediately without a snapshot round-trip.
-      const myRole: MyRole = userId === s.myUserId ? "member" : s.myRole;
+      const isMe = userId === s.myUserId;
+      const myRole: MyRole = isMe ? "member" : s.myRole;
+      const spectatorReason: SpectatorReason | null = isMe ? null : s.spectatorReason;
       return {
         ...s,
         myRole,
+        spectatorReason,
         members: sortBySlot([
           ...s.members.filter((m) => m.userId !== userId),
           { userId, slot, displayName, online: false, lastSeenAt: null },
         ]),
+        displayNamesByUserId: { ...s.displayNamesByUserId, [userId]: displayName },
         timeline: [...s.timeline, event],
       };
     });
@@ -140,4 +158,23 @@ function patchMember(store: RoomStore, userId: string, patch: Partial<MemberView
 
 function sortBySlot(members: readonly MemberView[]): MemberView[] {
   return [...members].toSorted((a, b) => a.slot - b.slot);
+}
+
+// Seed the name lookup from the snapshot's current Members plus any
+// historical `member_joined` events in the recent timeline — that covers
+// the case where a User left before the snapshot but their `member_left`
+// is still in the recent-events window.
+function collectDisplayNames(
+  members: readonly MemberView[],
+  timeline: readonly RoomTimelineEntry[],
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const m of members) out[m.userId] = m.displayName;
+  for (const entry of timeline) {
+    if (entry.kind === "room.member_joined") {
+      const joined = entry as MemberJoinedEvent;
+      out[joined.payload.userId] = joined.payload.displayName;
+    }
+  }
+  return out;
 }
