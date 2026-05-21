@@ -4,8 +4,8 @@ import { db as defaultDb } from "@bun-mono/db";
 import { room as roomTable } from "@bun-mono/db/schema/room";
 
 import { chatReducer } from "./chat-reducer";
-import { RoomActor, type AnyLibSQLDatabase, type RoomActorDeps } from "./room-actor";
-import type { RoomKind, RoomRow } from "./types";
+import { RoomActor, type RoomActorDeps } from "./room-actor";
+import type { AnyLibSQLDatabase, RoomKind, RoomRow } from "./types";
 
 export type RegistryDeps = {
   db?: AnyLibSQLDatabase;

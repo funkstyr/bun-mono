@@ -3,11 +3,12 @@ import { customAlphabet } from "nanoid";
 
 import { roomEvent } from "@bun-mono/db/schema/room";
 import type { EventEnvelope } from "@bun-mono/room-protocol/envelope";
+import { durable, type EventKind } from "@bun-mono/room-protocol/kinds";
 import type {
   MemberJoinedPayload,
   MemberOfflinePayload,
   MemberOnlinePayload,
-} from "@bun-mono/room-protocol/room-events";
+} from "@bun-mono/room-protocol/member-events";
 import type { RoomMember } from "@bun-mono/room-protocol/system";
 
 import type { ChatEvent, ChatIntent, ChatState } from "./chat-reducer";
@@ -26,8 +27,6 @@ const SNAPSHOT_EVENT_COUNT = 100;
 
 const idAlphabet = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ0123456789";
 const generateEventId = customAlphabet(idAlphabet, 21);
-
-export type { AnyLibSQLDatabase };
 
 export type RoomActorDeps = {
   db: AnyLibSQLDatabase;
@@ -54,7 +53,7 @@ export class RoomActor {
   private readonly connections = new Map<string, Connection>();
   private readonly connectionsByUser = new Map<string, Set<string>>();
   private readonly members = new Map<string, MemberInfo>();
-  private readonly admissionsInFlight = new Map<string, Promise<MemberInfo | null>>();
+  private admissionChain: Promise<unknown> = Promise.resolve();
   private state: ChatState;
   private recentDurableEvents: EventEnvelope[] = [];
   private nextPosition = 0;
@@ -99,9 +98,8 @@ export class RoomActor {
 
     if (!wasOnline) {
       this.members.set(conn.userId, { ...existing, lastSeenAt: null });
-      // Clear lastSeenAt so a future cold-start reads "currently online"
-      // correctly. Sequenced before the broadcast to avoid colliding with the
-      // event-log write on libsql (SQLITE_BUSY).
+      // Persist lastSeenAt=null so a future cold-start reads "currently
+      // online" correctly until the next detach overwrites it.
       await setMemberLastSeen(this.db, this.room.id, conn.userId, null);
       this.emitTransient<MemberOnlinePayload>("room.member_online", {
         userId: conn.userId,
@@ -177,19 +175,21 @@ export class RoomActor {
   }
 
   private ensureAdmitted(userId: string): Promise<MemberInfo | null> {
-    // Two concurrent first-attaches from the same User would otherwise both
-    // pass the `members.get(userId) === undefined` check and race into
-    // `insertMemberRow`, where the (roomId, userId) primary key would throw
-    // on the loser. Memoize the in-flight admission so the second caller
-    // awaits the first's result.
-    const inFlight = this.admissionsInFlight.get(userId);
-    if (inFlight !== undefined) return inFlight;
-
-    const promise = this.admitNewMember(userId).finally(() => {
-      this.admissionsInFlight.delete(userId);
+    // Serialize admissions across all users. Two concurrent first-attaches
+    // (same or different users) would otherwise both read an empty / stale
+    // `members.values()` between awaits — same user races into a PK
+    // violation on (roomId, userId); different users race into a unique
+    // violation on (roomId, slotIndex). The chain lets each admission run
+    // to completion before the next reads taken slots. Same-user races also
+    // fold in: the second caller re-checks `members` after the chain
+    // resolves and finds the row the first admission inserted.
+    const next = this.admissionChain.then(() => {
+      const existing = this.members.get(userId);
+      if (existing !== undefined) return existing;
+      return this.admitNewMember(userId);
     });
-    this.admissionsInFlight.set(userId, promise);
-    return promise;
+    this.admissionChain = next.catch(() => undefined);
+    return next;
   }
 
   private async admitNewMember(userId: string): Promise<MemberInfo | null> {
@@ -263,7 +263,9 @@ export class RoomActor {
   }
 
   private async emitDurableSystem<TPayload>(
-    kind: "room.member_joined" | "room.member_left",
+    // member_left is reserved in the protocol but emission is deferred to a
+    // later slice (eviction / TTL). When that lands, widen this union.
+    kind: "room.member_joined",
     payload: TPayload,
   ): Promise<void> {
     const event: EventEnvelope = {
@@ -390,15 +392,15 @@ export class RoomActor {
 }
 
 function rowToDurableEvent(row: RoomEventRow): EventEnvelope | null {
-  if (
-    row.kind !== "chat.message_sent" &&
-    row.kind !== "room.member_joined" &&
-    row.kind !== "room.member_left"
-  ) {
-    return null;
-  }
+  // Source of truth for "is this kind durable" lives in
+  // `@bun-mono/room-protocol/kinds`. A row whose kind isn't in the registry
+  // (legacy data) or is registered as transient (shouldn't be in the log,
+  // but defensive) is dropped from rehydration.
+  if (!Object.hasOwn(durable, row.kind)) return null;
+  const kind = row.kind as EventKind;
+  if (!durable[kind]) return null;
   return {
-    kind: row.kind,
+    kind,
     payload: JSON.parse(row.payload),
     id: row.id,
     ts: row.ts,

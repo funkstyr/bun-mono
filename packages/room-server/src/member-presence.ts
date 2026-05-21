@@ -22,6 +22,10 @@ export function allocateSlot(taken: ReadonlySet<number>): Slot | null {
   return null;
 }
 
+function isSlot(n: number): n is Slot {
+  return n === 0 || n === 1 || n === 2 || n === 3;
+}
+
 export async function loadMembers(
   db: AnyLibSQLDatabase,
   roomId: string,
@@ -39,8 +43,16 @@ export async function loadMembers(
 
   const out = new Map<string, MemberInfo>();
   for (const row of rows) {
+    if (!isSlot(row.slotIndex)) {
+      console.warn("loadMembers: skipping row with out-of-range slotIndex", {
+        roomId,
+        userId: row.userId,
+        slotIndex: row.slotIndex,
+      });
+      continue;
+    }
     out.set(row.userId, {
-      slot: row.slotIndex as Slot,
+      slot: row.slotIndex,
       displayName: row.displayName,
       lastSeenAt: row.lastSeenAt instanceof Date ? row.lastSeenAt.getTime() : row.lastSeenAt,
     });

@@ -20,9 +20,9 @@
       "types": "./dist/system.d.ts",
       "import": "./dist/system.js"
     },
-    "./room-events": {
-      "types": "./dist/room-events.d.ts",
-      "import": "./dist/room-events.js"
+    "./member-events": {
+      "types": "./dist/member-events.d.ts",
+      "import": "./dist/member-events.js"
     },
     "./kinds": {
       "types": "./dist/kinds.d.ts",

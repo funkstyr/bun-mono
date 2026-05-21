@@ -25,11 +25,11 @@
       "Bash(gh label *)",
       "Bash(gh issue *)",
       "Bash(gh project *)",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Skill(pr-review)",
+      "Bash(gh pr *)"
     ],
     "deny": [
-      "Read(**/node_modules/**)",
-      "Read(**/dist/**)",
       "Read(**/.turbo/**)",
       "Read(**/coverage/**)",
       "Read(**/playwright-report/**)",

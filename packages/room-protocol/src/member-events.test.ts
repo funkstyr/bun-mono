@@ -7,7 +7,7 @@ import {
   memberLeftPayload,
   memberOfflinePayload,
   memberOnlinePayload,
-} from "./room-events";
+} from "./member-events";
 
 describe("memberJoinedPayload", () => {
   it("accepts a valid payload", () => {

@@ -7,7 +7,7 @@ import {
   memberLeftPayload,
   memberOfflinePayload,
   memberOnlinePayload,
-} from "./room-events";
+} from "./member-events";
 import { intentRejectedPayload, roomSnapshotPayload } from "./system";
 
 export type IntentKind = "chat.send_message";

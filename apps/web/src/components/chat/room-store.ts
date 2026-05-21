@@ -2,15 +2,16 @@ import { Store } from "@tanstack/store";
 
 import type { EventEnvelope } from "@bun-mono/room-protocol/envelope";
 
-import type {
-  ChatMessageEvent,
-  MemberJoinedEvent,
-  MemberLeftEvent,
-  MemberOfflineEvent,
-  MemberOnlineEvent,
-  MemberView,
-  RoomSnapshotEvent,
-  RoomTimelineEntry,
+import {
+  isChatMessage,
+  isMemberJoined,
+  isMemberLeft,
+  isMemberOffline,
+  isMemberOnline,
+  isRoomSnapshot,
+  isTimelineEntry,
+  type MemberView,
+  type RoomTimelineEntry,
 } from "./room-events";
 
 export type ConnectionStatus = "connecting" | "open" | "closed";
@@ -44,7 +45,7 @@ export function setStatus(store: RoomStore, status: ConnectionStatus): void {
 }
 
 export function applyEvent(store: RoomStore, event: EventEnvelope): void {
-  if (isSnapshot(event)) {
+  if (isRoomSnapshot(event)) {
     const { payload } = event;
     store.setState(() => ({
       status: "open",
@@ -103,32 +104,4 @@ function patchMember(store: RoomStore, userId: string, patch: Partial<MemberView
 
 function sortBySlot(members: readonly MemberView[]): MemberView[] {
   return [...members].toSorted((a, b) => a.slot - b.slot);
-}
-
-function isSnapshot(ev: EventEnvelope): ev is RoomSnapshotEvent {
-  return ev.kind === "room.snapshot";
-}
-
-function isChatMessage(ev: EventEnvelope): ev is ChatMessageEvent {
-  return ev.kind === "chat.message_sent";
-}
-
-function isMemberJoined(ev: EventEnvelope): ev is MemberJoinedEvent {
-  return ev.kind === "room.member_joined";
-}
-
-function isMemberLeft(ev: EventEnvelope): ev is MemberLeftEvent {
-  return ev.kind === "room.member_left";
-}
-
-function isMemberOnline(ev: EventEnvelope): ev is MemberOnlineEvent {
-  return ev.kind === "room.member_online";
-}
-
-function isMemberOffline(ev: EventEnvelope): ev is MemberOfflineEvent {
-  return ev.kind === "room.member_offline";
-}
-
-function isTimelineEntry(ev: EventEnvelope): ev is RoomTimelineEntry {
-  return isChatMessage(ev) || isMemberJoined(ev) || isMemberLeft(ev);
 }

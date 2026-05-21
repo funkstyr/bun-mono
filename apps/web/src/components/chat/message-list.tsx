@@ -1,21 +1,14 @@
 import { useEffect, useRef } from "react";
 
-import type {
-  ChatMessageEvent,
-  MemberJoinedEvent,
-  MemberLeftEvent,
-  RoomTimelineEntry,
+import {
+  isChatMessage,
+  isMemberJoined,
+  type MemberJoinedEvent,
+  type MemberLeftEvent,
+  type RoomTimelineEntry,
 } from "./room-events";
 
 type Props = { timeline: readonly RoomTimelineEntry[] };
-
-function isChatMessage(e: RoomTimelineEntry): e is ChatMessageEvent {
-  return e.kind === "chat.message_sent";
-}
-
-function isMemberJoined(e: RoomTimelineEntry): e is MemberJoinedEvent {
-  return e.kind === "room.member_joined";
-}
 
 function systemText(e: MemberJoinedEvent | MemberLeftEvent): string {
   if (isMemberJoined(e)) return `${e.payload.displayName} joined`;
