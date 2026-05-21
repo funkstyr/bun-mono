@@ -15,11 +15,13 @@ export type RoomRow = {
   createdAt: number;
 };
 
+// `userId: null` is a cookie-less Spectator. Slot ownership is decided by
+// the actor (presence of a `room_member` row), not by this shape.
 export type Connection = {
-  connectionId: string;
-  userId: string;
-  send: (event: EventEnvelope) => void;
-  close: (code: number, reason: string) => void;
+  readonly connectionId: string;
+  readonly userId: string | null;
+  readonly send: (event: EventEnvelope) => void;
+  readonly close: (code: number, reason: string) => void;
 };
 
 export type ReducerContext = {

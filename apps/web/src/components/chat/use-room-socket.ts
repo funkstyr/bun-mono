@@ -13,14 +13,17 @@ import {
   resetStore,
   setStatus,
   type ConnectionStatus,
+  type MyRole,
   type RoomState,
 } from "./room-store";
 
-export type { ConnectionStatus };
+export type { ConnectionStatus, MyRole };
 
 type UseRoomSocket = {
   status: ConnectionStatus;
   myUserId: string | null;
+  myRole: MyRole;
+  spectatorCount: number;
   members: readonly MemberView[];
   timeline: readonly RoomTimelineEntry[];
   send: (text: string) => void;
@@ -79,6 +82,10 @@ export function useRoomSocket(slug: string): UseRoomSocket {
 
   const myUserId = useSelector(store, (s: RoomState) => s.myUserId);
 
+  const myRole = useSelector(store, (s: RoomState) => s.myRole);
+
+  const spectatorCount = useSelector(store, (s: RoomState) => s.spectatorCount);
+
   const members = useSelector(store, (s: RoomState) => s.members);
 
   const timeline = useSelector(store, (s: RoomState) => s.timeline);
@@ -96,5 +103,5 @@ export function useRoomSocket(slug: string): UseRoomSocket {
     sock.send(JSON.stringify(intent));
   };
 
-  return { status, myUserId, members, timeline, send };
+  return { status, myUserId, myRole, spectatorCount, members, timeline, send };
 }

@@ -31,14 +31,16 @@ function snapshot(
   members: ReadonlyArray<MemberView>,
   recentEvents: EventEnvelope[] = [],
   yourUserId: string | null = "alice",
+  yourRole: "member" | "spectator" = "member",
+  spectatorCount = 0,
 ): RoomSnapshotEvent {
   return {
     kind: "room.snapshot",
     payload: {
       members: [...members],
       recentEvents,
-      spectatorCount: 0,
-      yourRole: "member",
+      spectatorCount,
+      yourRole,
       yourSlot: members.find((m) => m.userId === yourUserId)?.slot ?? null,
       yourUserId,
     },
@@ -123,6 +125,8 @@ describe("createRoomStore", () => {
     expect(store.state).toEqual({
       status: "connecting",
       myUserId: null,
+      myRole: "unknown",
+      spectatorCount: 0,
       members: [],
       timeline: [],
     });
@@ -149,6 +153,8 @@ describe("resetStore", () => {
     expect(store.state).toEqual({
       status: "connecting",
       myUserId: null,
+      myRole: "unknown",
+      spectatorCount: 0,
       members: [],
       timeline: [],
     });
@@ -256,6 +262,41 @@ describe("applyEvent — room.member_left", () => {
     applyEvent(store, left("ghost", 3, "ttl_expired", 4));
     expect(store.state.members).toEqual(before);
     expect(store.state.timeline.map((e) => e.kind)).toEqual(["room.member_left"]);
+  });
+});
+
+describe("applyEvent — spectator role + spectatorCount", () => {
+  it("records myRole and spectatorCount from snapshot for an anonymous spectator", () => {
+    const store = createRoomStore();
+    applyEvent(store, snapshot([alice], [], null, "spectator", 2));
+    expect(store.state.myUserId).toBeNull();
+    expect(store.state.myRole).toBe("spectator");
+    expect(store.state.spectatorCount).toBe(2);
+  });
+
+  it("records myRole=spectator for a full-room downgraded but authenticated user", () => {
+    const store = createRoomStore();
+    applyEvent(store, snapshot([alice, bob], [], "carol", "spectator", 0));
+    expect(store.state.myUserId).toBe("carol");
+    expect(store.state.myRole).toBe("spectator");
+  });
+
+  it("flips myRole from spectator to member when my own member_joined arrives (promotion)", () => {
+    const store = createRoomStore();
+    applyEvent(store, snapshot([alice], [], "carol", "spectator", 1));
+    expect(store.state.myRole).toBe("spectator");
+
+    applyEvent(store, joined("carol", 2, "Carol", 10));
+
+    expect(store.state.myRole).toBe("member");
+    expect(store.state.members.find((m) => m.userId === "carol")?.slot).toBe(2);
+  });
+
+  it("does not flip myRole when a different user joins", () => {
+    const store = createRoomStore();
+    applyEvent(store, snapshot([alice], [], "carol", "spectator", 1));
+    applyEvent(store, joined("bob", 1, "Bob", 10));
+    expect(store.state.myRole).toBe("spectator");
   });
 });
 

@@ -13,8 +13,12 @@ const generateConnectionId = customAlphabet(connectionIdAlphabet, 16);
 const eventIdAlphabet = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ0123456789";
 const generateRejectionId = customAlphabet(eventIdAlphabet, 21);
 
+// `userId` is the authenticated id at upgrade time, or `null` for a
+// cookie-less anonymous Spectator. Promotion to a Member requires a fresh
+// WS connection (i.e. the client must reconnect after sign-in) — the
+// upgrade request's headers are not re-evaluated mid-connection.
 export type RoomUpgradeContext = {
-  userId: string;
+  userId: string | null;
   slug: string;
   roomId: string;
   connectionId: string;
@@ -30,7 +34,6 @@ export async function authoriseRoomUpgrade(
   deps: RegistryDeps = {},
 ): Promise<AuthoriseResult> {
   const session = await auth.api.getSession({ headers: req.headers });
-  if (!session?.user) return { ok: false, status: 401, reason: "unauthenticated" };
 
   const found = await getOrCreateActorBySlug(slug, deps);
   if (!found) return { ok: false, status: 404, reason: "room_not_found" };
@@ -38,7 +41,7 @@ export async function authoriseRoomUpgrade(
   return {
     ok: true,
     ctx: {
-      userId: session.user.id,
+      userId: session?.user?.id ?? null,
       slug,
       roomId: found.row.id,
       connectionId: generateConnectionId(),
@@ -112,11 +115,8 @@ export async function onRoomMessage(
     return;
   }
 
-  // Invariant: `onRoomOpen` runs before any `onRoomMessage`, so this entry
-  // is always populated by the time a message arrives. If it isn't, the
-  // socket is in an unexpected state — close it rather than building a
-  // fresh disconnected Connection that the actor wouldn't know to broadcast
-  // back to.
+  // `onRoomOpen` runs before any `onRoomMessage`, so this entry is always
+  // populated by the time a message arrives — close on the impossible.
   const entry = connByConnectionId.get(ctx.connectionId);
   if (!entry) {
     close(1011, "no_open_handshake");

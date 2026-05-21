@@ -43,6 +43,9 @@
     },
     "db:local": {
       "cache": false
+    },
+    "db:init": {
+      "cache": false
     }
   }
 }

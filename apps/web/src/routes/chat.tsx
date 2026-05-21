@@ -1,18 +1,11 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 
-import { getUser } from "@/functions/get-user";
-
+// No auth gate on the parent layout — `/chat/r/:slug` accepts anonymous
+// Spectators, and only the `/chat` index (Memberships list + Create Room
+// CTA) requires a session. Each child route enforces its own auth
+// requirement.
 export const Route = createFileRoute("/chat")({
   component: RouteComponent,
-  beforeLoad: async () => {
-    const session = await getUser();
-    return { session };
-  },
-  loader: async ({ context }) => {
-    if (!context.session) {
-      throw redirect({ to: "/login" });
-    }
-  },
 });
 
 function RouteComponent(): React.ReactElement {
