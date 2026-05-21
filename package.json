@@ -59,6 +59,7 @@
     "db:generate": "turbo -F @bun-mono/db db:generate",
     "db:migrate": "turbo -F @bun-mono/db db:migrate",
     "db:local": "turbo -F @bun-mono/db db:local",
+    "db:init": "turbo -F @bun-mono/db db:init",
     "postinstall": "lefthook install",
     "up-deps": "bunx taze -r -w minor",
     "up-deps:major": "bunx taze -r -w major",
