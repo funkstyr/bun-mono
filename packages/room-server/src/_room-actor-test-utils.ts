@@ -43,6 +43,14 @@ export function makeIntent(text: string, intentId: string): ChatIntent {
   };
 }
 
+export function makeTypingIntent(intentId: string): ChatIntent {
+  return {
+    kind: "chat.typing_ping",
+    payload: {},
+    intentId,
+  };
+}
+
 export function makeIdCounter(): () => string {
   let n = 0;
   return () => `id-${++n}`;

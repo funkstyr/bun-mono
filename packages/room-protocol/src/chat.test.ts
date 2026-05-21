@@ -1,7 +1,7 @@
 import { type } from "arktype";
 import { describe, expect, it } from "vitest";
 
-import { messageSentPayload, sendMessagePayload } from "./chat";
+import { messageSentPayload, sendMessagePayload, typingPayload, typingPingPayload } from "./chat";
 
 describe("sendMessagePayload — text bounds", () => {
   it("accepts text of length 1", () => {
@@ -68,5 +68,25 @@ describe("messageSentPayload — text bounds (mirror of sendMessagePayload)", ()
 
   it("rejects when text is null", () => {
     expect(messageSentPayload({ text: null }) instanceof type.errors).toBe(true);
+  });
+});
+
+describe("typingPingPayload — empty payload", () => {
+  it("accepts an empty object", () => {
+    expect(typingPingPayload({}) instanceof type.errors).toBe(false);
+  });
+});
+
+describe("typingPayload — userId", () => {
+  it("accepts a userId string", () => {
+    expect(typingPayload({ userId: "user-1" }) instanceof type.errors).toBe(false);
+  });
+
+  it("rejects when userId is missing", () => {
+    expect(typingPayload({}) instanceof type.errors).toBe(true);
+  });
+
+  it("rejects when userId is not a string", () => {
+    expect(typingPayload({ userId: 42 }) instanceof type.errors).toBe(true);
   });
 });

@@ -4,6 +4,7 @@ import type { EventEnvelope } from "@bun-mono/room-protocol/envelope";
 
 import type {
   ChatMessageEvent,
+  ChatTypingEvent,
   MemberJoinedEvent,
   MemberLeftEvent,
   MemberOfflineEvent,
@@ -11,7 +12,7 @@ import type {
   MemberView,
   RoomSnapshotEvent,
 } from "./room-events";
-import { applyEvent, createRoomStore, resetStore, setStatus } from "./room-store";
+import { applyEvent, createRoomStore, removeTypingUser, resetStore, setStatus } from "./room-store";
 
 type Slot = 0 | 1 | 2 | 3;
 
@@ -110,6 +111,18 @@ function offline(userId: string, slot: Slot, position: number, ts = 5000): Membe
   };
 }
 
+function typing(userId: string, position: number): ChatTypingEvent {
+  return {
+    kind: "chat.typing",
+    payload: { userId },
+    id: `t-${position}`,
+    ts: 1000 + position,
+    position,
+    from: userId,
+    durable: false,
+  };
+}
+
 const alice = {
   userId: "alice",
   slot: 0 as const,
@@ -129,6 +142,7 @@ describe("createRoomStore", () => {
       spectatorCount: 0,
       members: [],
       timeline: [],
+      typingUserIds: [],
     });
   });
 });
@@ -157,6 +171,7 @@ describe("resetStore", () => {
       spectatorCount: 0,
       members: [],
       timeline: [],
+      typingUserIds: [],
     });
   });
 });
@@ -297,6 +312,54 @@ describe("applyEvent — spectator role + spectatorCount", () => {
     applyEvent(store, snapshot([alice], [], "carol", "spectator", 1));
     applyEvent(store, joined("bob", 1, "Bob", 10));
     expect(store.state.myRole).toBe("spectator");
+  });
+});
+
+describe("applyEvent — chat.typing", () => {
+  it("adds the userId to typingUserIds without touching the timeline", () => {
+    const store = createRoomStore();
+    applyEvent(store, snapshot([alice, bob]));
+    const tlBefore = store.state.timeline;
+
+    applyEvent(store, typing("bob", 7));
+
+    expect(store.state.typingUserIds).toEqual(["bob"]);
+    expect(store.state.timeline).toBe(tlBefore);
+  });
+
+  it("is idempotent: a second typing event for the same user keeps a single entry", () => {
+    const store = createRoomStore();
+    applyEvent(store, snapshot([alice, bob]));
+
+    applyEvent(store, typing("bob", 7));
+    applyEvent(store, typing("bob", 8));
+
+    expect(store.state.typingUserIds).toEqual(["bob"]);
+  });
+
+  it("snapshot wipes typingUserIds (typing is transient by definition)", () => {
+    const store = createRoomStore();
+    applyEvent(store, snapshot([alice, bob]));
+    applyEvent(store, typing("bob", 7));
+    expect(store.state.typingUserIds).toEqual(["bob"]);
+
+    applyEvent(store, snapshot([alice, bob]));
+    expect(store.state.typingUserIds).toEqual([]);
+  });
+});
+
+describe("removeTypingUser", () => {
+  it("removes the userId; no-op when not present", () => {
+    const store = createRoomStore();
+    applyEvent(store, snapshot([alice, bob]));
+    applyEvent(store, typing("bob", 7));
+
+    removeTypingUser(store, "bob");
+    expect(store.state.typingUserIds).toEqual([]);
+
+    const before = store.state;
+    removeTypingUser(store, "ghost");
+    expect(store.state).toBe(before);
   });
 });
 

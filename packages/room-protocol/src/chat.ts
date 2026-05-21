@@ -11,3 +11,13 @@ export const messageSentPayload = type({
 });
 
 export type MessageSentPayload = typeof messageSentPayload.infer;
+
+export const typingPingPayload = type({});
+
+export type TypingPingPayload = typeof typingPingPayload.infer;
+
+export const typingPayload = type({
+  userId: "string",
+});
+
+export type TypingPayload = typeof typingPayload.infer;

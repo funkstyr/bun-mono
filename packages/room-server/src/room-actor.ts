@@ -1,6 +1,7 @@
 import { customAlphabet } from "nanoid";
 
 import type { EventEnvelope } from "@bun-mono/room-protocol/envelope";
+import { broadcastToSpectators, type EventKind } from "@bun-mono/room-protocol/kinds";
 import type {
   MemberJoinedPayload,
   MemberLeftPayload,
@@ -25,6 +26,12 @@ import type { AnyLibSQLDatabase, Connection, ReducerContext, RoomReducer, RoomRo
 
 const SNAPSHOT_EVENT_COUNT = 100;
 
+// Per-Member-per-Room rate limit on chat.typing broadcasts. A typing_ping
+// received within this window of the previous broadcast for the same Member
+// is accepted silently — no broadcast, no rejection. The client mirrors this
+// to avoid wasted intents, but the server is authoritative.
+const TYPING_DEBOUNCE_MS = 1500;
+
 const idAlphabet = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ0123456789";
 const generateEventId = customAlphabet(idAlphabet, 21);
 
@@ -45,6 +52,8 @@ export class RoomActor {
   private readonly members = new Map<string, MemberInfo>();
   // Connection ids attached without a slot — anonymous Spectators and authenticated joiners who found the Room full.
   private readonly spectators = new Set<string>();
+  // Last `chat.typing` broadcast timestamp per Member, for server-side debounce.
+  private readonly lastTypingAt = new Map<string, number>();
   private admissionChain: Promise<unknown> = Promise.resolve();
   private state: ChatState;
   private recentDurableEvents: EventEnvelope[] = [];
@@ -197,10 +206,19 @@ export class RoomActor {
     }
 
     for (const ev of result.emit) {
-      const positioned: ChatEvent = { ...ev, position: this.nextPosition };
-      this.nextPosition += 1;
+      // Server-side debounce for typing broadcasts. The reducer is pure; the
+      // debounce map lives on the actor and is consulted before broadcast
+      // so a swallowed ping consumes nothing — no event id pressure, no
+      // position increment, no listener wakeup.
+      if (ev.kind === "chat.typing" && !this.shouldEmitTyping(fromUserId)) continue;
 
+      const positioned: ChatEvent = { ...ev, position: this.nextPosition };
+
+      // Transient events from the reducer use `nextPosition` as a marker for
+      // "the state up to here" but do not claim a slot — matches the
+      // `emitTransient` shape for `room.member_online` / `room.member_offline`.
       if (positioned.durable) {
+        this.nextPosition += 1;
         // eslint-disable-next-line no-await-in-loop -- monotonic position assignment requires sequential persistence
         await this.persistAndPrune(positioned);
         this.pushRecentDurable(positioned);
@@ -210,6 +228,14 @@ export class RoomActor {
     }
 
     this.state = result.state;
+  }
+
+  private shouldEmitTyping(fromUserId: string): boolean {
+    const now = this.now();
+    const last = this.lastTypingAt.get(fromUserId);
+    if (last !== undefined && now - last < TYPING_DEBOUNCE_MS) return false;
+    this.lastTypingAt.set(fromUserId, now);
+    return true;
   }
 
   private ensureAdmitted(userId: string): Promise<MemberInfo | null> {
@@ -446,6 +472,13 @@ export class RoomActor {
   }
 
   private broadcast(ev: EventEnvelope): void {
-    for (const conn of this.connections.values()) conn.send(ev);
+    // Per-kind toggle: some transient broadcasts (e.g. `chat.typing`) are
+    // not meaningful to Spectators and the protocol opts them out.
+    const allowSpectators =
+      ev.kind in broadcastToSpectators ? broadcastToSpectators[ev.kind as EventKind] : true;
+    for (const [connId, conn] of this.connections) {
+      if (!allowSpectators && this.spectators.has(connId)) continue;
+      conn.send(ev);
+    }
   }
 }

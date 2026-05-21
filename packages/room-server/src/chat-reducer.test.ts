@@ -21,6 +21,14 @@ function makeIntent(text: string, intentId = "intent-1"): ChatIntent {
   };
 }
 
+function makeTypingIntent(intentId = "intent-typing"): ChatIntent {
+  return {
+    kind: "chat.typing_ping",
+    payload: {},
+    intentId,
+  };
+}
+
 describe("chatReducer.initialState", () => {
   it("returns an empty messages array", () => {
     const room = {
@@ -97,6 +105,31 @@ describe("chatReducer.handle — happy paths", () => {
     if (!result.ok) return;
     expect(result.state.messages).toHaveLength(1);
     expect(result.state.messages[0]?.payload.text).toBe("hello");
+  });
+});
+
+describe("chatReducer.handle — typing_ping", () => {
+  it("emits a chat.typing event with userId taken from ctx.fromUserId", () => {
+    const ctx = makeCtx({ fromUserId: "alice", now: () => 5000 });
+    const result = chatReducer.handle({ messages: [] }, makeTypingIntent(), ctx);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.emit).toHaveLength(1);
+    const ev = result.emit[0]!;
+    expect(ev.kind).toBe("chat.typing");
+    expect(ev.durable).toBe(false);
+    expect(ev.from).toBe("alice");
+    expect((ev.payload as { userId: string }).userId).toBe("alice");
+    expect(ev.ts).toBe(5000);
+  });
+
+  it("does not mutate state.messages on typing_ping", () => {
+    const ctx = makeCtx();
+    const before: ChatState = { messages: [] };
+    const result = chatReducer.handle(before, makeTypingIntent(), ctx);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.state.messages).toEqual(before.messages);
   });
 });
 
