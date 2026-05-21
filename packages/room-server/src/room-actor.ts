@@ -18,7 +18,6 @@ import {
   loadMembers,
   setMemberLastSeen,
   type MemberInfo,
-  type Slot,
 } from "./member-presence";
 import type { AnyLibSQLDatabase, Connection, ReducerContext, RoomReducer, RoomRow } from "./types";
 
@@ -55,6 +54,7 @@ export class RoomActor {
   private readonly connections = new Map<string, Connection>();
   private readonly connectionsByUser = new Map<string, Set<string>>();
   private readonly members = new Map<string, MemberInfo>();
+  private readonly admissionsInFlight = new Map<string, Promise<MemberInfo | null>>();
   private state: ChatState;
   private recentDurableEvents: EventEnvelope[] = [];
   private nextPosition = 0;
@@ -84,7 +84,7 @@ export class RoomActor {
     let existing = this.members.get(conn.userId);
 
     if (existing === undefined) {
-      const allocated = await this.admitNewMember(conn.userId);
+      const allocated = await this.ensureAdmitted(conn.userId);
       if (allocated === null) {
         conn.close(1008, "room_full");
         return;
@@ -176,6 +176,22 @@ export class RoomActor {
     this.state = result.state;
   }
 
+  private ensureAdmitted(userId: string): Promise<MemberInfo | null> {
+    // Two concurrent first-attaches from the same User would otherwise both
+    // pass the `members.get(userId) === undefined` check and race into
+    // `insertMemberRow`, where the (roomId, userId) primary key would throw
+    // on the loser. Memoize the in-flight admission so the second caller
+    // awaits the first's result.
+    const inFlight = this.admissionsInFlight.get(userId);
+    if (inFlight !== undefined) return inFlight;
+
+    const promise = this.admitNewMember(userId).finally(() => {
+      this.admissionsInFlight.delete(userId);
+    });
+    this.admissionsInFlight.set(userId, promise);
+    return promise;
+  }
+
   private async admitNewMember(userId: string): Promise<MemberInfo | null> {
     const takenSlots = new Set<number>();
     for (const info of this.members.values()) takenSlots.add(info.slot);
@@ -252,7 +268,7 @@ export class RoomActor {
   ): Promise<void> {
     const event: EventEnvelope = {
       kind,
-      payload: payload as unknown,
+      payload,
       id: this.nextEventId(),
       ts: this.now(),
       position: this.nextPosition,
@@ -275,7 +291,7 @@ export class RoomActor {
     // `room.intent_rejected` and `room.snapshot` patterns.
     const event: EventEnvelope = {
       kind,
-      payload: payload as unknown,
+      payload,
       id: this.nextEventId(),
       ts: this.now(),
       position: this.nextPosition,
@@ -383,7 +399,7 @@ function rowToDurableEvent(row: RoomEventRow): EventEnvelope | null {
   }
   return {
     kind: row.kind,
-    payload: JSON.parse(row.payload) as unknown,
+    payload: JSON.parse(row.payload),
     id: row.id,
     ts: row.ts,
     position: row.position,
@@ -391,6 +407,3 @@ function rowToDurableEvent(row: RoomEventRow): EventEnvelope | null {
     durable: true,
   };
 }
-
-// Re-export so existing imports of Slot keep working from the actor module.
-export type { Slot };

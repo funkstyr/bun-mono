@@ -7,7 +7,7 @@ import type {
   RoomTimelineEntry,
 } from "./room-events";
 
-type Props = { timeline: RoomTimelineEntry[] };
+type Props = { timeline: readonly RoomTimelineEntry[] };
 
 function isChatMessage(e: RoomTimelineEntry): e is ChatMessageEvent {
   return e.kind === "chat.message_sent";

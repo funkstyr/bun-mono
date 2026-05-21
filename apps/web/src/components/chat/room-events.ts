@@ -1,30 +1,43 @@
+import type { MessageSentPayload } from "@bun-mono/room-protocol/chat";
 import type { EventEnvelope } from "@bun-mono/room-protocol/envelope";
-
-type Slot = 0 | 1 | 2 | 3;
+import type {
+  MemberJoinedPayload,
+  MemberLeftPayload,
+  MemberOfflinePayload,
+  MemberOnlinePayload,
+} from "@bun-mono/room-protocol/room-events";
+import type { RoomSnapshotPayload } from "@bun-mono/room-protocol/system";
 
 export type ChatMessageEvent = EventEnvelope & {
   kind: "chat.message_sent";
-  payload: { text: string };
+  payload: MessageSentPayload;
 };
 
 export type MemberJoinedEvent = EventEnvelope & {
   kind: "room.member_joined";
-  payload: { userId: string; slot: Slot; displayName: string };
+  payload: MemberJoinedPayload;
 };
 
 export type MemberLeftEvent = EventEnvelope & {
   kind: "room.member_left";
-  payload: { userId: string; slot: Slot; reason: "left" | "ttl_expired" };
+  payload: MemberLeftPayload;
+};
+
+export type MemberOnlineEvent = EventEnvelope & {
+  kind: "room.member_online";
+  payload: MemberOnlinePayload;
+};
+
+export type MemberOfflineEvent = EventEnvelope & {
+  kind: "room.member_offline";
+  payload: MemberOfflinePayload;
+};
+
+export type RoomSnapshotEvent = EventEnvelope & {
+  kind: "room.snapshot";
+  payload: RoomSnapshotPayload;
 };
 
 export type RoomTimelineEntry = ChatMessageEvent | MemberJoinedEvent | MemberLeftEvent;
 
-export type RoomEvent = RoomTimelineEntry;
-
-export type MemberView = {
-  userId: string;
-  slot: Slot;
-  displayName: string;
-  online: boolean;
-  lastSeenAt: number | null;
-};
+export type MemberView = RoomSnapshotPayload["members"][number];

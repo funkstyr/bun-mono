@@ -1,7 +1,7 @@
 import type { MemberView } from "./room-events";
 
 type Props = {
-  members: MemberView[];
+  members: readonly MemberView[];
   myUserId: string | null;
 };
 

@@ -227,6 +227,35 @@ describe("RoomActor.attach — second User joining", () => {
   });
 });
 
+describe("RoomActor.attach — concurrent first-join from same User", () => {
+  it("admits only once across two concurrent first-attaches, no PK violation", async () => {
+    const actor = new RoomActor(room, chatReducer, {
+      db: testDb as AnyLibSQLDatabase,
+      now: () => 1000,
+      nextEventId: makeIdCounter(),
+    });
+    const a1 = makeConnection("c-a1", "alice");
+    const a2 = makeConnection("c-a2", "alice");
+
+    await Promise.all([actor.attach(a1), actor.attach(a2)]);
+
+    const rows = await testDb.select().from(roomMember).where(eq(roomMember.roomId, room.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.userId).toBe("alice");
+
+    const eventRows = await testDb
+      .select()
+      .from(roomEvent)
+      .where(eq(roomEvent.roomId, room.id))
+      .orderBy(roomEvent.position);
+    const joinedEvents = eventRows.filter((r) => r.kind === "room.member_joined");
+    expect(joinedEvents).toHaveLength(1);
+
+    expect(a1.closed).toBe(false);
+    expect(a2.closed).toBe(false);
+  });
+});
+
 describe("RoomActor.attach — reconnect", () => {
   it("does not re-emit member_joined for a reconnect (existing room_member row)", async () => {
     const actor = new RoomActor(room, chatReducer, {
