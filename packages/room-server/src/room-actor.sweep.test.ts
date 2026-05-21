@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { roomEvent, roomMember } from "@bun-mono/db/schema/room";
@@ -23,11 +23,11 @@ beforeEach(async () => {
   ({ testDb, room } = await setupRoomTest());
 });
 
-async function backdateLastSeen(db: TestDb, _roomId: string, userId: string, ts: number) {
+async function backdateLastSeen(db: TestDb, roomId: string, userId: string, ts: number) {
   await db
     .update(roomMember)
     .set({ lastSeenAt: new Date(ts) })
-    .where(eq(roomMember.userId, userId));
+    .where(and(eq(roomMember.roomId, roomId), eq(roomMember.userId, userId)));
 }
 
 describe("RoomActor.sweepStaleMembers — stale row past TTL", () => {
@@ -142,9 +142,6 @@ describe("RoomActor.attach — lazy sweep on connect", () => {
     expect(userIds).toEqual(["bob"]);
     expect(payload.yourSlot).toBe(0);
 
-    // Bob also saw the durable member_left for the swept Alice (before his
-    // own snapshot — or alongside it; what matters is the snapshot doesn't
-    // include the stale row).
     const rows = await testDb.select().from(roomMember).where(eq(roomMember.roomId, room.id));
     expect(rows.map((r) => r.userId)).toEqual(["bob"]);
   });

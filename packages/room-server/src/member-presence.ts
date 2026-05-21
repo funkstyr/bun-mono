@@ -104,7 +104,7 @@ export async function loadStaleMembers(
   db: AnyLibSQLDatabase,
   roomId: string,
   threshold: number,
-): Promise<StaleMemberRow[]> {
+): Promise<readonly StaleMemberRow[]> {
   const rows = await db
     .select({ userId: roomMember.userId, slotIndex: roomMember.slotIndex })
     .from(roomMember)

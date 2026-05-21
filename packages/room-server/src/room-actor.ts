@@ -1,9 +1,6 @@
-import { eq, sql } from "drizzle-orm";
 import { customAlphabet } from "nanoid";
 
-import { roomEvent } from "@bun-mono/db/schema/room";
 import type { EventEnvelope } from "@bun-mono/room-protocol/envelope";
-import { durable, type EventKind } from "@bun-mono/room-protocol/kinds";
 import type {
   MemberJoinedPayload,
   MemberLeftPayload,
@@ -18,15 +15,14 @@ import {
   deleteStaleMember,
   insertMemberRow,
   loadDisplayName,
-  loadMembers,
   loadStaleMembers,
   setMemberLastSeen,
   type MemberInfo,
 } from "./member-presence";
+import { persistAndPruneEvent, rehydrateRoom } from "./room-actor-persistence";
 import { TTL_MS } from "./ttl";
 import type { AnyLibSQLDatabase, Connection, ReducerContext, RoomReducer, RoomRow } from "./types";
 
-const EVENT_LOG_CAP = 500;
 const SNAPSHOT_EVENT_COUNT = 100;
 
 const idAlphabet = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ0123456789";
@@ -36,16 +32,6 @@ export type RoomActorDeps = {
   db: AnyLibSQLDatabase;
   now?: () => number;
   nextEventId?: () => string;
-};
-
-type RoomEventRow = {
-  roomId: string;
-  position: number;
-  id: string;
-  kind: string;
-  fromUserId: string | null;
-  payload: string;
-  ts: number;
 };
 
 export class RoomActor {
@@ -163,7 +149,7 @@ export class RoomActor {
 
       this.members.delete(userId);
 
-      // eslint-disable-next-line no-await-in-loop -- see above
+      // eslint-disable-next-line no-await-in-loop -- monotonic position assignment requires sequential emission
       await this.emitDurableSystem<MemberLeftPayload>("room.member_left", {
         userId,
         slot,
@@ -360,88 +346,28 @@ export class RoomActor {
   }
 
   private async runRehydrate(): Promise<void> {
-    const rows = (await this.db
-      .select()
-      .from(roomEvent)
-      .where(eq(roomEvent.roomId, this.room.id))
-      .orderBy(roomEvent.position)) as RoomEventRow[];
+    const { durableEvents, nextPosition, members } = await rehydrateRoom(this.db, this.room);
 
     const chatEvents: ChatEvent[] = [];
-    const durableEvents: EventEnvelope[] = [];
-    for (const row of rows) {
-      const event = rowToDurableEvent(row);
-      if (event === null) continue;
-      durableEvents.push(event);
+    for (const event of durableEvents) {
       if (event.kind === "chat.message_sent") chatEvents.push(event as ChatEvent);
     }
 
     this.state = this.reducer.rehydrate(this.state, chatEvents);
     this.recentDurableEvents = durableEvents.slice(-SNAPSHOT_EVENT_COUNT);
+    this.nextPosition = nextPosition;
 
-    const lastRow = rows.at(-1);
-    this.nextPosition = lastRow === undefined ? 0 : lastRow.position + 1;
-
-    const members = await loadMembers(this.db, this.room.id);
     this.members.clear();
     for (const [userId, info] of members) this.members.set(userId, info);
 
     this.rehydrated = true;
   }
 
-  private async persistAndPrune(ev: EventEnvelope): Promise<void> {
-    await this.db.transaction(async (tx) => {
-      await tx.insert(roomEvent).values({
-        roomId: this.room.id,
-        position: ev.position,
-        id: ev.id,
-        kind: ev.kind,
-        fromUserId: ev.from,
-        payload: JSON.stringify(ev.payload),
-        ts: ev.ts,
-      });
-
-      const countRow = await tx
-        .select({ count: sql<number>`count(*)`.as("count") })
-        .from(roomEvent)
-        .where(eq(roomEvent.roomId, this.room.id));
-      const count = Number(countRow[0]?.count ?? 0);
-
-      if (count > EVENT_LOG_CAP) {
-        const toDelete = count - EVENT_LOG_CAP;
-        await tx.run(sql`
-          delete from room_event
-          where room_id = ${this.room.id}
-            and position in (
-              select position from room_event
-              where room_id = ${this.room.id}
-              order by position asc
-              limit ${toDelete}
-            )
-        `);
-      }
-    });
+  private persistAndPrune(ev: EventEnvelope): Promise<void> {
+    return persistAndPruneEvent(this.db, this.room.id, ev);
   }
 
   private broadcast(ev: EventEnvelope): void {
     for (const conn of this.connections.values()) conn.send(ev);
   }
-}
-
-function rowToDurableEvent(row: RoomEventRow): EventEnvelope | null {
-  // Source of truth for "is this kind durable" lives in
-  // `@bun-mono/room-protocol/kinds`. A row whose kind isn't in the registry
-  // (legacy data) or is registered as transient (shouldn't be in the log,
-  // but defensive) is dropped from rehydration.
-  if (!Object.hasOwn(durable, row.kind)) return null;
-  const kind = row.kind as EventKind;
-  if (!durable[kind]) return null;
-  return {
-    kind,
-    payload: JSON.parse(row.payload),
-    id: row.id,
-    ts: row.ts,
-    position: row.position,
-    from: row.fromUserId,
-    durable: true,
-  };
 }

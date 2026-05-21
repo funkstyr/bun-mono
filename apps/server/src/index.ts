@@ -147,7 +147,12 @@ app.get("/", (c) => {
   return c.text("OK");
 });
 
-startTtlSweeper(iterateActors);
+// Only start the periodic sweeper when this module is the entry point —
+// importing it for tests, type-checking, or doc generation must not spin
+// up a background timer.
+if (import.meta.main) {
+  startTtlSweeper(iterateActors);
+}
 
 export default {
   fetch: app.fetch,
