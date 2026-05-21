@@ -2,11 +2,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSelector } from "@tanstack/react-store";
 import PartySocket from "partysocket";
 
+import { toast } from "@bun-mono/core-ui/sonner";
 import { env } from "@bun-mono/env/web";
 import type { IntentEnvelope } from "@bun-mono/room-protocol/envelope";
 import { parseEvent } from "@bun-mono/room-protocol/kinds";
+import { SEND_RATE_LIMIT_COUNT, SEND_RATE_LIMIT_WINDOW_MS } from "@bun-mono/room-protocol/limits";
 
-import { isChatTyping, type MemberView, type RoomTimelineEntry } from "./room-events";
+import {
+  isChatTyping,
+  isIntentRejected,
+  type MemberView,
+  type RoomTimelineEntry,
+} from "./room-events";
 import {
   applyEvent,
   createRoomStore,
@@ -35,6 +42,7 @@ type UseRoomSocket = {
   myUserId: string | null;
   myRole: MyRole;
   spectatorReason: SpectatorReason | null;
+  sessionExpired: boolean;
   spectatorCount: number;
   members: readonly MemberView[];
   displayNamesByUserId: Readonly<Record<string, string>>;
@@ -89,6 +97,18 @@ export function useRoomSocket(slug: string): UseRoomSocket {
 
       applyEvent(store, parsed.value);
 
+      // Rate-limit rejection is purely transient UI — surface a toast and
+      // leave the pending input alone so the User can edit and resend.
+      if (
+        isIntentRejected(parsed.value) &&
+        parsed.value.payload.reason === "rate_limit_send_message"
+      ) {
+        const seconds = SEND_RATE_LIMIT_WINDOW_MS / 1000;
+        toast.error(
+          `Slow down a bit — you can send ${SEND_RATE_LIMIT_COUNT} messages per ${seconds}s.`,
+        );
+      }
+
       // A fresh typing event from the same User restarts the 3s expiry —
       // an actively-typing User keeps refreshing without flicker.
       if (isChatTyping(parsed.value)) {
@@ -124,6 +144,8 @@ export function useRoomSocket(slug: string): UseRoomSocket {
   const myRole = useSelector(store, (s: RoomState) => s.myRole);
 
   const spectatorReason = useSelector(store, (s: RoomState) => s.spectatorReason);
+
+  const sessionExpired = useSelector(store, (s: RoomState) => s.sessionExpired);
 
   const spectatorCount = useSelector(store, (s: RoomState) => s.spectatorCount);
 
@@ -170,6 +192,7 @@ export function useRoomSocket(slug: string): UseRoomSocket {
     myUserId,
     myRole,
     spectatorReason,
+    sessionExpired,
     spectatorCount,
     members,
     displayNamesByUserId,

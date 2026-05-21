@@ -5,7 +5,7 @@ import { parseIntent } from "@bun-mono/room-protocol/kinds";
 
 import type { ChatIntent } from "./chat-reducer";
 import { getOrCreateActorBySlug, type RegistryDeps } from "./room-registry";
-import type { Connection } from "./types";
+import type { AuthRevalidator, Connection } from "./types";
 
 const connectionIdAlphabet = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ0123456789";
 const generateConnectionId = customAlphabet(connectionIdAlphabet, 16);
@@ -49,6 +49,18 @@ export async function authoriseRoomUpgrade(
   };
 }
 
+// Captures the handshake-time headers so the actor can re-check the
+// better-auth session on every Member intent. Returns the live `userId` or
+// `null` if the session has been revoked/expired.
+export function buildAuthRevalidator(req: Request): AuthRevalidator {
+  const headers = req.headers;
+  return async () => {
+    const session = await auth.api.getSession({ headers });
+    const userId = session?.user?.id;
+    return userId === undefined ? null : { userId };
+  };
+}
+
 export type WsSend = (raw: string) => void;
 export type WsClose = (code: number, reason: string) => void;
 
@@ -61,6 +73,7 @@ export async function onRoomOpen(
   send: WsSend,
   close: WsClose,
   deps: RegistryDeps = {},
+  revalidateAuth?: AuthRevalidator,
 ): Promise<void> {
   const found = await getOrCreateActorBySlug(ctx.slug, deps);
   if (!found) {
@@ -73,6 +86,9 @@ export async function onRoomOpen(
     userId: ctx.userId,
     send: (ev) => send(JSON.stringify(ev)),
     close,
+    // `exactOptionalPropertyTypes` rejects an explicit `undefined`; spread
+    // the field only when a revalidator is provided.
+    ...(revalidateAuth === undefined ? {} : { revalidateAuth }),
   };
   connByConnectionId.set(ctx.connectionId, { conn, roomId: found.row.id });
 

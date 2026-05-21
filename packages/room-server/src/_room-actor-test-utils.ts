@@ -3,11 +3,15 @@ import type { RoomMember } from "@bun-mono/room-protocol/system";
 
 import { createTestDb, seedRoom, seedUser, type TestDb } from "./_test-utils";
 import type { ChatIntent } from "./chat-reducer";
-import type { Connection, RoomRow } from "./types";
+import type { AuthRevalidator, Connection, RoomRow } from "./types";
 
 export type CapturedConnection = Connection & { events: EventEnvelope[]; closed: boolean };
 
-export function makeConnection(connectionId: string, userId: string | null): CapturedConnection {
+export function makeConnection(
+  connectionId: string,
+  userId: string | null,
+  revalidateAuth?: AuthRevalidator,
+): CapturedConnection {
   const events: EventEnvelope[] = [];
   const conn: CapturedConnection = {
     connectionId,
@@ -20,6 +24,8 @@ export function makeConnection(connectionId: string, userId: string | null): Cap
     close: () => {
       conn.closed = true;
     },
+    // `exactOptionalPropertyTypes` rejects an explicit `undefined`.
+    ...(revalidateAuth === undefined ? {} : { revalidateAuth }),
   };
   return conn;
 }

@@ -11,6 +11,7 @@ import type {
 } from "@bun-mono/room-protocol/member-events";
 import type { RoomMember, SpectatorReason } from "@bun-mono/room-protocol/system";
 
+import { AuthRevalidationCache } from "./auth-revalidate";
 import type { ChatEvent, ChatIntent, ChatState } from "./chat-reducer";
 import {
   allocateSlot,
@@ -24,6 +25,11 @@ import {
   type MemberInfo,
 } from "./member-presence";
 import { persistAndPruneEvent, rehydrateRoom } from "./room-actor-persistence";
+import {
+  createSendRateLimitState,
+  tryRecordSend,
+  type SendRateLimitState,
+} from "./send-rate-limit";
 import { TTL_MS } from "./ttl";
 import type { AnyLibSQLDatabase, Connection, ReducerContext, RoomReducer, RoomRow } from "./types";
 
@@ -59,6 +65,10 @@ export class RoomActor {
   private readonly spectators = new Set<string>();
   // Last `chat.typing` broadcast timestamp per Member, for server-side debounce.
   private readonly lastTypingAt = new Map<string, number>();
+  private readonly authCache: AuthRevalidationCache;
+  // Rolling-window timestamps of `chat.send_message` intents per Member, for
+  // the send-rate limit. Pruned in place on each check.
+  private readonly sendRateLimit: SendRateLimitState = createSendRateLimitState();
   private admissionChain: Promise<unknown> = Promise.resolve();
   private state: ChatState;
   private recentDurableEvents: EventEnvelope[] = [];
@@ -77,6 +87,7 @@ export class RoomActor {
     this.now = deps.now ?? (() => Date.now());
     this.nextEventId = deps.nextEventId ?? generateEventId;
     this.state = reducer.initialState(room);
+    this.authCache = new AuthRevalidationCache(this.now);
   }
 
   get nextPositionForTests(): number {
@@ -143,6 +154,7 @@ export class RoomActor {
 
   async detach(conn: Connection): Promise<void> {
     this.connections.delete(conn.connectionId);
+    this.authCache.evict(conn.connectionId);
 
     // Spectators have no slot, row, or presence — the count shift is observed on the next snapshot, not broadcast.
     if (this.spectators.delete(conn.connectionId)) return;
@@ -238,8 +250,22 @@ export class RoomActor {
   async submit(conn: Connection, intent: ChatIntent): Promise<void> {
     await this.ensureRehydrated();
 
+    const stillAuthorised = await this.revalidateConnection(conn);
+    if (!stillAuthorised) {
+      this.sendRejection(conn, intent.intentId, "auth_lost");
+      return;
+    }
+
     const fromUserId = await this.resolveSubmittingMember(conn, intent);
     if (fromUserId === null) return;
+
+    if (
+      intent.kind === "chat.send_message" &&
+      !tryRecordSend(this.sendRateLimit, fromUserId, this.now())
+    ) {
+      this.sendRejection(conn, intent.intentId, "rate_limit_send_message");
+      return;
+    }
 
     const ctx: ReducerContext = {
       now: this.now,
@@ -284,6 +310,74 @@ export class RoomActor {
     if (last !== undefined && now - last < TYPING_DEBOUNCE_MS) return false;
     this.lastTypingAt.set(fromUserId, now);
     return true;
+  }
+
+  // Returns true if the connection should continue acting as a Member.
+  // Returns false (after performing the demotion) when the handshake-time
+  // cookie is no longer valid; the caller emits the `auth_lost` rejection.
+  // The check is skipped for Spectator connections (no Member to demote)
+  // and for connections without a `revalidateAuth` hook (tests).
+  private async revalidateConnection(conn: Connection): Promise<boolean> {
+    if (conn.revalidateAuth === undefined) return true;
+    if (this.spectators.has(conn.connectionId)) return true;
+    if (conn.userId === null) return true;
+
+    if (this.authCache.isFresh(conn.connectionId)) return true;
+
+    let result: { userId: string } | null;
+    try {
+      result = await conn.revalidateAuth();
+    } catch (err) {
+      // Fail-open: a transient auth-DB hiccup shouldn't demote every active
+      // chatter. Skip the cache update so the next intent re-checks; a real
+      // revocation surfaces promptly once the auth layer recovers.
+      console.error("revalidateAuth threw; treating session as still valid", err);
+      return true;
+    }
+
+    this.authCache.markValidated(conn.connectionId);
+
+    // Either a revoked/expired session (`null`) or a different user behind
+    // the same conn (defensive — shouldn't happen with better-auth tokens).
+    if (result === null || result.userId !== conn.userId) {
+      await this.demoteToSpectator(conn);
+      return false;
+    }
+
+    return true;
+  }
+
+  // Demotes a Member connection in place to a Spectator. The `room_member`
+  // row stays — the User keeps their slot and will re-promote on a future
+  // intent if the cookie comes back valid. The conn keeps receiving
+  // broadcasts; it just can't act until promotion.
+  private async demoteToSpectator(conn: Connection): Promise<void> {
+    const userId = conn.userId;
+    if (userId === null) return;
+
+    const userConns = this.connectionsByUser.get(userId);
+    if (userConns !== undefined) {
+      userConns.delete(conn.connectionId);
+      if (userConns.size === 0) this.connectionsByUser.delete(userId);
+    }
+    this.spectators.add(conn.connectionId);
+    conn.userId = null;
+    this.authCache.evict(conn.connectionId);
+
+    // Mirror the `detach` "last conn drops" path: the Member is now
+    // effectively offline. Persist `lastSeenAt` so the TTL sweep can free
+    // the slot if the User never reconnects, and emit `member_offline`.
+    if (this.isUserOnline(userId)) return;
+    const info = this.members.get(userId);
+    if (info === undefined) return;
+
+    const lastSeenAt = this.now();
+    this.members.set(userId, { ...info, lastSeenAt });
+    await setMemberLastSeen(this.db, this.room.id, userId, lastSeenAt);
+    this.emitTransient<MemberOfflinePayload>("room.member_offline", {
+      userId,
+      slot: info.slot,
+    });
   }
 
   private ensureAdmitted(userId: string): Promise<MemberInfo | null> {

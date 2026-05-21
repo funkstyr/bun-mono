@@ -73,9 +73,12 @@ describe("RoomActor.submit — rejection", () => {
 
 describe("RoomActor.submit — event-log cap of 500", () => {
   it("prunes the oldest row past the 500-event cap and keeps positions monotonic", async () => {
+    // Advance the clock past the rate-limit window between sends so the
+    // 500-burst lands without tripping the per-Member 5-per-10s limit.
+    let clock = 1;
     const actor = new RoomActor(room, chatReducer, {
       db: testDb as AnyLibSQLDatabase,
-      now: () => 1,
+      now: () => clock,
       nextEventId: makeIdCounter(),
     });
     const conn = makeConnection("c-1", "alice");
@@ -84,6 +87,7 @@ describe("RoomActor.submit — event-log cap of 500", () => {
     // messages to overflow the 500-row cap.
 
     for (let i = 0; i < 500; i += 1) {
+      clock += 11_000;
       // eslint-disable-next-line no-await-in-loop -- ordered persistence requires sequential awaits
       await actor.submit(conn, makeIntent("m", `i-${i}`));
     }

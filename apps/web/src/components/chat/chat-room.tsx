@@ -29,6 +29,7 @@ export function ChatRoom({ slug }: Props): React.ReactElement {
     myUserId,
     myRole,
     spectatorReason,
+    sessionExpired,
     spectatorCount,
     members,
     displayNamesByUserId,
@@ -66,7 +67,9 @@ export function ChatRoom({ slug }: Props): React.ReactElement {
   const isSpectator = myRole === "spectator";
   const isAnonymous = myUserId === null;
   const isCapSpectator = isSpectator && spectatorReason === "membership_cap";
-  const showFullRoomBanner = isSpectator && !isAnonymous && !isCapSpectator;
+  // `auth_lost` demotion preempts the other spectator banners — the User
+  // wasn't denied a slot, they lost their session mid-conversation.
+  const showFullRoomBanner = isSpectator && !isAnonymous && !isCapSpectator && !sessionExpired;
 
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col">
@@ -82,6 +85,8 @@ export function ChatRoom({ slug }: Props): React.ReactElement {
           </Button>
         ) : null}
       </header>
+
+      {sessionExpired ? <SessionExpiredBanner slug={slug} /> : null}
 
       {isCapSpectator ? <CapSpectatorBanner /> : null}
 
@@ -126,6 +131,21 @@ function FullRoomBanner({ members }: { members: readonly MemberView[] }): React.
     <Card className="mx-4 my-2">
       <CardContent className="text-sm">
         This Room is full. You're watching as a spectator. Members in this Room: {names}.
+      </CardContent>
+    </Card>
+  );
+}
+
+function SessionExpiredBanner({ slug }: { slug: string }): React.ReactElement {
+  const loginSearch = useMemo(() => ({ redirect: `/chat/r/${slug}` }), [slug]);
+  return (
+    <Card className="mx-4 my-2">
+      <CardContent className="text-sm">
+        Your session has expired.{" "}
+        <Link to="/login" search={loginSearch} className="text-primary font-medium hover:underline">
+          Sign in
+        </Link>{" "}
+        to keep sending messages.
       </CardContent>
     </Card>
   );
