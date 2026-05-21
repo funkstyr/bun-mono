@@ -5,7 +5,8 @@ import { customAlphabet } from "nanoid";
 
 import { db } from "@bun-mono/db";
 import { room, roomMember, type RoomKind } from "@bun-mono/db/schema/room";
-import { MEMBERSHIP_CAP } from "@bun-mono/room-server/member-presence";
+import { MEMBERSHIP_CAP } from "@bun-mono/room-protocol/limits";
+import { countMembershipsForUser } from "@bun-mono/room-server/member-presence";
 import { getOrCreateActorBySlug } from "@bun-mono/room-server/room-registry";
 
 import { protectedProcedure } from "../index";
@@ -23,9 +24,7 @@ export const createInput = type({
 
 type CreateResult = { slug: string };
 
-// Snapshot of the caller's current Memberships, returned in the
-// `MEMBERSHIP_CAP_EXCEEDED` error payload so the client can render the
-// "leave one first" prompt without an extra `room.list` round-trip.
+// Returned in MEMBERSHIP_CAP_EXCEEDED so the client renders "leave one first" without a follow-up room.list.
 type MembershipSummary = {
   slug: string;
   name: string | null;
@@ -55,9 +54,6 @@ async function loadOwnMemberships(userId: string): Promise<MembershipSummary[]> 
   }));
 }
 
-// Schema for the typed cap-error payload. Declared with `.errors({})` so
-// the client gets compile-time knowledge of the shape and `isDefinedError`
-// returns true on detection.
 const capErrorData = type({
   memberships: type({
     slug: "string",
@@ -79,15 +75,7 @@ const create = protectedProcedure
   .handler(async ({ context, input, errors }): Promise<CreateResult> => {
     const userId = context.session.user.id;
 
-    // 10-Membership soft cap. The User must release a slot in another Room
-    // before they can create an 11th. The error payload carries the list
-    // of current Memberships so the client can show "leave one first"
-    // inline without a follow-up `room.list` query.
-    const countRows = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(roomMember)
-      .where(eq(roomMember.userId, userId));
-    const ownCount = Number(countRows[0]?.count ?? 0);
+    const ownCount = await countMembershipsForUser(db, userId);
 
     if (ownCount >= MEMBERSHIP_CAP) {
       const memberships = await loadOwnMemberships(userId);
@@ -183,19 +171,14 @@ export const leaveInput = type({
 
 type LeaveResult = { ok: true };
 
-// HTTP twin of the WS `room.leave` intent. Same side-effects: deletes the
-// `room_member` row, emits a durable `room.member_left{reason:"left"}`,
-// and demotes any of the User's still-open WS connections in this Room to
-// Spectator. Routed through the actor so the in-memory presence map stays
-// in sync with the row delete and the broadcast fans out to all attached
-// connections.
+// HTTP twin of the WS `room.leave` intent — routed through the actor so the in-memory presence map stays in sync with the row delete.
 const leave = protectedProcedure
   .input(leaveInput)
   .handler(async ({ context, input }): Promise<LeaveResult> => {
     const userId = context.session.user.id;
 
     const memberRows = await db
-      .select({ slotIndex: roomMember.slotIndex })
+      .select({ userId: roomMember.userId })
       .from(roomMember)
       .innerJoin(room, eq(roomMember.roomId, room.id))
       .where(and(eq(room.slug, input.slug), eq(roomMember.userId, userId)))
@@ -216,12 +199,8 @@ const leave = protectedProcedure
       });
     }
 
-    const ok = await found.actor.leaveAsMember(userId);
-    if (!ok) {
-      // Membership row vanished between the lookup and the actor call —
-      // treat as success since the user is no longer a Member anyway.
-      return { ok: true };
-    }
+    // `leaveAsMember` returning false here means the row vanished between the lookup and the call — caller is no longer a Member, treat as success.
+    await found.actor.leaveAsMember(userId);
 
     return { ok: true };
   });

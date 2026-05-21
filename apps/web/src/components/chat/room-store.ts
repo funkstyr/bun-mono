@@ -1,6 +1,7 @@
 import { Store } from "@tanstack/store";
 
 import type { EventEnvelope } from "@bun-mono/room-protocol/envelope";
+import type { SpectatorReason } from "@bun-mono/room-protocol/system";
 
 import {
   isChatMessage,
@@ -11,16 +12,15 @@ import {
   isMemberOnline,
   isRoomSnapshot,
   isTimelineEntry,
-  type MemberJoinedEvent,
   type MemberView,
   type RoomTimelineEntry,
 } from "./room-events";
 
+export type { SpectatorReason };
+
 export type ConnectionStatus = "connecting" | "open" | "closed";
 
 export type MyRole = "unknown" | "member" | "spectator";
-
-export type SpectatorReason = "membership_cap";
 
 export type RoomState = {
   status: ConnectionStatus;
@@ -29,10 +29,7 @@ export type RoomState = {
   spectatorReason: SpectatorReason | null;
   spectatorCount: number;
   members: readonly MemberView[];
-  // Sticky display-name lookup for users who may no longer be Members —
-  // populated from snapshot.members and `member_joined` events (current
-  // and historical). Entries persist across `member_left` so the message
-  // list can render "Alice left the Room" with the actual name.
+  // Persists across `member_left` so the message list can still render the User's name after they leave.
   displayNamesByUserId: Readonly<Record<string, string>>;
   timeline: readonly RoomTimelineEntry[];
   typingUserIds: readonly string[];
@@ -160,10 +157,7 @@ function sortBySlot(members: readonly MemberView[]): MemberView[] {
   return [...members].toSorted((a, b) => a.slot - b.slot);
 }
 
-// Seed the name lookup from the snapshot's current Members plus any
-// historical `member_joined` events in the recent timeline — that covers
-// the case where a User left before the snapshot but their `member_left`
-// is still in the recent-events window.
+// Includes historical member_joined events so a User who left before the snapshot but is still in the recent-events window keeps their name.
 function collectDisplayNames(
   members: readonly MemberView[],
   timeline: readonly RoomTimelineEntry[],
@@ -171,9 +165,8 @@ function collectDisplayNames(
   const out: Record<string, string> = {};
   for (const m of members) out[m.userId] = m.displayName;
   for (const entry of timeline) {
-    if (entry.kind === "room.member_joined") {
-      const joined = entry as MemberJoinedEvent;
-      out[joined.payload.userId] = joined.payload.displayName;
+    if (isMemberJoined(entry)) {
+      out[entry.payload.userId] = entry.payload.displayName;
     }
   }
   return out;

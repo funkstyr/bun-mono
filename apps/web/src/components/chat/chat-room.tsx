@@ -53,8 +53,11 @@ export function ChatRoom({ slug }: Props): React.ReactElement {
   });
 
   const onLeaveClick = useCallback(() => setConfirmOpen(true), []);
+
   const onLeaveCancel = useCallback(() => setConfirmOpen(false), []);
+
   const onLeaveConfirm = useCallback(() => leave.mutate(), [leave]);
+
   const onDialogOpenChange = useCallback((next: boolean) => {
     if (!next) setConfirmOpen(false);
   }, []);

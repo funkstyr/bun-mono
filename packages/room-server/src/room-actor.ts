@@ -2,13 +2,14 @@ import { customAlphabet } from "nanoid";
 
 import type { EventEnvelope } from "@bun-mono/room-protocol/envelope";
 import { broadcastToSpectators, type EventKind } from "@bun-mono/room-protocol/kinds";
+import { MEMBERSHIP_CAP } from "@bun-mono/room-protocol/limits";
 import type {
   MemberJoinedPayload,
   MemberLeftPayload,
   MemberOfflinePayload,
   MemberOnlinePayload,
 } from "@bun-mono/room-protocol/member-events";
-import type { RoomMember } from "@bun-mono/room-protocol/system";
+import type { RoomMember, SpectatorReason } from "@bun-mono/room-protocol/system";
 
 import type { ChatEvent, ChatIntent, ChatState } from "./chat-reducer";
 import {
@@ -19,7 +20,6 @@ import {
   insertMemberRow,
   loadDisplayName,
   loadStaleMembers,
-  MEMBERSHIP_CAP,
   setMemberLastSeen,
   type MemberInfo,
 } from "./member-presence";
@@ -44,7 +44,7 @@ export type RoomActorDeps = {
   nextEventId?: () => string;
 };
 
-type PromoteResult = { ok: true } | { ok: false; reason: "room_full" | "membership_cap" };
+type PromoteResult = { ok: true } | { ok: false; reason: "room_full" | SpectatorReason };
 
 export class RoomActor {
   private readonly room: RoomRow;
@@ -100,11 +100,7 @@ export class RoomActor {
     let existing = this.members.get(conn.userId);
 
     if (existing === undefined) {
-      // 10-Membership soft cap: a User already at the cap who is *not*
-      // already a Member of this Room attaches as a Spectator with a
-      // `reason: "membership_cap"` field on the snapshot. The client uses
-      // that to prompt "leave one first" instead of sitting silently as a
-      // read-only Spectator.
+      // Snapshot reason lets the client prompt "leave one first" instead of sitting silently as a read-only Spectator.
       const underCap = await this.isUnderMembershipCap(conn.userId);
       if (!underCap) {
         this.attachAsSpectator(conn, "membership_cap");
@@ -139,7 +135,7 @@ export class RoomActor {
     conn.send(this.buildSnapshot(conn));
   }
 
-  private attachAsSpectator(conn: Connection, reason?: "membership_cap"): void {
+  private attachAsSpectator(conn: Connection, reason?: SpectatorReason): void {
     this.connections.set(conn.connectionId, conn);
     this.spectators.add(conn.connectionId);
     conn.send(this.buildSnapshot(conn, reason));
@@ -203,13 +199,8 @@ export class RoomActor {
     }
   }
 
-  // WS path for `room.leave`. Routed from `ws-upgrade` for room-namespace
-  // intents (the chat reducer doesn't see them). Rejects a Spectator
-  // sender with `not_a_member`; for a Member, runs the same side-effects
-  // as the orpc procedure.
+  // WS path for `room.leave`. Routed from `ws-upgrade` since the chat reducer doesn't see room-namespace intents.
   async leave(conn: Connection, intentId: string): Promise<void> {
-    await this.ensureRehydrated();
-
     if (conn.userId === null || this.spectators.has(conn.connectionId)) {
       this.sendRejection(conn, intentId, "not_a_member");
       return;
@@ -219,13 +210,7 @@ export class RoomActor {
     if (!ok) this.sendRejection(conn, intentId, "not_a_member");
   }
 
-  // Shared handler for both the WS `room.leave` intent and the orpc
-  // `room.leave({slug})` procedure. Returns `false` when `userId` is not
-  // a Member of this Room — the caller turns that into the appropriate
-  // rejection / typed error for its lane. On success: deletes the row,
-  // demotes every WS connection this User has in this Room to Spectator
-  // (kept open so they can keep reading), and emits a durable
-  // `room.member_left{reason:"left"}`.
+  // Shared handler for WS `room.leave` and the orpc procedure. Returns false if `userId` isn't a Member; on success demotes the User's connections to Spectator (kept open for reading) and emits a durable member_left.
   async leaveAsMember(userId: string): Promise<boolean> {
     await this.ensureRehydrated();
 
@@ -343,10 +328,7 @@ export class RoomActor {
     return info;
   }
 
-  // True if this User is already a Member of this Room, or has fewer than
-  // `MEMBERSHIP_CAP` rows in `room_member` across all Rooms. A User already
-  // in this Room is always under the cap (they aren't acquiring a new
-  // membership), so we short-circuit before the DB count.
+  // Short-circuits before the DB count: an existing Member of this Room isn't acquiring a new Membership.
   private async isUnderMembershipCap(userId: string): Promise<boolean> {
     if (this.members.has(userId)) return true;
 
@@ -396,11 +378,7 @@ export class RoomActor {
     return conn.userId;
   }
 
-  // Promotes a Spectator connection to a Member when a slot is available
-  // AND the User is under the soft cap. The cap re-check matters for a
-  // cap-downgrade Spectator who leaves another Room in a different tab —
-  // their next action here promotes them. Inverse: if their cap status
-  // hasn't changed, the rejection tells the client why.
+  // Cap re-check matters: a cap-downgrade Spectator who left another Room in a different tab gets promoted here on their next action.
   private async tryPromoteSpectator(conn: Connection, userId: string): Promise<PromoteResult> {
     const underCap = await this.isUnderMembershipCap(userId);
     if (!underCap) return { ok: false, reason: "membership_cap" };
@@ -438,7 +416,7 @@ export class RoomActor {
     conn.send(rejection);
   }
 
-  private buildSnapshot(conn: Connection, reason?: "membership_cap"): EventEnvelope {
+  private buildSnapshot(conn: Connection, reason?: SpectatorReason): EventEnvelope {
     const members: RoomMember[] = [];
     for (const [userId, info] of this.members) {
       members.push({

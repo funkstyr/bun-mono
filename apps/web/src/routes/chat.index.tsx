@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { isDefinedError } from "@orpc/client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 
@@ -13,12 +14,11 @@ import {
   DialogTitle,
 } from "@bun-mono/core-ui/dialog";
 import { getUser } from "@/functions/get-user";
-import { client, orpc, queryClient } from "@/utils/orpc";
+import { orpc, queryClient } from "@/utils/orpc";
 
 export const Route = createFileRoute("/chat/")({
   component: RouteComponent,
-  // The Memberships list is per-user, so this index needs a session.
-  // `/chat/r/:slug` does *not* — anonymous Spectators land there directly.
+  // The Memberships list is per-user, so this index needs a session — `/chat/r/:slug` does not.
   beforeLoad: async () => {
     const session = await getUser();
     if (!session) throw redirect({ to: "/login" });
@@ -33,53 +33,49 @@ type CappedMembership = {
 
 type CapErrorData = { memberships: CappedMembership[]; cap: number };
 
-function isCapError(err: unknown): err is { code: string; data: CapErrorData } {
-  if (typeof err !== "object" || err === null) return false;
-  const candidate = err as { code?: unknown; data?: unknown };
-  return candidate.code === "MEMBERSHIP_CAP_EXCEEDED" && typeof candidate.data === "object";
-}
-
 function RouteComponent(): React.ReactElement {
   const navigate = useNavigate();
   const rooms = useQuery(orpc.room.list.queryOptions());
 
   const [capData, setCapData] = useState<CapErrorData | null>(null);
 
-  const create = useMutation({
-    mutationFn: () => client.room.create({ kind: "chat" }),
-    onSuccess: async ({ slug }) => {
-      await queryClient.invalidateQueries({
-        queryKey: orpc.room.list.queryOptions().queryKey,
-      });
-      navigate({ to: "/chat/r/$slug", params: { slug } });
-    },
-    onError: (err) => {
-      // The cap error opens an inline modal listing the User's Rooms so
-      // they can release one without leaving this page; other errors fall
-      // through to the global toast handler in `utils/orpc.ts`.
-      if (isCapError(err)) setCapData(err.data);
-    },
-  });
+  const create = useMutation(
+    orpc.room.create.mutationOptions({
+      onSuccess: async ({ slug }) => {
+        await queryClient.invalidateQueries({
+          queryKey: orpc.room.list.queryOptions().queryKey,
+        });
+        navigate({ to: "/chat/r/$slug", params: { slug } });
+      },
+      onError: (err) => {
+        // Cap error opens the inline "leave one first" modal; other errors fall through to the global toast in utils/orpc.ts.
+        if (isDefinedError(err) && err.code === "MEMBERSHIP_CAP_EXCEEDED") {
+          setCapData(err.data);
+        }
+      },
+    }),
+  );
 
-  const leave = useMutation({
-    mutationFn: (slug: string) => client.room.leave({ slug }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: orpc.room.list.queryOptions().queryKey,
-      });
-      setCapData(null);
-    },
-  });
+  const leave = useMutation(
+    orpc.room.leave.mutationOptions({
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: orpc.room.list.queryOptions().queryKey,
+        });
+        setCapData(null);
+      },
+    }),
+  );
 
   const handleCreate = useCallback(() => {
-    create.mutate();
+    create.mutate({ kind: "chat" });
   }, [create]);
 
   const handleCloseCap = useCallback(() => setCapData(null), []);
 
   const handleLeave = useCallback(
     (slug: string) => {
-      leave.mutate(slug);
+      leave.mutate({ slug });
     },
     [leave],
   );
@@ -126,7 +122,7 @@ function RouteComponent(): React.ReactElement {
         onClose={handleCloseCap}
         onOpenChange={handleCapOpenChange}
         onLeave={handleLeave}
-        leavingSlug={leave.isPending ? leave.variables : null}
+        leavingSlug={leave.isPending ? (leave.variables?.slug ?? null) : null}
       />
     </div>
   );

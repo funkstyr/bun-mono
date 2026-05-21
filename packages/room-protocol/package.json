@@ -28,6 +28,10 @@
       "types": "./dist/room-intents.d.ts",
       "import": "./dist/room-intents.js"
     },
+    "./limits": {
+      "types": "./dist/limits.d.ts",
+      "import": "./dist/limits.js"
+    },
     "./kinds": {
       "types": "./dist/kinds.d.ts",
       "import": "./dist/kinds.js"

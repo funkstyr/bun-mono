@@ -1,6 +1,8 @@
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { MEMBERSHIP_CAP } from "@bun-mono/room-protocol/limits";
+
 import {
   makeConnection,
   makeIdCounter,
@@ -11,7 +13,7 @@ import {
 } from "./_room-actor-test-utils";
 import { seedRoom, seedUser, type TestDb } from "./_test-utils";
 import { chatReducer } from "./chat-reducer";
-import { MEMBERSHIP_CAP, countMembershipsForUser } from "./member-presence";
+import { countMembershipsForUser } from "./member-presence";
 import { RoomActor } from "./room-actor";
 import type { AnyLibSQLDatabase, RoomRow } from "./types";
 

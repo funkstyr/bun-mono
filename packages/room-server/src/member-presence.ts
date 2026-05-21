@@ -5,13 +5,6 @@ import { roomMember } from "@bun-mono/db/schema/room";
 
 import type { AnyLibSQLDatabase } from "./types";
 
-// Per-User soft cap on `room_member` rows. Enforced by `room.create` (orpc
-// typed error) and the WS-attach path (downgrade to Spectator). Not a hard
-// constraint at the DB level — a User who is already a Member of >= 10
-// Rooms when this cap ships is allowed to continue, they just can't join
-// or create more until they leave one.
-export const MEMBERSHIP_CAP = 10;
-
 export type Slot = 0 | 1 | 2 | 3;
 
 export type MemberInfo = {
@@ -103,10 +96,7 @@ export async function setMemberLastSeen(
     .where(and(eq(roomMember.roomId, roomId), eq(roomMember.userId, userId)));
 }
 
-// Unconditional delete used by the explicit-leave path. The TTL sweeper
-// uses `deleteStaleMember` instead — its WHERE clause guards against a
-// race with reconnect. Explicit leave has no such race: the User chose to
-// release the slot.
+// Unconditional delete for explicit leave — no reconnect race to guard against.
 export async function deleteMemberRow(
   db: AnyLibSQLDatabase,
   roomId: string,
@@ -117,8 +107,7 @@ export async function deleteMemberRow(
     .where(and(eq(roomMember.roomId, roomId), eq(roomMember.userId, userId)));
 }
 
-// Count of Memberships owned by this User across all Rooms — drives the
-// 10-Membership soft cap enforced on `room.create` and WS attach.
+// Count of Memberships owned by this User across all Rooms — drives the soft cap.
 export async function countMembershipsForUser(
   db: AnyLibSQLDatabase,
   userId: string,
