@@ -14,11 +14,14 @@ import { Route as TicTacToeRouteImport } from './routes/tic-tac-toe'
 import { Route as RoyaltyRouteImport } from './routes/royalty'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as ChatRouteImport } from './routes/chat'
 import { Route as AiRouteImport } from './routes/ai'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as RoyaltyIndexRouteImport } from './routes/royalty.index'
+import { Route as ChatIndexRouteImport } from './routes/chat.index'
 import { Route as RoyaltyWatchRouteImport } from './routes/royalty.watch'
+import { Route as ChatRSlugRouteImport } from './routes/chat.r.$slug'
 
 const TimerRoute = TimerRouteImport.update({
   id: '/timer',
@@ -45,6 +48,11 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ChatRoute = ChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AiRoute = AiRouteImport.update({
   id: '/ai',
   path: '/ai',
@@ -65,23 +73,36 @@ const RoyaltyIndexRoute = RoyaltyIndexRouteImport.update({
   path: '/',
   getParentRoute: () => RoyaltyRoute,
 } as any)
+const ChatIndexRoute = ChatIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ChatRoute,
+} as any)
 const RoyaltyWatchRoute = RoyaltyWatchRouteImport.update({
   id: '/watch',
   path: '/watch',
   getParentRoute: () => RoyaltyRoute,
+} as any)
+const ChatRSlugRoute = ChatRSlugRouteImport.update({
+  id: '/r/$slug',
+  path: '/r/$slug',
+  getParentRoute: () => ChatRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/ai': typeof AiRoute
+  '/chat': typeof ChatRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
   '/royalty': typeof RoyaltyRouteWithChildren
   '/tic-tac-toe': typeof TicTacToeRoute
   '/timer': typeof TimerRoute
   '/royalty/watch': typeof RoyaltyWatchRoute
+  '/chat/': typeof ChatIndexRoute
   '/royalty/': typeof RoyaltyIndexRoute
+  '/chat/r/$slug': typeof ChatRSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -92,20 +113,25 @@ export interface FileRoutesByTo {
   '/tic-tac-toe': typeof TicTacToeRoute
   '/timer': typeof TimerRoute
   '/royalty/watch': typeof RoyaltyWatchRoute
+  '/chat': typeof ChatIndexRoute
   '/royalty': typeof RoyaltyIndexRoute
+  '/chat/r/$slug': typeof ChatRSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/ai': typeof AiRoute
+  '/chat': typeof ChatRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
   '/royalty': typeof RoyaltyRouteWithChildren
   '/tic-tac-toe': typeof TicTacToeRoute
   '/timer': typeof TimerRoute
   '/royalty/watch': typeof RoyaltyWatchRoute
+  '/chat/': typeof ChatIndexRoute
   '/royalty/': typeof RoyaltyIndexRoute
+  '/chat/r/$slug': typeof ChatRSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -113,13 +139,16 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/ai'
+    | '/chat'
     | '/dashboard'
     | '/login'
     | '/royalty'
     | '/tic-tac-toe'
     | '/timer'
     | '/royalty/watch'
+    | '/chat/'
     | '/royalty/'
+    | '/chat/r/$slug'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -130,25 +159,31 @@ export interface FileRouteTypes {
     | '/tic-tac-toe'
     | '/timer'
     | '/royalty/watch'
+    | '/chat'
     | '/royalty'
+    | '/chat/r/$slug'
   id:
     | '__root__'
     | '/'
     | '/account'
     | '/ai'
+    | '/chat'
     | '/dashboard'
     | '/login'
     | '/royalty'
     | '/tic-tac-toe'
     | '/timer'
     | '/royalty/watch'
+    | '/chat/'
     | '/royalty/'
+    | '/chat/r/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountRoute: typeof AccountRoute
   AiRoute: typeof AiRoute
+  ChatRoute: typeof ChatRouteWithChildren
   DashboardRoute: typeof DashboardRoute
   LoginRoute: typeof LoginRoute
   RoyaltyRoute: typeof RoyaltyRouteWithChildren
@@ -193,6 +228,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/chat': {
+      id: '/chat'
+      path: '/chat'
+      fullPath: '/chat'
+      preLoaderRoute: typeof ChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/ai': {
       id: '/ai'
       path: '/ai'
@@ -221,6 +263,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RoyaltyIndexRouteImport
       parentRoute: typeof RoyaltyRoute
     }
+    '/chat/': {
+      id: '/chat/'
+      path: '/'
+      fullPath: '/chat/'
+      preLoaderRoute: typeof ChatIndexRouteImport
+      parentRoute: typeof ChatRoute
+    }
     '/royalty/watch': {
       id: '/royalty/watch'
       path: '/watch'
@@ -228,8 +277,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RoyaltyWatchRouteImport
       parentRoute: typeof RoyaltyRoute
     }
+    '/chat/r/$slug': {
+      id: '/chat/r/$slug'
+      path: '/r/$slug'
+      fullPath: '/chat/r/$slug'
+      preLoaderRoute: typeof ChatRSlugRouteImport
+      parentRoute: typeof ChatRoute
+    }
   }
 }
+
+interface ChatRouteChildren {
+  ChatIndexRoute: typeof ChatIndexRoute
+  ChatRSlugRoute: typeof ChatRSlugRoute
+}
+
+const ChatRouteChildren: ChatRouteChildren = {
+  ChatIndexRoute: ChatIndexRoute,
+  ChatRSlugRoute: ChatRSlugRoute,
+}
+
+const ChatRouteWithChildren = ChatRoute._addFileChildren(ChatRouteChildren)
 
 interface RoyaltyRouteChildren {
   RoyaltyWatchRoute: typeof RoyaltyWatchRoute
@@ -248,6 +316,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRoute,
   AiRoute: AiRoute,
+  ChatRoute: ChatRouteWithChildren,
   DashboardRoute: DashboardRoute,
   LoginRoute: LoginRoute,
   RoyaltyRoute: RoyaltyRouteWithChildren,

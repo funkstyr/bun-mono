@@ -6,13 +6,15 @@ Hono + oRPC API server on Bun. Wires up `@bun-mono/api` routers, `@bun-mono/auth
 
 ```
 src/
-├── index.ts            # Hono app entry — composes oRPC, auth, partykit, telemetry
+├── index.ts            # Hono app entry — composes oRPC, auth, room WS upgrade, telemetry
 ├── lib/
 │   ├── logger.ts       # pino + pino-http
 │   └── tracing.ts      # OpenTelemetry SDK bootstrap (load FIRST in index.ts)
 └── emails/
     └── welcome.tsx     # react-email templates (render via @react-email/components)
 ```
+
+The room WebSocket endpoint is mounted at `WS /ws/room/:slug`; lifecycle is delegated to `@bun-mono/room-server/ws-upgrade`. The default export is `{ fetch, websocket }` — the contract `Bun.serve` expects when serving Hono + Bun WebSockets.
 
 ## Commands
 
@@ -22,6 +24,7 @@ src/
 | `bun --filter server build`       | tsdown → `dist/index.js`                        |
 | `bun --filter server compile`     | Single-file Bun binary (`server`) with bytecode |
 | `bun --filter server start`       | Run built `dist/index.js`                       |
+| `bun --filter server test`        | vitest (integration tests under `__tests__/`)   |
 | `bun --filter server check-types` | tsgo                                            |
 
 ## Gotchas
@@ -30,5 +33,5 @@ src/
 - oRPC routers live in `packages/api/src/routers/`, not here. This app composes them.
 - Email templates use react-email components; preview with `bunx react-email dev` from this dir.
 - Env schema is `@bun-mono/env/server` — add new server vars there.
-- partykit + libsql clients are wired here; persistence schema lives in `@bun-mono/db`.
-- The realtime **Room** primitive (iteration 2, not yet built) is designed in `CONTEXT.md` in this directory. Read it before adding PartyKit-backed features.
+- libsql client lives in `@bun-mono/db`; this app composes it via `@bun-mono/api` context.
+- The realtime **Room** primitive is implemented in `@bun-mono/room-server`. This app only wires the WS upgrade route (`/ws/room/:slug`) — add Room-actor-backed features there, not here.

@@ -7,7 +7,9 @@
     "check-types": "tsgo --noEmit",
     "compile": "bun build --compile --minify --sourcemap --bytecode ./src/index.ts --outfile server",
     "dev": "bun run --hot src/index.ts",
-    "start": "bun run dist/index.js"
+    "start": "bun run dist/index.js",
+    "test": "vitest run",
+    "test:bun": "bun test test-bun/"
   },
   "dependencies": {
     "@ai-sdk/devtools": "^0.0.18",
@@ -16,6 +18,7 @@
     "@bun-mono/auth": "workspace:*",
     "@bun-mono/db": "workspace:*",
     "@bun-mono/env": "workspace:*",
+    "@bun-mono/room-server": "workspace:*",
     "@effect/platform": "catalog:",
     "@effect/platform-bun": "^0.89.0",
     "@effect/schema": "catalog:",
@@ -40,7 +43,6 @@
     "dotenv": "catalog:",
     "effect": "catalog:",
     "hono": "catalog:",
-    "partykit": "^0.0.115",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
     "react": "catalog:",
@@ -50,6 +52,8 @@
   "devDependencies": {
     "@bun-mono/config": "workspace:*",
     "@effect/vitest": "catalog:",
+    "@libsql/client": "catalog:",
+    "@orpc/client": "catalog:",
     "@playwright/test": "catalog:",
     "@types/bun": "catalog:",
     "@types/react": "catalog:",

@@ -56,4 +56,5 @@ temp
 
 # Claude Code
 .scratch/
+.claude/worktrees/
 CONTEXT.md
