@@ -6,6 +6,7 @@ import type { SpectatorReason } from "@bun-mono/room-protocol/system";
 import {
   isChatMessage,
   isChatTyping,
+  isIntentRejected,
   isMemberJoined,
   isMemberLeft,
   isMemberOffline,
@@ -33,6 +34,10 @@ export type RoomState = {
   displayNamesByUserId: Readonly<Record<string, string>>;
   timeline: readonly RoomTimelineEntry[];
   typingUserIds: readonly string[];
+  // Set by an `auth_lost` rejection — the server demoted this connection
+  // because the handshake cookie was revoked/expired. Drives a sticky
+  // "session expired" banner with a sign-in link.
+  sessionExpired: boolean;
 };
 
 const initial: RoomState = {
@@ -45,6 +50,7 @@ const initial: RoomState = {
   displayNamesByUserId: {},
   timeline: [],
   typingUserIds: [],
+  sessionExpired: false,
 };
 
 export type RoomStore = Store<RoomState>;
@@ -76,7 +82,27 @@ export function applyEvent(store: RoomStore, event: EventEnvelope): void {
       timeline,
       // Snapshot doesn't carry typing state — typing is transient by definition.
       typingUserIds: [],
+      sessionExpired: false,
     }));
+    return;
+  }
+
+  if (isIntentRejected(event)) {
+    const { reason } = event.payload;
+    if (reason === "auth_lost") {
+      // Server demoted us in place: we keep reading messages but can't send.
+      // Flip local role/identity to match so the input swap (Member → Spectator
+      // footer) renders without waiting for a fresh snapshot.
+      store.setState((s) => ({
+        ...s,
+        myRole: "spectator",
+        myUserId: null,
+        sessionExpired: true,
+      }));
+    }
+    // `rate_limit_send_message` is handled imperatively (toast) in the
+    // socket consumer; nothing to fold into the store. Any other rejection
+    // kind already has dedicated handling (membership_cap snapshot, etc.).
     return;
   }
 

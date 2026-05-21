@@ -6,7 +6,7 @@ import type {
   MemberOfflinePayload,
   MemberOnlinePayload,
 } from "@bun-mono/room-protocol/member-events";
-import type { RoomSnapshotPayload } from "@bun-mono/room-protocol/system";
+import type { IntentRejectedPayload, RoomSnapshotPayload } from "@bun-mono/room-protocol/system";
 
 export type ChatMessageEvent = EventEnvelope & {
   kind: "chat.message_sent";
@@ -43,6 +43,11 @@ export type RoomSnapshotEvent = EventEnvelope & {
   payload: RoomSnapshotPayload;
 };
 
+export type IntentRejectedEvent = EventEnvelope & {
+  kind: "room.intent_rejected";
+  payload: IntentRejectedPayload;
+};
+
 export type RoomTimelineEntry = ChatMessageEvent | MemberJoinedEvent | MemberLeftEvent;
 
 export type MemberView = RoomSnapshotPayload["members"][number];
@@ -73,6 +78,10 @@ export function isMemberOffline(ev: EventEnvelope): ev is MemberOfflineEvent {
 
 export function isRoomSnapshot(ev: EventEnvelope): ev is RoomSnapshotEvent {
   return ev.kind === "room.snapshot";
+}
+
+export function isIntentRejected(ev: EventEnvelope): ev is IntentRejectedEvent {
+  return ev.kind === "room.intent_rejected";
 }
 
 export function isTimelineEntry(ev: EventEnvelope): ev is RoomTimelineEntry {

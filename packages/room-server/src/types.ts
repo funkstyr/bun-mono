@@ -16,12 +16,24 @@ export type RoomRow = {
 };
 
 // `userId: null` is a cookie-less Spectator. Slot ownership is decided by
-// the actor (presence of a `room_member` row), not by this shape.
+// the actor (presence of a `room_member` row), not by this shape. `userId`
+// is mutable so the actor can demote a Member whose session is lost mid-
+// connection (set it to `null`) without closing the WS — the connection
+// keeps reading messages as a Spectator until the User re-authenticates on
+// a fresh WS handshake.
+export type AuthRevalidator = () => Promise<{ userId: string } | null>;
+
 export type Connection = {
   readonly connectionId: string;
-  readonly userId: string | null;
+  userId: string | null;
   readonly send: (event: EventEnvelope) => void;
   readonly close: (code: number, reason: string) => void;
+  // Re-checks the original handshake cookie against better-auth on every
+  // intent (cached ~60s per conn). Returns the live `userId` if the session
+  // is still valid, `null` if it was revoked/expired. Omitted in tests that
+  // do not exercise the demotion path; the actor treats an undefined
+  // revalidator as "auth never expires on this conn".
+  readonly revalidateAuth?: AuthRevalidator;
 };
 
 export type ReducerContext = {

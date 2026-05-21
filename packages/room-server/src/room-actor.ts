@@ -35,6 +35,20 @@ const SNAPSHOT_EVENT_COUNT = 100;
 // to avoid wasted intents, but the server is authoritative.
 const TYPING_DEBOUNCE_MS = 1500;
 
+// Per-connection cache window for better-auth session lookups. The server
+// re-validates the handshake cookie on every Member intent, but a hot
+// chatter would otherwise hammer the auth layer; one validate every ~60s is
+// good enough to demote a revoked session before the User does any
+// observable damage (their next-but-one send fails).
+const AUTH_REVALIDATE_TTL_MS = 60_000;
+
+// Per-Member-per-Room send-message rate limit. Five sends in any rolling
+// 10s window pass; a sixth in the same window is rejected with
+// `rate_limit_send_message`. The reducer never sees the intent — no
+// `chat.message_sent` is emitted. In-memory only; resets on hibernation.
+const SEND_RATE_LIMIT_WINDOW_MS = 10_000;
+const SEND_RATE_LIMIT_COUNT = 5;
+
 const idAlphabet = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ0123456789";
 const generateEventId = customAlphabet(idAlphabet, 21);
 
@@ -59,6 +73,11 @@ export class RoomActor {
   private readonly spectators = new Set<string>();
   // Last `chat.typing` broadcast timestamp per Member, for server-side debounce.
   private readonly lastTypingAt = new Map<string, number>();
+  // Last successful auth revalidation per connection, for the 60s TTL cache.
+  private readonly authValidatedAt = new Map<string, number>();
+  // Rolling-window timestamps of `chat.send_message` intents per Member, for
+  // the send-rate limit. Pruned in place on each check.
+  private readonly sendRateLimit = new Map<string, number[]>();
   private admissionChain: Promise<unknown> = Promise.resolve();
   private state: ChatState;
   private recentDurableEvents: EventEnvelope[] = [];
@@ -143,6 +162,7 @@ export class RoomActor {
 
   async detach(conn: Connection): Promise<void> {
     this.connections.delete(conn.connectionId);
+    this.authValidatedAt.delete(conn.connectionId);
 
     // Spectators have no slot, row, or presence — the count shift is observed on the next snapshot, not broadcast.
     if (this.spectators.delete(conn.connectionId)) return;
@@ -238,8 +258,19 @@ export class RoomActor {
   async submit(conn: Connection, intent: ChatIntent): Promise<void> {
     await this.ensureRehydrated();
 
+    const stillAuthorised = await this.revalidateConnection(conn);
+    if (!stillAuthorised) {
+      this.sendRejection(conn, intent.intentId, "auth_lost");
+      return;
+    }
+
     const fromUserId = await this.resolveSubmittingMember(conn, intent);
     if (fromUserId === null) return;
+
+    if (intent.kind === "chat.send_message" && !this.recordSendForRateLimit(fromUserId)) {
+      this.sendRejection(conn, intent.intentId, "rate_limit_send_message");
+      return;
+    }
 
     const ctx: ReducerContext = {
       now: this.now,
@@ -283,6 +314,85 @@ export class RoomActor {
     const last = this.lastTypingAt.get(fromUserId);
     if (last !== undefined && now - last < TYPING_DEBOUNCE_MS) return false;
     this.lastTypingAt.set(fromUserId, now);
+    return true;
+  }
+
+  // Returns true if the connection should continue acting as a Member.
+  // Returns false (after performing the demotion) when the handshake-time
+  // cookie is no longer valid; the caller emits the `auth_lost` rejection.
+  // The check is skipped for Spectator connections (no Member to demote)
+  // and for connections without a `revalidateAuth` hook (tests).
+  private async revalidateConnection(conn: Connection): Promise<boolean> {
+    if (conn.revalidateAuth === undefined) return true;
+    if (this.spectators.has(conn.connectionId)) return true;
+    if (conn.userId === null) return true;
+
+    const last = this.authValidatedAt.get(conn.connectionId);
+    if (last !== undefined && this.now() - last < AUTH_REVALIDATE_TTL_MS) return true;
+
+    const result = await conn.revalidateAuth();
+    this.authValidatedAt.set(conn.connectionId, this.now());
+
+    // Either a revoked/expired session (`null`) or a different user behind
+    // the same conn (defensive — shouldn't happen with better-auth tokens).
+    if (result === null || result.userId !== conn.userId) {
+      await this.demoteToSpectator(conn);
+      return false;
+    }
+
+    return true;
+  }
+
+  // Demotes a Member connection in place to a Spectator. The `room_member`
+  // row stays — the User keeps their slot and will re-promote on a future
+  // intent if the cookie comes back valid. The conn keeps receiving
+  // broadcasts; it just can't act until promotion.
+  private async demoteToSpectator(conn: Connection): Promise<void> {
+    const userId = conn.userId;
+    if (userId === null) return;
+
+    const userConns = this.connectionsByUser.get(userId);
+    if (userConns !== undefined) {
+      userConns.delete(conn.connectionId);
+      if (userConns.size === 0) this.connectionsByUser.delete(userId);
+    }
+    this.spectators.add(conn.connectionId);
+    conn.userId = null;
+    this.authValidatedAt.delete(conn.connectionId);
+
+    // Mirror the `detach` "last conn drops" path: the Member is now
+    // effectively offline. Persist `lastSeenAt` so the TTL sweep can free
+    // the slot if the User never reconnects, and emit `member_offline`.
+    if (this.isUserOnline(userId)) return;
+    const info = this.members.get(userId);
+    if (info === undefined) return;
+
+    const lastSeenAt = this.now();
+    this.members.set(userId, { ...info, lastSeenAt });
+    await setMemberLastSeen(this.db, this.room.id, userId, lastSeenAt);
+    this.emitTransient<MemberOfflinePayload>("room.member_offline", {
+      userId,
+      slot: info.slot,
+    });
+  }
+
+  // Returns true and records the timestamp if the User is under the
+  // per-10s send budget; returns false otherwise. The 6th send in a window
+  // is rejected — the existing timestamps stay so the budget continues to
+  // tick over without the rejected attempt counting against it.
+  private recordSendForRateLimit(userId: string): boolean {
+    const now = this.now();
+    const cutoff = now - SEND_RATE_LIMIT_WINDOW_MS;
+    const existing = this.sendRateLimit.get(userId) ?? [];
+    const fresh = existing.filter((t) => t > cutoff);
+
+    if (fresh.length >= SEND_RATE_LIMIT_COUNT) {
+      this.sendRateLimit.set(userId, fresh);
+      return false;
+    }
+
+    fresh.push(now);
+    this.sendRateLimit.set(userId, fresh);
     return true;
   }
 

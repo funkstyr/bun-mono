@@ -5,6 +5,7 @@ import type { EventEnvelope } from "@bun-mono/room-protocol/envelope";
 import type {
   ChatMessageEvent,
   ChatTypingEvent,
+  IntentRejectedEvent,
   MemberJoinedEvent,
   MemberLeftEvent,
   MemberOfflineEvent,
@@ -111,6 +112,18 @@ function offline(userId: string, slot: Slot, position: number, ts = 5000): Membe
   };
 }
 
+function rejected(intentId: string, reason: string, position: number): IntentRejectedEvent {
+  return {
+    kind: "room.intent_rejected",
+    payload: { intentId, reason },
+    id: `r-${position}`,
+    ts: 1000 + position,
+    position,
+    from: null,
+    durable: false,
+  };
+}
+
 function typing(userId: string, position: number): ChatTypingEvent {
   return {
     kind: "chat.typing",
@@ -145,6 +158,7 @@ describe("createRoomStore", () => {
       displayNamesByUserId: {},
       timeline: [],
       typingUserIds: [],
+      sessionExpired: false,
     });
   });
 });
@@ -176,6 +190,7 @@ describe("resetStore", () => {
       displayNamesByUserId: {},
       timeline: [],
       typingUserIds: [],
+      sessionExpired: false,
     });
   });
 });
@@ -364,6 +379,46 @@ describe("removeTypingUser", () => {
     const before = store.state;
     removeTypingUser(store, "ghost");
     expect(store.state).toBe(before);
+  });
+});
+
+describe("applyEvent — room.intent_rejected (auth_lost)", () => {
+  it("flips role/userId to spectator and raises sessionExpired on auth_lost", () => {
+    const store = createRoomStore();
+    applyEvent(store, snapshot([alice], [], "alice", "member"));
+    expect(store.state.myRole).toBe("member");
+
+    applyEvent(store, rejected("i-1", "auth_lost", 9));
+
+    expect(store.state.sessionExpired).toBe(true);
+    expect(store.state.myRole).toBe("spectator");
+    expect(store.state.myUserId).toBeNull();
+    // The member roster does not change — the server kept Alice's row.
+    expect(store.state.members.map((m) => m.userId)).toEqual(["alice"]);
+  });
+
+  it("leaves sessionExpired alone for non-auth rejections", () => {
+    const store = createRoomStore();
+    applyEvent(store, snapshot([alice], [], "alice", "member"));
+
+    applyEvent(store, rejected("i-1", "rate_limit_send_message", 9));
+    expect(store.state.sessionExpired).toBe(false);
+    expect(store.state.myRole).toBe("member");
+
+    applyEvent(store, rejected("i-2", "invalid_payload", 10));
+    expect(store.state.sessionExpired).toBe(false);
+    expect(store.state.myRole).toBe("member");
+  });
+
+  it("clears sessionExpired when a fresh snapshot arrives (re-attach after sign-in)", () => {
+    const store = createRoomStore();
+    applyEvent(store, snapshot([alice], [], "alice", "member"));
+    applyEvent(store, rejected("i-1", "auth_lost", 9));
+    expect(store.state.sessionExpired).toBe(true);
+
+    applyEvent(store, snapshot([alice], [], "alice", "member"));
+    expect(store.state.sessionExpired).toBe(false);
+    expect(store.state.myRole).toBe("member");
   });
 });
 

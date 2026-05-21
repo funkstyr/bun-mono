@@ -20,6 +20,7 @@ import { iterateActors } from "@bun-mono/room-server/room-registry";
 import { startTtlSweeper } from "@bun-mono/room-server/ttl";
 import {
   authoriseRoomUpgrade,
+  buildAuthRevalidator,
   onRoomClose,
   onRoomMessage,
   onRoomOpen,
@@ -118,12 +119,17 @@ app.get(
     }
 
     const ctx = result.ctx;
+    // Captured at handshake; closure is invoked by the actor on every Member
+    // intent (cached ~60s) to detect cookie revocation / session expiry.
+    const revalidateAuth = buildAuthRevalidator(c.req.raw);
     return {
       onOpen: async (_ev, ws) => {
         await onRoomOpen(
           ctx,
           (s) => ws.send(s),
           (code, reason) => ws.close(code, reason),
+          {},
+          revalidateAuth,
         );
       },
       onMessage: async (event, ws) => {
