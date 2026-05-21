@@ -53,3 +53,7 @@ export async function getOrCreateActorBySlug(
 export function resetRegistryForTests(): void {
   actors.clear();
 }
+
+export function iterateActors(): Iterable<RoomActor> {
+  return actors.values();
+}

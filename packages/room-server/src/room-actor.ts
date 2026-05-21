@@ -6,6 +6,7 @@ import type { EventEnvelope } from "@bun-mono/room-protocol/envelope";
 import { durable, type EventKind } from "@bun-mono/room-protocol/kinds";
 import type {
   MemberJoinedPayload,
+  MemberLeftPayload,
   MemberOfflinePayload,
   MemberOnlinePayload,
 } from "@bun-mono/room-protocol/member-events";
@@ -14,12 +15,15 @@ import type { RoomMember } from "@bun-mono/room-protocol/system";
 import type { ChatEvent, ChatIntent, ChatState } from "./chat-reducer";
 import {
   allocateSlot,
+  deleteStaleMember,
   insertMemberRow,
   loadDisplayName,
   loadMembers,
+  loadStaleMembers,
   setMemberLastSeen,
   type MemberInfo,
 } from "./member-presence";
+import { TTL_MS } from "./ttl";
 import type { AnyLibSQLDatabase, Connection, ReducerContext, RoomReducer, RoomRow } from "./types";
 
 const EVENT_LOG_CAP = 500;
@@ -80,6 +84,12 @@ export class RoomActor {
   async attach(conn: Connection): Promise<void> {
     await this.ensureRehydrated();
 
+    // Lazy-on-connect sweep. Runs before the admission check so a returning
+    // User whose own row has expired re-joins as a new Member (with
+    // whatever slot is now free), not as their stale ghost. Cheap when
+    // there are no stale rows: a single indexed query that returns nothing.
+    await this.sweepStaleMembers();
+
     let existing = this.members.get(conn.userId);
 
     if (existing === undefined) {
@@ -132,6 +142,34 @@ export class RoomActor {
       userId: conn.userId,
       slot: info.slot,
     });
+  }
+
+  // Periodic sweeper entrypoint. Also runs lazily on attach. Queries the DB
+  // for rows whose `last_seen_at` is past TTL, then for each one does a
+  // conditional DELETE — a User who reconnects between the SELECT and the
+  // DELETE keeps their slot, and the corresponding `member_left` event is
+  // suppressed.
+  async sweepStaleMembers(): Promise<void> {
+    await this.ensureRehydrated();
+
+    const threshold = this.now() - TTL_MS;
+    const stale = await loadStaleMembers(this.db, this.room.id, threshold);
+    if (stale.length === 0) return;
+
+    for (const { userId, slot } of stale) {
+      // eslint-disable-next-line no-await-in-loop -- monotonic position assignment requires sequential emission
+      const deleted = await deleteStaleMember(this.db, this.room.id, userId, threshold);
+      if (!deleted) continue;
+
+      this.members.delete(userId);
+
+      // eslint-disable-next-line no-await-in-loop -- see above
+      await this.emitDurableSystem<MemberLeftPayload>("room.member_left", {
+        userId,
+        slot,
+        reason: "ttl_expired",
+      });
+    }
   }
 
   async submit(conn: Connection, intent: ChatIntent): Promise<void> {
@@ -263,9 +301,7 @@ export class RoomActor {
   }
 
   private async emitDurableSystem<TPayload>(
-    // member_left is reserved in the protocol but emission is deferred to a
-    // later slice (eviction / TTL). When that lands, widen this union.
-    kind: "room.member_joined",
+    kind: "room.member_joined" | "room.member_left",
     payload: TPayload,
   ): Promise<void> {
     const event: EventEnvelope = {

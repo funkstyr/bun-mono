@@ -16,6 +16,8 @@ import { createContext } from "@bun-mono/api/context";
 import { appRouter } from "@bun-mono/api/routers/index";
 import { auth } from "@bun-mono/auth";
 import { env } from "@bun-mono/env/server";
+import { iterateActors } from "@bun-mono/room-server/room-registry";
+import { startTtlSweeper } from "@bun-mono/room-server/ttl";
 import {
   authoriseRoomUpgrade,
   onRoomClose,
@@ -144,6 +146,8 @@ app.get(
 app.get("/", (c) => {
   return c.text("OK");
 });
+
+startTtlSweeper(iterateActors);
 
 export default {
   fetch: app.fetch,
