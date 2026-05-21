@@ -12,6 +12,10 @@ export const roomMember = type({
 
 export type RoomMember = typeof roomMember.infer;
 
+// Only emitted when `yourRole === "spectator"` was forced; absent on
+// anonymous-spectator and full-room-spectator attaches.
+export type SpectatorReason = "membership_cap";
+
 export const roomSnapshotPayload = type({
   members: roomMember.array(),
   recentEvents: eventEnvelope.array().atMostLength(100),
@@ -19,6 +23,7 @@ export const roomSnapshotPayload = type({
   yourRole: "'member' | 'spectator'",
   yourSlot: "0 | 1 | 2 | 3 | null",
   yourUserId: "string | null",
+  "reason?": "'membership_cap'",
 });
 
 export type RoomSnapshotPayload = typeof roomSnapshotPayload.infer;

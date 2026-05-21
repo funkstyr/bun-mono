@@ -194,18 +194,22 @@ describe("ws integration", () => {
     wsB.ws.close();
   });
 
-  it("rejects WS connection without a session cookie", async () => {
+  it("attaches a cookie-less WS connection as a Spectator (snapshot.yourRole === 'spectator')", async () => {
+    // The spectator slice (PR #45) removed the 4401 unauthorised path —
+    // an anonymous WS connection now stays open and receives a Spectator
+    // snapshot. This test pins the new contract so a future regression
+    // doesn't silently re-introduce the close.
     const c = await signup("carol");
     const slug = await createRoom(c.cookie);
 
-    const url = `ws://localhost:${TEST_PORT}/ws/room/${slug}`;
-    const ws = new WebSocket(url);
-    const result = await new Promise<{ code: number; reason: string }>((resolve) => {
-      ws.addEventListener("close", (ev) => resolve({ code: ev.code, reason: ev.reason }), {
-        once: true,
-      });
-    });
-    expect(result.code).toBe(4401);
+    const buf = await openWs(slug, null);
+    const snap = await nextMessage<{ payload: { yourRole: string; yourUserId: string | null } }>(
+      buf,
+      "room.snapshot",
+    );
+    expect(snap.payload.yourRole).toBe("spectator");
+    expect(snap.payload.yourUserId).toBeNull();
+    buf.ws.close();
   });
 
   it("rejects empty text with intent_rejected, no broadcast", async () => {

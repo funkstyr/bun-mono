@@ -94,6 +94,16 @@ describe("parseIntent — happy path", () => {
     expect(result.ok).toBe(true);
     expect(valueOf(result)?.kind).toBe("chat.typing_ping");
   });
+
+  it("accepts a room.leave intent with an empty payload", () => {
+    const result = parseIntent({
+      kind: "room.leave",
+      payload: {},
+      intentId: "i-leave",
+    });
+    expect(result.ok).toBe(true);
+    expect(valueOf(result)?.kind).toBe("room.leave");
+  });
 });
 
 describe("parseIntent — sad paths", () => {

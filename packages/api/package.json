@@ -27,6 +27,8 @@
     "@bun-mono/auth": "workspace:*",
     "@bun-mono/db": "workspace:*",
     "@bun-mono/env": "workspace:*",
+    "@bun-mono/room-protocol": "workspace:*",
+    "@bun-mono/room-server": "workspace:*",
     "@effect/schema": "catalog:",
     "@orpc/client": "catalog:",
     "@orpc/openapi": "catalog:",

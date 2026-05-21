@@ -16,9 +16,10 @@ import {
   type ConnectionStatus,
   type MyRole,
   type RoomState,
+  type SpectatorReason,
 } from "./room-store";
 
-export type { ConnectionStatus, MyRole };
+export type { ConnectionStatus, MyRole, SpectatorReason };
 
 // 3s window exceeds the server's 1.5s debounce so an actively-typing User
 // keeps refreshing their own indicator instead of flickering off between
@@ -33,8 +34,10 @@ type UseRoomSocket = {
   status: ConnectionStatus;
   myUserId: string | null;
   myRole: MyRole;
+  spectatorReason: SpectatorReason | null;
   spectatorCount: number;
   members: readonly MemberView[];
+  displayNamesByUserId: Readonly<Record<string, string>>;
   timeline: readonly RoomTimelineEntry[];
   typingUserIds: readonly string[];
   send: (text: string) => void;
@@ -120,9 +123,13 @@ export function useRoomSocket(slug: string): UseRoomSocket {
 
   const myRole = useSelector(store, (s: RoomState) => s.myRole);
 
+  const spectatorReason = useSelector(store, (s: RoomState) => s.spectatorReason);
+
   const spectatorCount = useSelector(store, (s: RoomState) => s.spectatorCount);
 
   const members = useSelector(store, (s: RoomState) => s.members);
+
+  const displayNamesByUserId = useSelector(store, (s: RoomState) => s.displayNamesByUserId);
 
   const timeline = useSelector(store, (s: RoomState) => s.timeline);
 
@@ -162,8 +169,10 @@ export function useRoomSocket(slug: string): UseRoomSocket {
     status,
     myUserId,
     myRole,
+    spectatorReason,
     spectatorCount,
     members,
+    displayNamesByUserId,
     timeline,
     typingUserIds,
     send,

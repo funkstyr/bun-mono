@@ -104,8 +104,9 @@ export async function onRoomMessage(
     return;
   }
 
-  if (parsed.value.kind !== "chat.send_message") {
-    sendRejection(send, parsed.value.intentId, `unsupported_intent:${parsed.value.kind}`);
+  const kind = parsed.value.kind;
+  if (kind !== "chat.send_message" && kind !== "chat.typing_ping" && kind !== "room.leave") {
+    sendRejection(send, parsed.value.intentId, `unsupported_intent:${kind}`);
     return;
   }
 
@@ -120,6 +121,11 @@ export async function onRoomMessage(
   const entry = connByConnectionId.get(ctx.connectionId);
   if (!entry) {
     close(1011, "no_open_handshake");
+    return;
+  }
+
+  if (kind === "room.leave") {
+    await found.actor.leave(entry.conn, parsed.value.intentId);
     return;
   }
 

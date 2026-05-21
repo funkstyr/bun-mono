@@ -2,17 +2,20 @@ import { customAlphabet } from "nanoid";
 
 import type { EventEnvelope } from "@bun-mono/room-protocol/envelope";
 import { broadcastToSpectators, type EventKind } from "@bun-mono/room-protocol/kinds";
+import { MEMBERSHIP_CAP } from "@bun-mono/room-protocol/limits";
 import type {
   MemberJoinedPayload,
   MemberLeftPayload,
   MemberOfflinePayload,
   MemberOnlinePayload,
 } from "@bun-mono/room-protocol/member-events";
-import type { RoomMember } from "@bun-mono/room-protocol/system";
+import type { RoomMember, SpectatorReason } from "@bun-mono/room-protocol/system";
 
 import type { ChatEvent, ChatIntent, ChatState } from "./chat-reducer";
 import {
   allocateSlot,
+  countMembershipsForUser,
+  deleteMemberRow,
   deleteStaleMember,
   insertMemberRow,
   loadDisplayName,
@@ -40,6 +43,8 @@ export type RoomActorDeps = {
   now?: () => number;
   nextEventId?: () => string;
 };
+
+type PromoteResult = { ok: true } | { ok: false; reason: "room_full" | SpectatorReason };
 
 export class RoomActor {
   private readonly room: RoomRow;
@@ -95,6 +100,13 @@ export class RoomActor {
     let existing = this.members.get(conn.userId);
 
     if (existing === undefined) {
+      // Snapshot reason lets the client prompt "leave one first" instead of sitting silently as a read-only Spectator.
+      const underCap = await this.isUnderMembershipCap(conn.userId);
+      if (!underCap) {
+        this.attachAsSpectator(conn, "membership_cap");
+        return;
+      }
+
       const allocated = await this.ensureAdmitted(conn.userId);
       if (allocated === null) {
         // Full Room: downgrade to Spectator rather than close so the client can read along and wait for a slot.
@@ -123,10 +135,10 @@ export class RoomActor {
     conn.send(this.buildSnapshot(conn));
   }
 
-  private attachAsSpectator(conn: Connection): void {
+  private attachAsSpectator(conn: Connection, reason?: SpectatorReason): void {
     this.connections.set(conn.connectionId, conn);
     this.spectators.add(conn.connectionId);
-    conn.send(this.buildSnapshot(conn));
+    conn.send(this.buildSnapshot(conn, reason));
   }
 
   async detach(conn: Connection): Promise<void> {
@@ -185,6 +197,42 @@ export class RoomActor {
         reason: "ttl_expired",
       });
     }
+  }
+
+  // WS path for `room.leave`. Routed from `ws-upgrade` since the chat reducer doesn't see room-namespace intents.
+  async leave(conn: Connection, intentId: string): Promise<void> {
+    if (conn.userId === null || this.spectators.has(conn.connectionId)) {
+      this.sendRejection(conn, intentId, "not_a_member");
+      return;
+    }
+
+    const ok = await this.leaveAsMember(conn.userId);
+    if (!ok) this.sendRejection(conn, intentId, "not_a_member");
+  }
+
+  // Shared handler for WS `room.leave` and the orpc procedure. Returns false if `userId` isn't a Member; on success demotes the User's connections to Spectator (kept open for reading) and emits a durable member_left.
+  async leaveAsMember(userId: string): Promise<boolean> {
+    await this.ensureRehydrated();
+
+    const info = this.members.get(userId);
+    if (info === undefined) return false;
+
+    const userConns = this.connectionsByUser.get(userId);
+    if (userConns !== undefined) {
+      for (const connId of userConns) this.spectators.add(connId);
+      this.connectionsByUser.delete(userId);
+    }
+
+    this.members.delete(userId);
+    await deleteMemberRow(this.db, this.room.id, userId);
+
+    await this.emitDurableSystem<MemberLeftPayload>("room.member_left", {
+      userId,
+      slot: info.slot,
+      reason: "left",
+    });
+
+    return true;
   }
 
   async submit(conn: Connection, intent: ChatIntent): Promise<void> {
@@ -280,6 +328,14 @@ export class RoomActor {
     return info;
   }
 
+  // Short-circuits before the DB count: an existing Member of this Room isn't acquiring a new Membership.
+  private async isUnderMembershipCap(userId: string): Promise<boolean> {
+    if (this.members.has(userId)) return true;
+
+    const count = await countMembershipsForUser(this.db, userId);
+    return count < MEMBERSHIP_CAP;
+  }
+
   private isUserOnline(userId: string): boolean {
     const set = this.connectionsByUser.get(userId);
     return set !== undefined && set.size > 0;
@@ -306,8 +362,8 @@ export class RoomActor {
       }
 
       const promoted = await this.tryPromoteSpectator(conn, conn.userId);
-      if (!promoted) {
-        this.sendRejection(conn, intent.intentId, "room_full");
+      if (!promoted.ok) {
+        this.sendRejection(conn, intent.intentId, promoted.reason);
         return null;
       }
 
@@ -322,10 +378,13 @@ export class RoomActor {
     return conn.userId;
   }
 
-  // Promotes a Spectator connection to a Member when a slot is available. Returns true on success, false when the Room is still full.
-  private async tryPromoteSpectator(conn: Connection, userId: string): Promise<boolean> {
+  // Cap re-check matters: a cap-downgrade Spectator who left another Room in a different tab gets promoted here on their next action.
+  private async tryPromoteSpectator(conn: Connection, userId: string): Promise<PromoteResult> {
+    const underCap = await this.isUnderMembershipCap(userId);
+    if (!underCap) return { ok: false, reason: "membership_cap" };
+
     const allocated = await this.ensureAdmitted(userId);
-    if (allocated === null) return false;
+    if (allocated === null) return { ok: false, reason: "room_full" };
 
     this.spectators.delete(conn.connectionId);
 
@@ -341,7 +400,7 @@ export class RoomActor {
       });
     }
 
-    return true;
+    return { ok: true };
   }
 
   private sendRejection(conn: Connection, intentId: string, reason: string): void {
@@ -357,7 +416,7 @@ export class RoomActor {
     conn.send(rejection);
   }
 
-  private buildSnapshot(conn: Connection): EventEnvelope {
+  private buildSnapshot(conn: Connection, reason?: SpectatorReason): EventEnvelope {
     const members: RoomMember[] = [];
     for (const [userId, info] of this.members) {
       members.push({
@@ -381,6 +440,7 @@ export class RoomActor {
         yourRole: isMember ? "member" : "spectator",
         yourSlot: own?.slot ?? null,
         yourUserId: conn.userId,
+        ...(reason === undefined ? {} : { reason }),
       },
       id: this.nextEventId(),
       ts: this.now(),

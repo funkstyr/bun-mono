@@ -8,9 +8,10 @@ import {
   memberOfflinePayload,
   memberOnlinePayload,
 } from "./member-events";
+import { leaveRoomPayload } from "./room-intents";
 import { intentRejectedPayload, roomSnapshotPayload } from "./system";
 
-export type IntentKind = "chat.send_message" | "chat.typing_ping";
+export type IntentKind = "chat.send_message" | "chat.typing_ping" | "room.leave";
 
 export type EventKind =
   | "chat.message_sent"
@@ -27,6 +28,7 @@ type PayloadValidator = (input: unknown) => unknown;
 const intentRegistry: Record<IntentKind, PayloadValidator> = {
   "chat.send_message": sendMessagePayload as PayloadValidator,
   "chat.typing_ping": typingPingPayload as PayloadValidator,
+  "room.leave": leaveRoomPayload as PayloadValidator,
 };
 
 const eventRegistry: Record<EventKind, PayloadValidator> = {

@@ -1,6 +1,7 @@
 import { Store } from "@tanstack/store";
 
 import type { EventEnvelope } from "@bun-mono/room-protocol/envelope";
+import type { SpectatorReason } from "@bun-mono/room-protocol/system";
 
 import {
   isChatMessage,
@@ -15,6 +16,8 @@ import {
   type RoomTimelineEntry,
 } from "./room-events";
 
+export type { SpectatorReason };
+
 export type ConnectionStatus = "connecting" | "open" | "closed";
 
 export type MyRole = "unknown" | "member" | "spectator";
@@ -23,8 +26,11 @@ export type RoomState = {
   status: ConnectionStatus;
   myUserId: string | null;
   myRole: MyRole;
+  spectatorReason: SpectatorReason | null;
   spectatorCount: number;
   members: readonly MemberView[];
+  // Persists across `member_left` so the message list can still render the User's name after they leave.
+  displayNamesByUserId: Readonly<Record<string, string>>;
   timeline: readonly RoomTimelineEntry[];
   typingUserIds: readonly string[];
 };
@@ -33,8 +39,10 @@ const initial: RoomState = {
   status: "connecting",
   myUserId: null,
   myRole: "unknown",
+  spectatorReason: null,
   spectatorCount: 0,
   members: [],
+  displayNamesByUserId: {},
   timeline: [],
   typingUserIds: [],
 };
@@ -56,13 +64,16 @@ export function setStatus(store: RoomStore, status: ConnectionStatus): void {
 export function applyEvent(store: RoomStore, event: EventEnvelope): void {
   if (isRoomSnapshot(event)) {
     const { payload } = event;
+    const timeline = payload.recentEvents.filter(isTimelineEntry);
     store.setState(() => ({
       status: "open",
       myUserId: payload.yourUserId,
       myRole: payload.yourRole,
+      spectatorReason: payload.reason ?? null,
       spectatorCount: payload.spectatorCount,
       members: sortBySlot(payload.members),
-      timeline: payload.recentEvents.filter(isTimelineEntry),
+      displayNamesByUserId: collectDisplayNames(payload.members, timeline),
+      timeline,
       // Snapshot doesn't carry typing state — typing is transient by definition.
       typingUserIds: [],
     }));
@@ -80,14 +91,18 @@ export function applyEvent(store: RoomStore, event: EventEnvelope): void {
       // Promotion-on-intent: when *I* am the user being joined, this event
       // arrives before any reply to my pending chat intent — flip my role
       // so the input unlocks immediately without a snapshot round-trip.
-      const myRole: MyRole = userId === s.myUserId ? "member" : s.myRole;
+      const isMe = userId === s.myUserId;
+      const myRole: MyRole = isMe ? "member" : s.myRole;
+      const spectatorReason: SpectatorReason | null = isMe ? null : s.spectatorReason;
       return {
         ...s,
         myRole,
+        spectatorReason,
         members: sortBySlot([
           ...s.members.filter((m) => m.userId !== userId),
           { userId, slot, displayName, online: false, lastSeenAt: null },
         ]),
+        displayNamesByUserId: { ...s.displayNamesByUserId, [userId]: displayName },
         timeline: [...s.timeline, event],
       };
     });
@@ -140,4 +155,19 @@ function patchMember(store: RoomStore, userId: string, patch: Partial<MemberView
 
 function sortBySlot(members: readonly MemberView[]): MemberView[] {
   return [...members].toSorted((a, b) => a.slot - b.slot);
+}
+
+// Includes historical member_joined events so a User who left before the snapshot but is still in the recent-events window keeps their name.
+function collectDisplayNames(
+  members: readonly MemberView[],
+  timeline: readonly RoomTimelineEntry[],
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const m of members) out[m.userId] = m.displayName;
+  for (const entry of timeline) {
+    if (isMemberJoined(entry)) {
+      out[entry.payload.userId] = entry.payload.displayName;
+    }
+  }
+  return out;
 }
