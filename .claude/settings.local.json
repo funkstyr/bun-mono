@@ -24,7 +24,8 @@
       "Bash(gh repo *)",
       "Bash(gh label *)",
       "Bash(gh issue *)",
-      "Bash(gh project *)"
+      "Bash(gh project *)",
+      "Bash(git checkout *)"
     ],
     "deny": [
       "Read(**/node_modules/**)",

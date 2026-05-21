@@ -34,8 +34,10 @@
     "@orpc/zod": "catalog:",
     "arktype": "catalog:",
     "dotenv": "catalog:",
+    "drizzle-orm": "^0.45.2",
     "effect": "catalog:",
     "hono": "catalog:",
+    "nanoid": "catalog:",
     "ua-parser-js": "^2.0.9",
     "zod": "catalog:"
   },
