@@ -8,6 +8,11 @@ const globalSetupFile = fileURLToPath(new URL("./src/__tests__/_global-setup.ts"
 const testDbPath = fileURLToPath(new URL("./.vitest-tmp/test.db", import.meta.url));
 
 export default nodePreset({
+  // `test-bun/` runs under `bun test` via the `test:bun` script. Exclude it from
+  // vitest so the same file isn't loaded by both runners.
+  exclude: ["**/node_modules/**", "**/dist/**", "test-bun/**"],
+  // No vitest tests live in src/ today; integration coverage is under `test-bun/`.
+  passWithNoTests: true,
   globalSetup: [globalSetupFile],
   // Inject env BEFORE any test module loads — `@bun-mono/env/server` reads
   // `process.env` at module init, and `@bun-mono/db` opens libsql in the same tick.

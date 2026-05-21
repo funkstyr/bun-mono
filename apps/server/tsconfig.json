@@ -1,6 +1,6 @@
 {
   "extends": "@bun-mono/config/tsconfig.base.json",
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "test-bun/**/*.ts"],
   "exclude": ["dist", "node_modules"],
   "compilerOptions": {
     "noEmit": true,

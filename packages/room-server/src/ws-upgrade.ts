@@ -112,15 +112,18 @@ export async function onRoomMessage(
     return;
   }
 
+  // Invariant: `onRoomOpen` runs before any `onRoomMessage`, so this entry
+  // is always populated by the time a message arrives. If it isn't, the
+  // socket is in an unexpected state — close it rather than building a
+  // fresh disconnected Connection that the actor wouldn't know to broadcast
+  // back to.
   const entry = connByConnectionId.get(ctx.connectionId);
-  const conn: Connection = entry?.conn ?? {
-    connectionId: ctx.connectionId,
-    userId: ctx.userId,
-    send: (ev) => send(JSON.stringify(ev)),
-    close,
-  };
+  if (!entry) {
+    close(1011, "no_open_handshake");
+    return;
+  }
 
-  await found.actor.submit(conn, parsed.value as ChatIntent);
+  await found.actor.submit(entry.conn, parsed.value as ChatIntent);
 }
 
 export function onRoomClose(ctx: RoomUpgradeContext, deps: RegistryDeps = {}): void {
@@ -130,12 +133,23 @@ export function onRoomClose(ctx: RoomUpgradeContext, deps: RegistryDeps = {}): v
   connByConnectionId.delete(ctx.connectionId);
 
   // Best-effort detach; the registry holds the actor, so re-resolve lazily.
-  void getOrCreateActorBySlug(ctx.slug, deps).then((found) => {
-    if (found) found.actor.detach(entry.conn);
-  });
+  // The `.catch` swallows any registry-lookup failure (e.g., DB error during
+  // close) — the cost is a tiny memory leak in the actor's `connections` map
+  // until the actor is GC'd, not a crash.
+  void getOrCreateActorBySlug(ctx.slug, deps)
+    .then((found) => {
+      if (found) found.actor.detach(entry.conn);
+    })
+    .catch((err: unknown) => {
+      console.error("onRoomClose: detach lookup failed:", err);
+    });
 }
 
 function sendRejection(send: WsSend, intentId: string, reason: string): void {
+  // Pre-actor rejection: the intent failed `parseIntent` or routing before
+  // reaching a RoomActor, so we have no monotonic counter. `position` is
+  // informational for transient events; `0` is a sentinel meaning
+  // "not assigned by an actor".
   send(
     JSON.stringify({
       kind: "room.intent_rejected",

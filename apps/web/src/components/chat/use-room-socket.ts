@@ -10,6 +10,16 @@ type ChatMessageEvent = EventEnvelope & {
   payload: { text: string };
 };
 
+type RoomSnapshotEvent = EventEnvelope & {
+  kind: "room.snapshot";
+  payload: { recentEvents: EventEnvelope[] };
+};
+
+type RoomIntentRejectedEvent = EventEnvelope & {
+  kind: "room.intent_rejected";
+  payload: { reason: string };
+};
+
 export type ConnectionStatus = "connecting" | "open" | "closed";
 
 type UseRoomSocket = {
@@ -20,6 +30,14 @@ type UseRoomSocket = {
 
 function isChatMessageSent(ev: EventEnvelope): ev is ChatMessageEvent {
   return ev.kind === "chat.message_sent";
+}
+
+function isRoomSnapshot(ev: EventEnvelope): ev is RoomSnapshotEvent {
+  return ev.kind === "room.snapshot";
+}
+
+function isIntentRejected(ev: EventEnvelope): ev is RoomIntentRejectedEvent {
+  return ev.kind === "room.intent_rejected";
 }
 
 export function useRoomSocket(slug: string): UseRoomSocket {
@@ -58,18 +76,16 @@ export function useRoomSocket(slug: string): UseRoomSocket {
       }
 
       const event = parsed.value;
-      if (event.kind === "room.snapshot") {
-        const payload = event.payload as { recentEvents: EventEnvelope[] };
-        setMessages(payload.recentEvents.filter(isChatMessageSent));
+      if (isRoomSnapshot(event)) {
+        setMessages(event.payload.recentEvents.filter(isChatMessageSent));
         return;
       }
-      if (event.kind === "chat.message_sent" && isChatMessageSent(event)) {
+      if (isChatMessageSent(event)) {
         setMessages((prev) => [...prev, event]);
         return;
       }
-      if (event.kind === "room.intent_rejected") {
-        const payload = event.payload as { reason: string };
-        console.warn("intent rejected:", payload.reason);
+      if (isIntentRejected(event)) {
+        console.warn("intent rejected:", event.payload.reason);
       }
     };
 

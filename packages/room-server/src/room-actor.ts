@@ -149,7 +149,9 @@ export class RoomActor {
       .where(eq(roomEvent.roomId, this.room.id))
       .orderBy(roomEvent.position);
 
-    const events = rows.map((r) => rowToChatEvent(r as RoomEventRow));
+    const events = rows
+      .map((r) => rowToChatEvent(r as RoomEventRow))
+      .filter((e): e is ChatEvent => e !== null);
     this.state = this.reducer.rehydrate(this.state, events);
 
     const last = rows.at(-1) as RoomEventRow | undefined;
@@ -196,7 +198,11 @@ export class RoomActor {
   }
 }
 
-function rowToChatEvent(row: RoomEventRow): ChatEvent {
+function rowToChatEvent(row: RoomEventRow): ChatEvent | null {
+  // Future room-kinds may persist other durable events into the same log; the
+  // chat actor's reducer only understands `chat.message_sent`, so anything else
+  // is filtered out at rehydrate time rather than miscast.
+  if (row.kind !== "chat.message_sent") return null;
   return {
     kind: "chat.message_sent",
     payload: JSON.parse(row.payload) as ChatEvent["payload"],

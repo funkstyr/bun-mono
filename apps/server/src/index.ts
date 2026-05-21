@@ -125,7 +125,10 @@ app.get(
         );
       },
       onMessage: async (event, ws) => {
-        const raw = typeof event.data === "string" ? event.data : await (event.data as Blob).text();
+        // Bun's WS may surface `string`, `Blob`, or `ArrayBuffer`. `new Response()`
+        // accepts all three; `.text()` decodes via UTF-8.
+        const raw =
+          typeof event.data === "string" ? event.data : await new Response(event.data).text();
         await onRoomMessage(
           ctx,
           raw,

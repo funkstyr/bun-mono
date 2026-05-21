@@ -73,6 +73,7 @@
         "@bun-mono/config": "workspace:*",
         "@effect/vitest": "catalog:",
         "@libsql/client": "catalog:",
+        "@orpc/client": "catalog:",
         "@playwright/test": "catalog:",
         "@types/bun": "catalog:",
         "@types/react": "catalog:",
