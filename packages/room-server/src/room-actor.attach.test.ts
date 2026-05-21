@@ -139,7 +139,7 @@ describe("RoomActor.attach — second User joining", () => {
     expect(snapshotPayload(cSnap).yourSlot).toBe(2);
   });
 
-  it("closes the connection with room_full when all four slots are taken", async () => {
+  it("attaches an authenticated 5th joiner as a spectator when all four slots are taken", async () => {
     await seedUser(testDb, "dave", "Dave");
     await seedUser(testDb, "eve", "Eve");
     const actor = new RoomActor(room, chatReducer, {
@@ -156,8 +156,15 @@ describe("RoomActor.attach — second User joining", () => {
     const e = makeConnection("c-e", "eve");
     await actor.attach(e);
 
-    expect(e.closed).toBe(true);
-    expect(e.events).toEqual([]);
+    expect(e.closed).toBe(false);
+
+    const snap = e.events.find((ev) => ev.kind === "room.snapshot");
+    expect(snap).toBeDefined();
+    const payload = snapshotPayload(snap!);
+    expect(payload.yourRole).toBe("spectator");
+    expect(payload.yourSlot).toBeNull();
+    expect(payload.yourUserId).toBe("eve");
+    expect(payload.members).toHaveLength(4);
   });
 });
 

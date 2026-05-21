@@ -40,12 +40,17 @@ function makeRequest(): Request {
 }
 
 describe("authoriseRoomUpgrade", () => {
-  it("returns 401 unauthenticated when there is no session", async () => {
+  it("returns ok with userId=null when there is no session — cookie-less spectator attach", async () => {
+    await seedUser(testDb, "alice");
+    await seedRoom(testDb, "room-1", "abc", "alice");
     sessionMock.mockResolvedValueOnce(null);
 
-    const result = await authoriseRoomUpgrade(makeRequest(), "abc");
+    const result = await authoriseRoomUpgrade(makeRequest(), "abc", { db: testDb });
 
-    expect(result).toEqual({ ok: false, status: 401, reason: "unauthenticated" });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.ctx.userId).toBeNull();
+    expect(result.ctx.roomId).toBe("room-1");
   });
 
   it("returns 404 room_not_found for a valid session but missing slug", async () => {

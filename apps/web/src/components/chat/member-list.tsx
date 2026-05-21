@@ -3,9 +3,10 @@ import type { MemberView } from "./room-events";
 type Props = {
   members: readonly MemberView[];
   myUserId: string | null;
+  spectatorCount: number;
 };
 
-export function MemberList({ members, myUserId }: Props): React.ReactElement {
+export function MemberList({ members, myUserId, spectatorCount }: Props): React.ReactElement {
   return (
     <aside className="bg-background w-48 shrink-0 border-l px-3 py-2">
       <h2 className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">
@@ -29,6 +30,10 @@ export function MemberList({ members, myUserId }: Props): React.ReactElement {
           </li>
         ))}
       </ul>
+
+      {spectatorCount > 0 ? (
+        <p className="text-muted-foreground mt-3 text-xs">+ {spectatorCount} watching</p>
+      ) : null}
     </aside>
   );
 }

@@ -14,10 +14,16 @@ const eventIdAlphabet = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ0123456
 const generateRejectionId = customAlphabet(eventIdAlphabet, 21);
 
 export type RoomUpgradeContext = {
-  userId: string;
+  // The authenticated user id at upgrade time, or `null` for a cookie-less
+  // (anonymous) connection that attaches as a Spectator.
+  userId: string | null;
   slug: string;
   roomId: string;
   connectionId: string;
+  // Headers snapshot from the upgrade Request, retained so we can re-call
+  // the auth layer on a Spectator's first intent to detect a mid-session
+  // sign-in (the promotion-on-intent path).
+  headers: Headers;
 };
 
 export type AuthoriseSuccess = { ok: true; ctx: RoomUpgradeContext };
@@ -30,7 +36,6 @@ export async function authoriseRoomUpgrade(
   deps: RegistryDeps = {},
 ): Promise<AuthoriseResult> {
   const session = await auth.api.getSession({ headers: req.headers });
-  if (!session?.user) return { ok: false, status: 401, reason: "unauthenticated" };
 
   const found = await getOrCreateActorBySlug(slug, deps);
   if (!found) return { ok: false, status: 404, reason: "room_not_found" };
@@ -38,10 +43,11 @@ export async function authoriseRoomUpgrade(
   return {
     ok: true,
     ctx: {
-      userId: session.user.id,
+      userId: session?.user?.id ?? null,
       slug,
       roomId: found.row.id,
       connectionId: generateConnectionId(),
+      headers: req.headers,
     },
   };
 }
@@ -121,6 +127,16 @@ export async function onRoomMessage(
   if (!entry) {
     close(1011, "no_open_handshake");
     return;
+  }
+
+  // Promotion-on-intent: an anonymous Spectator that signed in mid-session
+  // gets re-evaluated here. We re-call the auth layer against the upgrade
+  // headers; if a session now exists, we set the Connection's `userId` so
+  // the actor's submit path can attempt to allocate a slot. No separate
+  // "promote me" intent — the check is implicit on every Spectator intent.
+  if (entry.conn.userId === null) {
+    const session = await auth.api.getSession({ headers: ctx.headers });
+    if (session?.user) entry.conn.userId = session.user.id;
   }
 
   await found.actor.submit(entry.conn, parsed.value as ChatIntent);

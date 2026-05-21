@@ -16,9 +16,13 @@ import {
 
 export type ConnectionStatus = "connecting" | "open" | "closed";
 
+export type MyRole = "unknown" | "member" | "spectator";
+
 export type RoomState = {
   status: ConnectionStatus;
   myUserId: string | null;
+  myRole: MyRole;
+  spectatorCount: number;
   members: readonly MemberView[];
   timeline: readonly RoomTimelineEntry[];
 };
@@ -26,6 +30,8 @@ export type RoomState = {
 const initial: RoomState = {
   status: "connecting",
   myUserId: null,
+  myRole: "unknown",
+  spectatorCount: 0,
   members: [],
   timeline: [],
 };
@@ -50,6 +56,8 @@ export function applyEvent(store: RoomStore, event: EventEnvelope): void {
     store.setState(() => ({
       status: "open",
       myUserId: payload.yourUserId,
+      myRole: payload.yourRole,
+      spectatorCount: payload.spectatorCount,
       members: sortBySlot(payload.members),
       timeline: payload.recentEvents.filter(isTimelineEntry),
     }));
@@ -63,14 +71,21 @@ export function applyEvent(store: RoomStore, event: EventEnvelope): void {
 
   if (isMemberJoined(event)) {
     const { userId, slot, displayName } = event.payload;
-    store.setState((s) => ({
-      ...s,
-      members: sortBySlot([
-        ...s.members.filter((m) => m.userId !== userId),
-        { userId, slot, displayName, online: false, lastSeenAt: null },
-      ]),
-      timeline: [...s.timeline, event],
-    }));
+    store.setState((s) => {
+      // Promotion-on-intent: when *I* am the user being joined, this event
+      // arrives before any reply to my pending chat intent — flip my role
+      // so the input unlocks immediately without a snapshot round-trip.
+      const myRole: MyRole = userId === s.myUserId ? "member" : s.myRole;
+      return {
+        ...s,
+        myRole,
+        members: sortBySlot([
+          ...s.members.filter((m) => m.userId !== userId),
+          { userId, slot, displayName, online: false, lastSeenAt: null },
+        ]),
+        timeline: [...s.timeline, event],
+      };
+    });
     return;
   }
 

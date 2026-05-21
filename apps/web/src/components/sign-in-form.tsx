@@ -53,7 +53,13 @@ function TextField({
   );
 }
 
-export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () => void }) {
+export default function SignInForm({
+  onSwitchToSignUp,
+  redirectTo,
+}: {
+  onSwitchToSignUp: () => void;
+  redirectTo?: string;
+}) {
   const navigate = useNavigate({
     from: "/",
   });
@@ -69,9 +75,9 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
       const isEmail = value.identifier.includes("@");
       const callbacks = {
         onSuccess: () => {
-          navigate({
-            to: "/dashboard",
-          });
+          // `redirectTo` is validated at the route layer to be a same-origin
+          // path (starts with "/"). Falls back to /dashboard.
+          navigate(redirectTo ? { to: redirectTo } : { to: "/dashboard" });
           toast.success("Sign in successful");
         },
         onError: (error: { error: { message?: string; statusText?: string } }) => {

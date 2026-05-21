@@ -1,13 +1,20 @@
 import { useCallback } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 
 import { Button } from "@bun-mono/core-ui/button";
 import { Card, CardContent } from "@bun-mono/core-ui/card";
+import { getUser } from "@/functions/get-user";
 import { client, orpc, queryClient } from "@/utils/orpc";
 
 export const Route = createFileRoute("/chat/")({
   component: RouteComponent,
+  // The Memberships list is per-user, so this index needs a session.
+  // `/chat/r/:slug` does *not* — anonymous Spectators land there directly.
+  beforeLoad: async () => {
+    const session = await getUser();
+    if (!session) throw redirect({ to: "/login" });
+  },
 });
 
 function RouteComponent(): React.ReactElement {

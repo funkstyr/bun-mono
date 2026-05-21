@@ -7,7 +7,7 @@ import type { Connection, RoomRow } from "./types";
 
 export type CapturedConnection = Connection & { events: EventEnvelope[]; closed: boolean };
 
-export function makeConnection(connectionId: string, userId: string): CapturedConnection {
+export function makeConnection(connectionId: string, userId: string | null): CapturedConnection {
   const events: EventEnvelope[] = [];
   const conn: CapturedConnection = {
     connectionId,
@@ -59,7 +59,8 @@ export function eventsOfKind(conn: CapturedConnection, kind: string): EventEnvel
 export type SnapshotPayload = {
   members: RoomMember[];
   recentEvents: EventEnvelope[];
-  yourRole: string;
+  spectatorCount: number;
+  yourRole: "member" | "spectator";
   yourSlot: 0 | 1 | 2 | 3 | null;
   yourUserId: string | null;
 };

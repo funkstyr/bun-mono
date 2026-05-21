@@ -43,6 +43,10 @@ export class RoomActor {
   private readonly connections = new Map<string, Connection>();
   private readonly connectionsByUser = new Map<string, Set<string>>();
   private readonly members = new Map<string, MemberInfo>();
+  // Connection ids currently attached without a slot — covers both
+  // cookie-less anonymous Spectators (`conn.userId === null`) and
+  // authenticated would-be Members whose attach found the Room full.
+  private readonly spectators = new Set<string>();
   private admissionChain: Promise<unknown> = Promise.resolve();
   private state: ChatState;
   private recentDurableEvents: EventEnvelope[] = [];
@@ -76,12 +80,20 @@ export class RoomActor {
     // there are no stale rows: a single indexed query that returns nothing.
     await this.sweepStaleMembers();
 
+    if (conn.userId === null) {
+      this.attachAsSpectator(conn);
+      return;
+    }
+
     let existing = this.members.get(conn.userId);
 
     if (existing === undefined) {
       const allocated = await this.ensureAdmitted(conn.userId);
       if (allocated === null) {
-        conn.close(1008, "room_full");
+        // Room is full. Don't close — downgrade to Spectator so the client
+        // sees the conversation and can wait for a slot or sign out. The
+        // snapshot's `yourRole`/`yourUserId` tells them what happened.
+        this.attachAsSpectator(conn);
         return;
       }
       existing = allocated;
@@ -90,7 +102,7 @@ export class RoomActor {
     const wasOnline = this.isUserOnline(conn.userId);
 
     this.connections.set(conn.connectionId, conn);
-    this.trackConnectionForUser(conn);
+    this.trackConnectionForUser(conn, conn.userId);
 
     if (!wasOnline) {
       this.members.set(conn.userId, { ...existing, lastSeenAt: null });
@@ -106,26 +118,40 @@ export class RoomActor {
     conn.send(this.buildSnapshot(conn));
   }
 
+  private attachAsSpectator(conn: Connection): void {
+    this.connections.set(conn.connectionId, conn);
+    this.spectators.add(conn.connectionId);
+    conn.send(this.buildSnapshot(conn));
+  }
+
   async detach(conn: Connection): Promise<void> {
     this.connections.delete(conn.connectionId);
 
-    const userConns = this.connectionsByUser.get(conn.userId);
+    // Spectators have no slot, no row, and no presence — clean up the
+    // tracking set and we're done. The `spectatorCount` shift is observed
+    // only on the next snapshot (not broadcast as its own event).
+    if (this.spectators.delete(conn.connectionId)) return;
+
+    const userId = conn.userId;
+    if (userId === null) return;
+
+    const userConns = this.connectionsByUser.get(userId);
     if (userConns === undefined) return;
     userConns.delete(conn.connectionId);
     if (userConns.size > 0) return;
 
-    this.connectionsByUser.delete(conn.userId);
+    this.connectionsByUser.delete(userId);
 
-    const info = this.members.get(conn.userId);
+    const info = this.members.get(userId);
     if (info === undefined) return;
 
     const lastSeenAt = this.now();
-    this.members.set(conn.userId, { ...info, lastSeenAt });
+    this.members.set(userId, { ...info, lastSeenAt });
 
-    await setMemberLastSeen(this.db, this.room.id, conn.userId, lastSeenAt);
+    await setMemberLastSeen(this.db, this.room.id, userId, lastSeenAt);
 
     this.emitTransient<MemberOfflinePayload>("room.member_offline", {
-      userId: conn.userId,
+      userId,
       slot: info.slot,
     });
   }
@@ -161,6 +187,30 @@ export class RoomActor {
   async submit(conn: Connection, intent: ChatIntent): Promise<void> {
     await this.ensureRehydrated();
 
+    // Spectator-path admission. A Spectator submitting any intent is either
+    // an anonymous client (no `userId`) trying to act — reject — or an
+    // authenticated client that attached during a full Room — try to claim
+    // a slot now that one may have opened up.
+    if (this.spectators.has(conn.connectionId)) {
+      if (conn.userId === null) {
+        this.sendRejection(conn, intent.intentId, "spectator_cannot_act");
+        return;
+      }
+
+      const promoted = await this.tryPromoteSpectator(conn, conn.userId);
+      if (!promoted) {
+        this.sendRejection(conn, intent.intentId, "room_full");
+        return;
+      }
+    }
+
+    // Past this point the connection is a Member. The reducer needs a
+    // concrete `fromUserId` — Spectators were filtered out above.
+    if (conn.userId === null) {
+      this.sendRejection(conn, intent.intentId, "spectator_cannot_act");
+      return;
+    }
+
     const ctx: ReducerContext = {
       now: this.now,
       nextEventId: this.nextEventId,
@@ -169,16 +219,7 @@ export class RoomActor {
 
     const result = this.reducer.handle(this.state, intent, ctx);
     if (!result.ok) {
-      const rejection: EventEnvelope = {
-        kind: "room.intent_rejected",
-        payload: { intentId: intent.intentId, reason: result.reason },
-        id: this.nextEventId(),
-        ts: this.now(),
-        position: this.nextPosition,
-        from: null,
-        durable: false,
-      };
-      conn.send(rejection);
+      this.sendRejection(conn, intent.intentId, result.reason);
       return;
     }
 
@@ -245,13 +286,51 @@ export class RoomActor {
     return set !== undefined && set.size > 0;
   }
 
-  private trackConnectionForUser(conn: Connection): void {
-    let set = this.connectionsByUser.get(conn.userId);
+  private trackConnectionForUser(conn: Connection, userId: string): void {
+    let set = this.connectionsByUser.get(userId);
     if (set === undefined) {
       set = new Set();
-      this.connectionsByUser.set(conn.userId, set);
+      this.connectionsByUser.set(userId, set);
     }
     set.add(conn.connectionId);
+  }
+
+  // Promotes a Spectator connection to a Member when a slot is available.
+  // Returns true on success (slot allocated, row inserted, member_joined
+  // emitted, member_online emitted, connection moved out of the Spectator
+  // bucket). Returns false when the Room is still full.
+  private async tryPromoteSpectator(conn: Connection, userId: string): Promise<boolean> {
+    const allocated = await this.ensureAdmitted(userId);
+    if (allocated === null) return false;
+
+    this.spectators.delete(conn.connectionId);
+
+    const wasOnline = this.isUserOnline(userId);
+    this.trackConnectionForUser(conn, userId);
+
+    if (!wasOnline) {
+      this.members.set(userId, { ...allocated, lastSeenAt: null });
+      await setMemberLastSeen(this.db, this.room.id, userId, null);
+      this.emitTransient<MemberOnlinePayload>("room.member_online", {
+        userId,
+        slot: allocated.slot,
+      });
+    }
+
+    return true;
+  }
+
+  private sendRejection(conn: Connection, intentId: string, reason: string): void {
+    const rejection: EventEnvelope = {
+      kind: "room.intent_rejected",
+      payload: { intentId, reason },
+      id: this.nextEventId(),
+      ts: this.now(),
+      position: this.nextPosition,
+      from: null,
+      durable: false,
+    };
+    conn.send(rejection);
   }
 
   private buildSnapshot(conn: Connection): EventEnvelope {
@@ -266,15 +345,16 @@ export class RoomActor {
       });
     }
 
-    const own = this.members.get(conn.userId);
+    const own = conn.userId === null ? undefined : this.members.get(conn.userId);
+    const isMember = own !== undefined;
 
     return {
       kind: "room.snapshot",
       payload: {
         members,
         recentEvents: this.recentDurableEvents.slice(-SNAPSHOT_EVENT_COUNT),
-        spectatorCount: 0,
-        yourRole: "member",
+        spectatorCount: this.spectators.size,
+        yourRole: isMember ? "member" : "spectator",
         yourSlot: own?.slot ?? null,
         yourUserId: conn.userId,
       },
