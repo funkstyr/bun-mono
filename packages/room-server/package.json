@@ -20,6 +20,10 @@
       "types": "./dist/chat-reducer.d.ts",
       "import": "./dist/chat-reducer.js"
     },
+    "./member-presence": {
+      "types": "./dist/member-presence.d.ts",
+      "import": "./dist/member-presence.js"
+    },
     "./room-actor": {
       "types": "./dist/room-actor.d.ts",
       "import": "./dist/room-actor.js"

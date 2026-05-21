@@ -1,4 +1,8 @@
+import type { LibSQLDatabase } from "drizzle-orm/libsql";
+
 import type { EventEnvelope, IntentEnvelope } from "@bun-mono/room-protocol/envelope";
+
+export type AnyLibSQLDatabase = LibSQLDatabase<Record<string, unknown>>;
 
 export type RoomKind = "chat";
 

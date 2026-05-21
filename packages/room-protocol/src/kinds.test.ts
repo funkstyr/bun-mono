@@ -248,6 +248,10 @@ describe("durable registry", () => {
     ["chat.message_sent", true],
     ["room.snapshot", false],
     ["room.intent_rejected", false],
+    ["room.member_joined", true],
+    ["room.member_left", true],
+    ["room.member_online", false],
+    ["room.member_offline", false],
   ];
 
   for (const [kind, expected] of cases) {
@@ -256,9 +260,17 @@ describe("durable registry", () => {
     });
   }
 
-  it("contains exactly the three event kinds defined in this slice", () => {
+  it("contains exactly the event kinds defined across slices 01–02", () => {
     expect(Object.keys(durable).toSorted()).toEqual(
-      ["chat.message_sent", "room.intent_rejected", "room.snapshot"].toSorted(),
+      [
+        "chat.message_sent",
+        "room.intent_rejected",
+        "room.snapshot",
+        "room.member_joined",
+        "room.member_left",
+        "room.member_online",
+        "room.member_offline",
+      ].toSorted(),
     );
   });
 });
