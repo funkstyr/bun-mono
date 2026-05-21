@@ -28,9 +28,17 @@
       "types": "./dist/room-actor.d.ts",
       "import": "./dist/room-actor.js"
     },
+    "./room-actor-persistence": {
+      "types": "./dist/room-actor-persistence.d.ts",
+      "import": "./dist/room-actor-persistence.js"
+    },
     "./room-registry": {
       "types": "./dist/room-registry.d.ts",
       "import": "./dist/room-registry.js"
+    },
+    "./ttl": {
+      "types": "./dist/ttl.d.ts",
+      "import": "./dist/ttl.js"
     },
     "./ws-upgrade": {
       "types": "./dist/ws-upgrade.d.ts",

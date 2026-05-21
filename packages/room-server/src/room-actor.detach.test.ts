@@ -73,6 +73,34 @@ describe("RoomActor.detach", () => {
     expect(bNew.filter((e) => e.kind === "room.member_offline")).toHaveLength(0);
   });
 
+  it("keeps lastSeenAt null across partial disconnects, then sets it on the last detach", async () => {
+    let clock = 1000;
+    const actor = new RoomActor(room, chatReducer, {
+      db: testDb as AnyLibSQLDatabase,
+      now: () => clock,
+      nextEventId: makeIdCounter(),
+    });
+
+    const a1 = makeConnection("c-a1", "alice");
+    const a2 = makeConnection("c-a2", "alice");
+    await actor.attach(a1);
+    await actor.attach(a2);
+
+    clock = 2000;
+    await actor.detach(a1);
+
+    let rows = await testDb.select().from(roomMember).where(eq(roomMember.userId, "alice"));
+    expect(rows[0]?.lastSeenAt).toBeNull();
+
+    clock = 3000;
+    await actor.detach(a2);
+
+    rows = await testDb.select().from(roomMember).where(eq(roomMember.userId, "alice"));
+    const ts = rows[0]?.lastSeenAt;
+    expect(ts).toBeInstanceOf(Date);
+    expect((ts as Date).getTime()).toBe(3000);
+  });
+
   it("stops broadcasting subsequent events to a detached connection", async () => {
     const actor = new RoomActor(room, chatReducer, {
       db: testDb as AnyLibSQLDatabase,

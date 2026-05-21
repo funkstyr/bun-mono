@@ -12,7 +12,9 @@ type Props = { timeline: readonly RoomTimelineEntry[] };
 
 function systemText(e: MemberJoinedEvent | MemberLeftEvent): string {
   if (isMemberJoined(e)) return `${e.payload.displayName} joined`;
-  if (e.payload.reason === "ttl_expired") return `slot ${e.payload.slot} released`;
+  if (e.payload.reason === "ttl_expired") {
+    return `slot ${e.payload.slot} reopened after 24h idle`;
+  }
   return `slot ${e.payload.slot} left`;
 }
 
