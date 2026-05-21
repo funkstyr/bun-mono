@@ -13,6 +13,9 @@ export function TypingIndicator({
   members,
   myUserId,
 }: Props): React.ReactElement | null {
+  // The server broadcasts chat.typing to every Member including the sender,
+  // so we filter ourselves out here rather than asking the actor to skip
+  // self-sends — keeps the broadcast lane uniform.
   const otherIds = typingUserIds.filter((id) => id !== myUserId);
   if (otherIds.length === 0) return null;
 
@@ -21,7 +24,7 @@ export function TypingIndicator({
   return (
     <div
       aria-live="polite"
-      className="text-muted-foreground bg-background border-t px-4 py-1 text-xs italic"
+      className="text-muted-foreground bg-background px-4 py-1 text-xs italic"
     >
       {text}
     </div>

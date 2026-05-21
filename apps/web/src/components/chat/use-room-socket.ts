@@ -49,6 +49,8 @@ export function useRoomSocket(slug: string): UseRoomSocket {
 
   useEffect(() => {
     resetStore(store);
+    // The ref persists across slug changes; clear it so a quick room-switch
+    // doesn't suppress the first ping against the previous room's timestamp.
     lastPingAtRef.current = 0;
 
     const url = new URL(env.VITE_SERVER_URL);

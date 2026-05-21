@@ -210,13 +210,13 @@ export class RoomActor {
       // debounce map lives on the actor and is consulted before broadcast
       // so a swallowed ping consumes nothing — no event id pressure, no
       // position increment, no listener wakeup.
-      if (ev.kind === "chat.typing" && !this.shouldEmitTyping(ev.from)) continue;
+      if (ev.kind === "chat.typing" && !this.shouldEmitTyping(fromUserId)) continue;
 
-      // Transient events use `nextPosition` as a marker for "the state up
-      // to here" but do not claim a slot — matches the `emitTransient`
-      // shape for `room.member_online` / `room.member_offline`.
       const positioned: ChatEvent = { ...ev, position: this.nextPosition };
 
+      // Transient events from the reducer use `nextPosition` as a marker for
+      // "the state up to here" but do not claim a slot — matches the
+      // `emitTransient` shape for `room.member_online` / `room.member_offline`.
       if (positioned.durable) {
         this.nextPosition += 1;
         // eslint-disable-next-line no-await-in-loop -- monotonic position assignment requires sequential persistence
@@ -230,8 +230,7 @@ export class RoomActor {
     this.state = result.state;
   }
 
-  private shouldEmitTyping(fromUserId: string | null): boolean {
-    if (fromUserId === null) return false;
+  private shouldEmitTyping(fromUserId: string): boolean {
     const now = this.now();
     const last = this.lastTypingAt.get(fromUserId);
     if (last !== undefined && now - last < TYPING_DEBOUNCE_MS) return false;
@@ -475,7 +474,8 @@ export class RoomActor {
   private broadcast(ev: EventEnvelope): void {
     // Per-kind toggle: some transient broadcasts (e.g. `chat.typing`) are
     // not meaningful to Spectators and the protocol opts them out.
-    const allowSpectators = broadcastToSpectators[ev.kind as EventKind] ?? true;
+    const allowSpectators =
+      ev.kind in broadcastToSpectators ? broadcastToSpectators[ev.kind as EventKind] : true;
     for (const [connId, conn] of this.connections) {
       if (!allowSpectators && this.spectators.has(connId)) continue;
       conn.send(ev);

@@ -115,8 +115,7 @@ describe("chatReducer.handle — typing_ping", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.emit).toHaveLength(1);
-    const ev = result.emit[0];
-    if (ev === undefined) throw new Error("emit was empty");
+    const ev = result.emit[0]!;
     expect(ev.kind).toBe("chat.typing");
     expect(ev.durable).toBe(false);
     expect(ev.from).toBe("alice");
