@@ -15,16 +15,13 @@ export type RoomRow = {
   createdAt: number;
 };
 
-// `userId` is the authenticated user id (from better-auth); a `null` userId
-// means the client has no session and is attached as a Spectator. Whether
-// an authenticated connection holds a slot is decided by the actor
-// (presence of a `room_member` row), not by this shape — an authenticated
-// user attached to a full Room sits here with `userId: <id>` but no slot.
+// `userId: null` is a cookie-less Spectator. Slot ownership is decided by
+// the actor (presence of a `room_member` row), not by this shape.
 export type Connection = {
-  connectionId: string;
-  userId: string | null;
-  send: (event: EventEnvelope) => void;
-  close: (code: number, reason: string) => void;
+  readonly connectionId: string;
+  readonly userId: string | null;
+  readonly send: (event: EventEnvelope) => void;
+  readonly close: (code: number, reason: string) => void;
 };
 
 export type ReducerContext = {

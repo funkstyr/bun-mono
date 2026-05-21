@@ -69,6 +69,16 @@ export function snapshotPayload(ev: EventEnvelope): SnapshotPayload {
   return ev.payload as SnapshotPayload;
 }
 
+export type RejectionPayload = { intentId: string; reason: string };
+
+export function rejectionPayload(ev: EventEnvelope): RejectionPayload {
+  return ev.payload as RejectionPayload;
+}
+
+export function userIdOf(ev: EventEnvelope): string {
+  return (ev.payload as { userId: string }).userId;
+}
+
 export async function setupRoomTest(): Promise<{ testDb: TestDb; room: RoomRow }> {
   const testDb = await createTestDb();
   await seedUser(testDb, "alice", "Alice");

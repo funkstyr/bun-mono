@@ -4,17 +4,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import SignInForm from "@/components/sign-in-form";
 import SignUpForm from "@/components/sign-up-form";
 
-type LoginSearch = { redirect?: string };
+import { validateLoginSearch } from "./-login-search";
 
 export const Route = createFileRoute("/login")({
   component: RouteComponent,
-  // `redirect` lets callers (e.g. the "Sign in to send" CTA on a Spectator
-  // chat Room) come back to the page they started from instead of the
-  // default /dashboard landing.
-  validateSearch: (search: Record<string, unknown>): LoginSearch => {
-    const r = search["redirect"];
-    return typeof r === "string" && r.startsWith("/") ? { redirect: r } : {};
-  },
+  validateSearch: validateLoginSearch,
 });
 
 function RouteComponent() {

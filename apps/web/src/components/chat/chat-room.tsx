@@ -6,6 +6,7 @@ import { Card, CardContent } from "@bun-mono/core-ui/card";
 import { MemberList } from "./member-list";
 import { MessageInput } from "./message-input";
 import { MessageList } from "./message-list";
+import type { MemberView } from "./room-events";
 import { useRoomSocket } from "./use-room-socket";
 
 type Props = { slug: string };
@@ -13,9 +14,7 @@ type Props = { slug: string };
 export function ChatRoom({ slug }: Props): React.ReactElement {
   const { status, myUserId, myRole, spectatorCount, members, timeline, send } = useRoomSocket(slug);
 
-  // Two distinct Spectator UX paths share `myRole === "spectator"`:
-  // - anonymous (no session): show "Sign in to send" CTA
-  // - authenticated but Room was full at attach: show full-room banner
+  // Spectator UX splits on whether the user has a session: anonymous → sign-in CTA, authenticated full-room → banner.
   const isSpectator = myRole === "spectator";
   const isAnonymous = myUserId === null;
   const showFullRoomBanner = isSpectator && !isAnonymous;
@@ -46,11 +45,7 @@ export function ChatRoom({ slug }: Props): React.ReactElement {
   );
 }
 
-function FullRoomBanner({
-  members,
-}: {
-  members: readonly { displayName: string }[];
-}): React.ReactElement {
+function FullRoomBanner({ members }: { members: readonly MemberView[] }): React.ReactElement {
   const names = members.map((m) => m.displayName).join(", ");
   return (
     <Card className="mx-4 my-2">

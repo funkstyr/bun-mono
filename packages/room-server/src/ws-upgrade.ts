@@ -13,17 +13,15 @@ const generateConnectionId = customAlphabet(connectionIdAlphabet, 16);
 const eventIdAlphabet = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ0123456789";
 const generateRejectionId = customAlphabet(eventIdAlphabet, 21);
 
+// `userId` is the authenticated id at upgrade time, or `null` for a
+// cookie-less anonymous Spectator. Promotion to a Member requires a fresh
+// WS connection (i.e. the client must reconnect after sign-in) — the
+// upgrade request's headers are not re-evaluated mid-connection.
 export type RoomUpgradeContext = {
-  // The authenticated user id at upgrade time, or `null` for a cookie-less
-  // (anonymous) connection that attaches as a Spectator.
   userId: string | null;
   slug: string;
   roomId: string;
   connectionId: string;
-  // Headers snapshot from the upgrade Request, retained so we can re-call
-  // the auth layer on a Spectator's first intent to detect a mid-session
-  // sign-in (the promotion-on-intent path).
-  headers: Headers;
 };
 
 export type AuthoriseSuccess = { ok: true; ctx: RoomUpgradeContext };
@@ -47,7 +45,6 @@ export async function authoriseRoomUpgrade(
       slug,
       roomId: found.row.id,
       connectionId: generateConnectionId(),
-      headers: req.headers,
     },
   };
 }
@@ -118,25 +115,12 @@ export async function onRoomMessage(
     return;
   }
 
-  // Invariant: `onRoomOpen` runs before any `onRoomMessage`, so this entry
-  // is always populated by the time a message arrives. If it isn't, the
-  // socket is in an unexpected state — close it rather than building a
-  // fresh disconnected Connection that the actor wouldn't know to broadcast
-  // back to.
+  // `onRoomOpen` runs before any `onRoomMessage`, so this entry is always
+  // populated by the time a message arrives — close on the impossible.
   const entry = connByConnectionId.get(ctx.connectionId);
   if (!entry) {
     close(1011, "no_open_handshake");
     return;
-  }
-
-  // Promotion-on-intent: an anonymous Spectator that signed in mid-session
-  // gets re-evaluated here. We re-call the auth layer against the upgrade
-  // headers; if a session now exists, we set the Connection's `userId` so
-  // the actor's submit path can attempt to allocate a slot. No separate
-  // "promote me" intent — the check is implicit on every Spectator intent.
-  if (entry.conn.userId === null) {
-    const session = await auth.api.getSession({ headers: ctx.headers });
-    if (session?.user) entry.conn.userId = session.user.id;
   }
 
   await found.actor.submit(entry.conn, parsed.value as ChatIntent);

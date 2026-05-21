@@ -7,8 +7,10 @@ import {
   makeConnection,
   makeIdCounter,
   makeIntent,
+  rejectionPayload,
   setupRoomTest,
   snapshotPayload,
+  userIdOf,
 } from "./_room-actor-test-utils";
 import { seedUser, type TestDb } from "./_test-utils";
 import { chatReducer } from "./chat-reducer";
@@ -101,7 +103,7 @@ describe("RoomActor — spectator submit", () => {
 
     const newEvents = anon.events.slice(before);
     expect(newEvents.map((e) => e.kind)).toEqual(["room.intent_rejected"]);
-    const payload = newEvents[0]!.payload as { intentId: string; reason: string };
+    const payload = rejectionPayload(newEvents[0]!);
     expect(payload.reason).toBe("spectator_cannot_act");
     expect(payload.intentId).toBe("i-1");
 
@@ -132,16 +134,14 @@ describe("RoomActor — spectator submit", () => {
 
     const newEvents = eve.events.slice(before);
     expect(newEvents.map((e) => e.kind)).toEqual(["room.intent_rejected"]);
-    expect((newEvents[0]!.payload as { reason: string }).reason).toBe("room_full");
+    expect(rejectionPayload(newEvents[0]!).reason).toBe("room_full");
   });
 
   it("promotes a downgraded spectator when a slot frees up: emits member_joined + member_online and processes the intent", async () => {
     await seedUser(testDb, "dave", "Dave");
     await seedUser(testDb, "eve", "Eve");
 
-    // The actor reads `now()` for every decision. Drive a controllable
-    // clock so we can detach Alice "yesterday", advance past the TTL, and
-    // run the sweep to free her slot.
+    // Controllable clock so we can detach Alice, advance past the TTL, and let the sweep free her slot.
     let clock = 1000;
     const actor = new RoomActor(room, chatReducer, {
       db: testDb as AnyLibSQLDatabase,
@@ -159,14 +159,11 @@ describe("RoomActor — spectator submit", () => {
     await actor.attach(eve);
     expect(snapshotPayload(eve.events[0]!).yourRole).toBe("spectator");
 
-    // Alice goes idle — last connection detaches at t=2000. Slot 0 is
-    // held until TTL expiry.
+    // Alice's last connection detaches; slot 0 is held until TTL expiry.
     clock = 2000;
     await actor.detach(alice);
 
-    // Advance past the 24h TTL and run the sweep. Alice's row is now
-    // stale and gets deleted; slot 0 becomes free in the actor's member
-    // map.
+    // Advance past the 24h TTL and sweep — slot 0 is now free.
     clock = 2000 + 25 * 60 * 60 * 1000;
     await actor.sweepStaleMembers();
 
@@ -176,10 +173,10 @@ describe("RoomActor — spectator submit", () => {
     const eveNew = eve.events.slice(eveBefore);
 
     const memberJoined = eveNew.find(
-      (e) => e.kind === "room.member_joined" && (e.payload as { userId: string }).userId === "eve",
+      (e) => e.kind === "room.member_joined" && userIdOf(e) === "eve",
     );
     const memberOnline = eveNew.find(
-      (e) => e.kind === "room.member_online" && (e.payload as { userId: string }).userId === "eve",
+      (e) => e.kind === "room.member_online" && userIdOf(e) === "eve",
     );
     const chat = eveNew.find((e) => e.kind === "chat.message_sent");
 
@@ -214,8 +211,7 @@ describe("RoomActor — spectator detach", () => {
     expect(aliceNew.filter((e) => e.kind === "room.member_left")).toHaveLength(0);
     expect(aliceNew.filter((e) => e.kind === "room.member_offline")).toHaveLength(0);
 
-    // A fresh spectator should see spectatorCount = 0 after the previous
-    // one detached.
+    // A fresh spectator should see spectatorCount = 1 (just itself) after the previous one detached.
     const anon2 = makeConnection("c-anon-2", null);
     await actor.attach(anon2);
     expect(snapshotPayload(anon2.events[0]!).spectatorCount).toBe(1);

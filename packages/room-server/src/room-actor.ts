@@ -43,9 +43,7 @@ export class RoomActor {
   private readonly connections = new Map<string, Connection>();
   private readonly connectionsByUser = new Map<string, Set<string>>();
   private readonly members = new Map<string, MemberInfo>();
-  // Connection ids currently attached without a slot — covers both
-  // cookie-less anonymous Spectators (`conn.userId === null`) and
-  // authenticated would-be Members whose attach found the Room full.
+  // Connection ids attached without a slot — anonymous Spectators and authenticated joiners who found the Room full.
   private readonly spectators = new Set<string>();
   private admissionChain: Promise<unknown> = Promise.resolve();
   private state: ChatState;
@@ -90,9 +88,7 @@ export class RoomActor {
     if (existing === undefined) {
       const allocated = await this.ensureAdmitted(conn.userId);
       if (allocated === null) {
-        // Room is full. Don't close — downgrade to Spectator so the client
-        // sees the conversation and can wait for a slot or sign out. The
-        // snapshot's `yourRole`/`yourUserId` tells them what happened.
+        // Full Room: downgrade to Spectator rather than close so the client can read along and wait for a slot.
         this.attachAsSpectator(conn);
         return;
       }
@@ -127,9 +123,7 @@ export class RoomActor {
   async detach(conn: Connection): Promise<void> {
     this.connections.delete(conn.connectionId);
 
-    // Spectators have no slot, no row, and no presence — clean up the
-    // tracking set and we're done. The `spectatorCount` shift is observed
-    // only on the next snapshot (not broadcast as its own event).
+    // Spectators have no slot, row, or presence — the count shift is observed on the next snapshot, not broadcast.
     if (this.spectators.delete(conn.connectionId)) return;
 
     const userId = conn.userId;
@@ -187,34 +181,13 @@ export class RoomActor {
   async submit(conn: Connection, intent: ChatIntent): Promise<void> {
     await this.ensureRehydrated();
 
-    // Spectator-path admission. A Spectator submitting any intent is either
-    // an anonymous client (no `userId`) trying to act — reject — or an
-    // authenticated client that attached during a full Room — try to claim
-    // a slot now that one may have opened up.
-    if (this.spectators.has(conn.connectionId)) {
-      if (conn.userId === null) {
-        this.sendRejection(conn, intent.intentId, "spectator_cannot_act");
-        return;
-      }
-
-      const promoted = await this.tryPromoteSpectator(conn, conn.userId);
-      if (!promoted) {
-        this.sendRejection(conn, intent.intentId, "room_full");
-        return;
-      }
-    }
-
-    // Past this point the connection is a Member. The reducer needs a
-    // concrete `fromUserId` — Spectators were filtered out above.
-    if (conn.userId === null) {
-      this.sendRejection(conn, intent.intentId, "spectator_cannot_act");
-      return;
-    }
+    const fromUserId = await this.resolveSubmittingMember(conn, intent);
+    if (fromUserId === null) return;
 
     const ctx: ReducerContext = {
       now: this.now,
       nextEventId: this.nextEventId,
-      fromUserId: conn.userId,
+      fromUserId,
     };
 
     const result = this.reducer.handle(this.state, intent, ctx);
@@ -295,10 +268,35 @@ export class RoomActor {
     set.add(conn.connectionId);
   }
 
-  // Promotes a Spectator connection to a Member when a slot is available.
-  // Returns true on success (slot allocated, row inserted, member_joined
-  // emitted, member_online emitted, connection moved out of the Spectator
-  // bucket). Returns false when the Room is still full.
+  // Returns the userId to forward into the reducer, or `null` after sending a rejection. Anonymous Spectator → reject `spectator_cannot_act`; authenticated Spectator → try to promote; Member → pass-through.
+  private async resolveSubmittingMember(
+    conn: Connection,
+    intent: ChatIntent,
+  ): Promise<string | null> {
+    if (this.spectators.has(conn.connectionId)) {
+      if (conn.userId === null) {
+        this.sendRejection(conn, intent.intentId, "spectator_cannot_act");
+        return null;
+      }
+
+      const promoted = await this.tryPromoteSpectator(conn, conn.userId);
+      if (!promoted) {
+        this.sendRejection(conn, intent.intentId, "room_full");
+        return null;
+      }
+
+      return conn.userId;
+    }
+
+    // Non-Spectator connection: attach() only tracks Members with a concrete userId. The null check is defensive; if it ever fires, the actor is in an inconsistent state.
+    if (conn.userId === null) {
+      this.sendRejection(conn, intent.intentId, "spectator_cannot_act");
+      return null;
+    }
+    return conn.userId;
+  }
+
+  // Promotes a Spectator connection to a Member when a slot is available. Returns true on success, false when the Room is still full.
   private async tryPromoteSpectator(conn: Connection, userId: string): Promise<boolean> {
     const allocated = await this.ensureAdmitted(userId);
     if (allocated === null) return false;
