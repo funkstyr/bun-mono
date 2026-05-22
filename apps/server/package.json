@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@ai-sdk/devtools": "^0.0.18",
-    "@ai-sdk/google": "^3.0.75",
+    "@ai-sdk/google": "^3.0.79",
     "@bun-mono/api": "workspace:*",
     "@bun-mono/auth": "workspace:*",
     "@bun-mono/db": "workspace:*",
@@ -46,7 +46,7 @@
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
     "react": "catalog:",
-    "react-email": "^6.1.5",
+    "react-email": "^6.3.1",
     "zod": "catalog:"
   },
   "devDependencies": {
