@@ -28,7 +28,9 @@
       "Bash(git checkout *)",
       "Skill(pr-review)",
       "Bash(gh pr *)",
-      "Bash(bun fix *)"
+      "Bash(bun fix *)",
+      "Bash(bunx playwright *)",
+      "Bash(bun e2e *)"
     ],
     "deny": [
       "Read(**/.turbo/**)",
